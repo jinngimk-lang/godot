@@ -46,7 +46,12 @@ func run() -> Array[String]:
 		failures.append("RED: HandVisual does not expose authored-hand runtime contract")
 		return failures
 
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		failures.append("Authored HandVisual test requires an active SceneTree")
+		return failures
 	var hand = hand_script.new()
+	tree.root.add_child(hand)
 	hand.setup(true)
 	if not hand.is_using_authored_asset():
 		failures.append("HandVisual should prefer repository-local authored GLB")
