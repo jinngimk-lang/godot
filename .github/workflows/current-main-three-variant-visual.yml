@@ -1,0 +1,74 @@
+name: Current Main Three Variant Visual Audit
+
+on:
+  push:
+    branches:
+      - verify/current-main-three-variant-visual-v4
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Import current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit
+
+      - name: Render warm silky crisp frames
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 60s \
+            ./godot --path . --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility \
+            --script res://tests/capture_three_variants.gd 2>&1 | tee three-variant-visual.log
+          test -s artifacts/01_warm_paper.png
+          test -s artifacts/02_silky_long.png
+          test -s artifacts/03_crisp_seal.png
+          if grep -E "SCRIPT ERROR:|ERROR: Failed to load|ERROR: Cannot open|ERROR: Parameter.*null" three-variant-visual.log; then
+            echo "Three-variant visual capture emitted a runtime/load error."
+            exit 1
+          fi
+          grep -Fq 'VARIANT_CAPTURE_OK id=warm_paper' three-variant-visual.log
+          grep -Fq 'VARIANT_CAPTURE_OK id=silky_long' three-variant-visual.log
+          grep -Fq 'VARIANT_CAPTURE_OK id=crisp_seal' three-variant-visual.log
+
+      - name: Upload visual audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-main-three-variant-visual
+          path: |
+            artifacts/*.png
+            three-variant-visual.log
+          if-no-files-found: error
+          retention-days: 7
