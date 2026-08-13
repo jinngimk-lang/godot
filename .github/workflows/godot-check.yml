@@ -91,6 +91,13 @@ jobs:
           test -f tests/smoke_forearm_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
 
+      - name: Forearm cup-clearance challenge
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_forearm_cup_clearance.gd
+          ./godot --headless --path . --script res://tests/smoke_forearm_cup_clearance.gd
+
       - name: Repeated-session reset smoke
         shell: bash
         run: |
