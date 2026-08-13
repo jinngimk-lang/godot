@@ -24,6 +24,8 @@ var _skeleton: Skeleton3D
 
 var _skin: StandardMaterial3D
 var _nail: StandardMaterial3D
+var _sleeve_fabric: StandardMaterial3D
+var _sleeve_rib: StandardMaterial3D
 var _finger_segments: Dictionary = {}
 var _finger_tips: Dictionary = {}
 var _nails: Dictionary = {}
@@ -140,9 +142,62 @@ func _try_build_authored_hand() -> bool:
 	_authored_root.position = Vector3.ZERO
 	_authored_root.rotation = Vector3.ZERO
 	_authored_root.scale = Vector3.ONE * AUTHORED_PRESENTATION_SCALE
+	_build_authored_wrist_cover()
 	_apply_authored_pose(required_pose)
 	_refresh_authored_anchors()
 	return true
+
+func _build_authored_wrist_cover() -> void:
+	if _authored_root == null:
+		return
+
+	# Real-render diagnostics show both imported hand meshes ending at local
+	# +Z ~= 0.026, with Wrist_L/Wrist_R rooted at +Z ~= 0.027. The cloth starts
+	# just inside that plane and extends beyond the camera edge. Keeping the
+	# forearm narrow and dark makes the hand/label interaction remain primary.
+	_sleeve_fabric = StandardMaterial3D.new()
+	_sleeve_fabric.resource_name = "SleeveFabric"
+	_sleeve_fabric.albedo_color = Color(0.18, 0.13, 0.11, 1.0)
+	_sleeve_fabric.roughness = 0.98
+
+	_sleeve_rib = StandardMaterial3D.new()
+	_sleeve_rib.resource_name = "SleeveRib"
+	_sleeve_rib.albedo_color = Color(0.32, 0.25, 0.21, 1.0)
+	_sleeve_rib.roughness = 0.97
+
+	var sleeve_length := 0.64 if _dynamic else 0.70
+	var far_radius := 0.052 if _dynamic else 0.056
+	var sleeve := MeshInstance3D.new()
+	sleeve.name = "WristSleeve"
+	var sleeve_mesh := CylinderMesh.new()
+	# After the +90° X rotation the mesh's -Y end is the wrist and +Y points
+	# outward along authored local +Z.
+	sleeve_mesh.bottom_radius = 0.034
+	sleeve_mesh.top_radius = far_radius
+	sleeve_mesh.height = sleeve_length
+	sleeve.mesh = sleeve_mesh
+	sleeve.material_override = _sleeve_fabric
+	sleeve.position = Vector3(0.0, 0.0, 0.020 + sleeve_length * 0.5)
+	sleeve.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	# A slim oval cross-section reads more like a cloth-covered forearm and
+	# removes the previous oversized tube silhouette.
+	sleeve.scale = Vector3(0.82, 1.0, 0.68)
+	_authored_root.add_child(sleeve)
+
+	# A very short rib band hides the exact skin/cloth join without creating a
+	# second visible tube.
+	var cuff := MeshInstance3D.new()
+	cuff.name = "WristCuff"
+	var cuff_mesh := CylinderMesh.new()
+	cuff_mesh.top_radius = 0.037
+	cuff_mesh.bottom_radius = 0.037
+	cuff_mesh.height = 0.012
+	cuff.mesh = cuff_mesh
+	cuff.material_override = _sleeve_rib
+	cuff.position = Vector3(0.0, 0.0, 0.028)
+	cuff.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	cuff.scale = Vector3(0.86, 1.0, 0.72)
+	_authored_root.add_child(cuff)
 
 func _apply_pose() -> void:
 	if not _built and not _using_authored_asset:

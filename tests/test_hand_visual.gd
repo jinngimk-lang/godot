@@ -25,6 +25,24 @@ func run() -> Array[String]:
 		if hand.find_child(required_node, true, false) == null:
 			failures.append("HandVisual missing pinch anchor %s" % required_node)
 
+	# Real-render diagnostics proved the authored GLBs end directly at their
+	# root Wrist_L/Wrist_R plane. Normal close-up presentation must therefore
+	# cover that open wrist end instead of exposing a cropped skin cylinder.
+	var sleeve := hand.find_child("WristSleeve", true, false) as MeshInstance3D
+	var cuff := hand.find_child("WristCuff", true, false) as MeshInstance3D
+	if sleeve == null:
+		failures.append("RED: authored hand must cover the open wrist with WristSleeve")
+	elif sleeve.mesh == null or sleeve.material_override == null:
+		failures.append("WristSleeve must have visible mesh and fabric material")
+	elif sleeve.material_override.resource_name != "SleeveFabric":
+		failures.append("WristSleeve must use semantic SleeveFabric material")
+	if cuff == null:
+		failures.append("RED: authored hand must finish the wrist cover with WristCuff")
+	elif cuff.mesh == null or cuff.material_override == null:
+		failures.append("WristCuff must have visible mesh and cuff material")
+	elif cuff.material_override.resource_name != "SleeveRib":
+		failures.append("WristCuff must use semantic SleeveRib material")
+
 	hand.set_pinch_amount(1.0)
 	hand.set_grip_target(Vector3(1.0, 0.5, 0.8))
 	hand.tick(0.016)

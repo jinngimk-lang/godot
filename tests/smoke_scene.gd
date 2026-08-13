@@ -36,6 +36,9 @@ func _run() -> void:
 		if authored_root == null:
 			failures.append("%s missing authored hand scene instance" % hand_name)
 		else:
+			# Keep the original authored-hand size/material gate focused on the GLB
+			# itself. Presentation accessories such as sleeves have their own bounded
+			# contract below and must not inflate this hand-mesh metric.
 			var presentation := _hand_presentation(authored_root)
 			var vertices := int(presentation["vertices"])
 			var max_extent := float(presentation["max_extent"])
@@ -48,6 +51,27 @@ func _run() -> void:
 				failures.append("%s authored hand presentation is implausibly oversized: extent=%.3f" % [hand_name, max_extent])
 			if not materials.has("HandSkin") or not materials.has("HandNail"):
 				failures.append("%s authored hand missing HandSkin/HandNail materials: %s" % [hand_name, str(materials)])
+
+			var sleeve := authored_root.find_child("WristSleeve", true, false) as MeshInstance3D
+			var cuff := authored_root.find_child("WristCuff", true, false) as MeshInstance3D
+			if sleeve == null or not (sleeve.mesh is CylinderMesh):
+				failures.append("%s authored hand must include bounded WristSleeve geometry" % hand_name)
+			else:
+				var sleeve_mesh := sleeve.mesh as CylinderMesh
+				if sleeve_mesh.height < 0.35 or sleeve_mesh.height > 0.80:
+					failures.append("%s WristSleeve length outside presentation bounds: %.3f" % [hand_name, sleeve_mesh.height])
+				if sleeve_mesh.bottom_radius > 0.045 or sleeve_mesh.top_radius > 0.065:
+					failures.append("%s WristSleeve is too bulky at wrist/forearm: %.3f/%.3f" % [hand_name, sleeve_mesh.bottom_radius, sleeve_mesh.top_radius])
+				if sleeve.material_override == null or sleeve.material_override.resource_name != "SleeveFabric":
+					failures.append("%s WristSleeve must use SleeveFabric" % hand_name)
+			if cuff == null or not (cuff.mesh is CylinderMesh):
+				failures.append("%s authored hand must include bounded WristCuff geometry" % hand_name)
+			else:
+				var cuff_mesh := cuff.mesh as CylinderMesh
+				if cuff_mesh.height > 0.025 or cuff_mesh.top_radius > 0.045:
+					failures.append("%s WristCuff must remain a thin wrist band" % hand_name)
+				if cuff.material_override == null or cuff.material_override.resource_name != "SleeveRib":
+					failures.append("%s WristCuff must use SleeveRib" % hand_name)
 		for anchor in ["ThumbTip", "IndexTip", "PinchPoint"]:
 			if hand.find_child(anchor, true, false) == null:
 				failures.append("%s missing pinch anchor: %s" % [hand_name, anchor])
@@ -127,6 +151,10 @@ func _hand_presentation(node: Node) -> Dictionary:
 	var vertices := 0
 	var max_extent := 0.0
 	var materials: Array[String] = []
+	# Wrist presentation accessories are validated separately. This helper is
+	# deliberately limited to the authored GLB hand mesh/material contract.
+	if node.name in ["WristSleeve", "WristCuff"]:
+		return {"vertices": 0, "max_extent": 0.0, "materials": materials}
 	if node is MeshInstance3D:
 		var mesh_instance := node as MeshInstance3D
 		var mesh := mesh_instance.mesh
