@@ -140,14 +140,16 @@ func _build_cup_structure() -> void:
 	_cup_base_fold = MeshInstance3D.new()
 	_cup_base_fold.name = "CupBaseFold"
 	var fold_mesh := CylinderMesh.new()
-	var fold_y := -height * 0.5 + 0.055
+	var fold_y := -height * 0.5 + 0.045
 	var fold_t := clampf((fold_y + height * 0.5) / height, 0.0, 1.0)
 	var fold_radius := lerpf(cup_mesh.bottom_radius, cup_mesh.top_radius, fold_t)
-	fold_mesh.bottom_radius = fold_radius + 0.008
-	fold_mesh.top_radius = fold_radius + 0.011
-	fold_mesh.height = 0.032
+	# Keep the compressed paper base nearly flush with the cup. A larger lip
+	# catches the key light like a plastic/metal trim ring in the close-up.
+	fold_mesh.bottom_radius = fold_radius + 0.003
+	fold_mesh.top_radius = fold_radius + 0.004
+	fold_mesh.height = 0.024
 	_cup_base_fold.mesh = fold_mesh
-	_cup_base_material = _semantic_material("CupBaseFold", 0.98)
+	_cup_base_material = _semantic_material("CupBaseFold", 1.0)
 	_cup_base_fold.material_override = _cup_base_material
 	_cup_base_local = Transform3D(Basis.IDENTITY, Vector3(0.0, fold_y, 0.0))
 	add_child(_cup_base_fold)
@@ -217,7 +219,7 @@ func _sync_cup_detail_palette() -> void:
 	if _cup_seam_material != null:
 		_cup_seam_material.albedo_color = _scaled_color(cup_color, 0.78)
 	if _cup_base_material != null:
-		_cup_base_material.albedo_color = _scaled_color(cup_color, 0.88)
+		_cup_base_material.albedo_color = _scaled_color(cup_color, 0.74)
 	if _cup_lip_material != null:
 		_cup_lip_material.albedo_color = _scaled_color(cup_color, 0.55)
 
