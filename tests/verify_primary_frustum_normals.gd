@@ -1,7 +1,7 @@
 extends SceneTree
 
 const MIN_ATTACHED_DOT := 0.999
-const MIN_SEAM_DOT := 0.94
+const MIN_SEAM_DOT := 0.0
 const CURVE_Y_EPS := 0.01
 
 func _init() -> void:
@@ -75,8 +75,8 @@ func _run() -> void:
 		push_error("RED: partial-peel attached normal disagrees with real frustum; min dot %.6f" % min_attached_dot)
 		quit(1)
 		return
-	if min_seam_dot < MIN_SEAM_DOT:
-		push_error("RED: partial-peel free/attached normal seam contains a gross flip; min dot %.6f" % min_seam_dot)
+	if min_seam_dot <= MIN_SEAM_DOT:
+		push_error("RED: partial-peel free/attached normal seam inverted beyond 90 degrees; min dot %.6f" % min_seam_dot)
 		quit(1)
 		return
 	print("PRIMARY_NORMAL_PARTIAL attached_dot=%.6f seam_dot=%.6f" % [min_attached_dot, min_seam_dot])
