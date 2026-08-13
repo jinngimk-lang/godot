@@ -65,3 +65,10 @@ jobs:
           set -euo pipefail
           test -f tests/smoke_scene.gd
           ./godot --headless --path . --script res://tests/smoke_scene.gd
+
+      - name: Repeated-session reset smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_reset_loop.gd
+          ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
