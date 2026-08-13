@@ -34,6 +34,7 @@ func update(progress: float, completed_now: bool, delta: float) -> void:
 		Phase.DETACHING:
 			_detach_elapsed += safe_delta
 			if _detach_elapsed >= _detach_duration:
+				_detach_elapsed = _detach_duration
 				_phase = Phase.HELD
 				_detach_event_pending = true
 		Phase.HELD:
@@ -43,6 +44,13 @@ func update(progress: float, completed_now: bool, delta: float) -> void:
 
 func get_phase_name() -> String:
 	return Phase.keys()[_phase]
+
+func get_detach_alpha() -> float:
+	if _phase == Phase.HELD:
+		return 1.0
+	if _phase != Phase.DETACHING:
+		return 0.0
+	return clampf(_detach_elapsed / _detach_duration, 0.0, 1.0)
 
 func is_detached() -> bool:
 	return _phase == Phase.HELD
