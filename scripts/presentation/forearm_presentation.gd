@@ -43,10 +43,10 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var bend_authored := Vector3(0.035 * side, 0.0, 0.245 if dynamic_hand else 0.265)
 	var end_authored := Vector3(0.205 * side, 0.0, 0.700 if dynamic_hand else 0.735)
 
-	var start := _descendant_point_to_ancestor(authored, hand, start_authored)
-	var bend := _descendant_point_to_ancestor(authored, hand, bend_authored)
-	var end := _descendant_point_to_ancestor(authored, hand, end_authored)
-	if start == null or bend == null or end == null:
+	var start: Vector3 = _descendant_point_to_ancestor(authored, hand, start_authored)
+	var bend: Vector3 = _descendant_point_to_ancestor(authored, hand, bend_authored)
+	var end: Vector3 = _descendant_point_to_ancestor(authored, hand, end_authored)
+	if not _finite_vector(start) or not _finite_vector(bend) or not _finite_vector(end):
 		legacy_sleeve.visible = true
 		return
 
@@ -94,15 +94,18 @@ func _place_tapered_segment(instance: MeshInstance3D, a: Vector3, b: Vector3, ra
 		(a + b) * 0.5
 	)
 
-func _descendant_point_to_ancestor(descendant: Node3D, ancestor: Node3D, point: Vector3):
+func _descendant_point_to_ancestor(descendant: Node3D, ancestor: Node3D, point: Vector3) -> Vector3:
 	var current := descendant
 	var converted := point
 	while current != ancestor:
 		if current.is_set_as_top_level():
-			return null
+			return Vector3(INF, INF, INF)
 		converted = current.transform * converted
 		var parent := current.get_parent()
 		if not (parent is Node3D):
-			return null
+			return Vector3(INF, INF, INF)
 		current = parent as Node3D
 	return converted
+
+func _finite_vector(value: Vector3) -> bool:
+	return is_finite(value.x) and is_finite(value.y) and is_finite(value.z)
