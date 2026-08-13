@@ -175,8 +175,8 @@ func _build_world() -> void:
 	_left_hand.name = "LeftHand"
 	add_child(_left_hand)
 	_left_hand.setup(false)
-	_left_hand.snap_to(Vector3(-0.60, 0.30, 0.34))
-	_left_hand.rotation_degrees = Vector3(18, -28, -48)
+	_left_hand.snap_to(Vector3(0.58, 0.24, 0.38))
+	_left_hand.rotation_degrees = Vector3(14, 42, 45)
 	_left_hand.set_pinch_amount(0.38)
 
 	_right_hand = HandVisual.new()
@@ -184,7 +184,7 @@ func _build_world() -> void:
 	add_child(_right_hand)
 	_right_hand.setup(true)
 	_right_hand.snap_to(Vector3(-0.72, 0.28, 0.88))
-	_right_hand.rotation_degrees = Vector3(-8, 8, 15)
+	_right_hand.rotation_degrees = Vector3(18, -22, -8)
 
 	_pointer = PointerAdapter.new()
 	_pointer.name = "PointerAdapter"

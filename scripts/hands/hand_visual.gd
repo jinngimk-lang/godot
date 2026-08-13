@@ -4,6 +4,7 @@ class_name HandVisual
 const RIGHT_ASSET_PATH := "res://assets/models/hands/hand_right.glb"
 const LEFT_ASSET_PATH := "res://assets/models/hands/hand_left.glb"
 const FINGER_NAMES := ["Thumb", "Index", "Middle", "Ring", "Little"]
+const AUTHORED_PRESENTATION_SCALE := 2.25
 
 var follow_rate := 11.0
 var pinch_follow_rate := 16.0
@@ -135,10 +136,10 @@ func _try_build_authored_hand() -> bool:
 		_skeleton = null
 		return false
 
-	# GLBs are self-contained presentation assets; gameplay keeps ownership of movement.
+	# GLBs are authored in XR-scale units; presentation scale makes them read beside the game cup.
 	_authored_root.position = Vector3.ZERO
 	_authored_root.rotation = Vector3.ZERO
-	_authored_root.scale = Vector3.ONE
+	_authored_root.scale = Vector3.ONE * AUTHORED_PRESENTATION_SCALE
 	_apply_authored_pose(required_pose)
 	_refresh_authored_anchors()
 	return true
