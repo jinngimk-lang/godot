@@ -40,6 +40,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f assets/models/hands/hand_left.glb assets/models/hands/hand_right.glb
+
           cat > /tmp/build_hand.py <<'PY'
           import bpy
           import os
@@ -62,6 +64,8 @@ jobs:
                   raise RuntimeError(f"required {label} render mesh missing or empty")
               obj.hide_viewport = False
               obj.hide_render = False
+              obj.hide_select = False
+              obj.hide_set(False)
           print("CANDIDATE_SOURCE_MESHES", [(hand.name, len(hand.data.vertices)), (nails.name, len(nails.data.vertices))])
 
           def make_material(name, base_color, roughness):
@@ -77,7 +81,6 @@ jobs:
               bsdf.inputs["Metallic"].default_value = 0.0
               return mat
 
-          # Clean, warm semi-realistic palette: visible form and nails without pore-level realism.
           skin = make_material("HandSkin", (0.72, 0.46, 0.35, 1.0), 0.62)
           nail = make_material("HandNail", (0.90, 0.67, 0.61, 1.0), 0.46)
           hand.data.materials.clear()
@@ -85,12 +88,13 @@ jobs:
           nails.data.materials.clear()
           nails.data.materials.append(nail)
 
-          # Join geometry so one skinned mesh carries both material surfaces. This avoids
-          # Blender's selected-object glTF exporter dropping the separate nail object.
           bpy.ops.object.select_all(action="DESELECT")
           hand.select_set(True)
           nails.select_set(True)
           bpy.context.view_layer.objects.active = hand
+          selected = [obj.name for obj in bpy.context.selected_objects]
+          if hand.name not in selected or nails.name not in selected:
+              raise RuntimeError(f"hand+nails were not both selected for join: {selected}")
           bpy.ops.object.join()
           joined = bpy.context.view_layer.objects.active
           joined.name = f"PeelCalmHand_{suffix}"
@@ -114,6 +118,8 @@ jobs:
           armature.animation_data.action = bpy.data.actions.get("Default pose")
 
           bpy.ops.object.select_all(action="DESELECT")
+          armature.hide_set(False)
+          armature.hide_select = False
           armature.select_set(True)
           joined.select_set(True)
           bpy.context.view_layer.objects.active = armature
@@ -130,7 +136,6 @@ jobs:
           }
           if "export_animation_mode" in properties:
               enum_items = [item.identifier for item in rna.properties["export_animation_mode"].enum_items]
-              print("GLTF_ANIMATION_MODES", enum_items)
               if "ACTIONS" in enum_items:
                   kwargs["export_animation_mode"] = "ACTIONS"
               elif "ACTIVE_ACTIONS" in enum_items:
@@ -151,10 +156,16 @@ jobs:
 
           blender -b --python /tmp/build_hand.py -- \
             /tmp/hand-src/hand_l.blend /tmp/hand-src/animations_hand_l.blend \
-            "$GITHUB_WORKSPACE/assets/models/hands/hand_left.glb" L
+            "$GITHUB_WORKSPACE/assets/models/hands/hand_left.glb" L 2>&1 | tee /tmp/build-left.log
+          grep -q '^CANDIDATE_GLB ' /tmp/build-left.log
+          test -s assets/models/hands/hand_left.glb
+
           blender -b --python /tmp/build_hand.py -- \
             /tmp/hand-src/hand_r.blend /tmp/hand-src/animations_hand_r.blend \
-            "$GITHUB_WORKSPACE/assets/models/hands/hand_right.glb" R
+            "$GITHUB_WORKSPACE/assets/models/hands/hand_right.glb" R 2>&1 | tee /tmp/build-right.log
+          grep -q '^CANDIDATE_GLB ' /tmp/build-right.log
+          test -s assets/models/hands/hand_right.glb
+
           sha256sum assets/models/hands/hand_left.glb assets/models/hands/hand_right.glb
           ls -lh assets/models/hands/hand_*.glb
 
@@ -268,5 +279,7 @@ jobs:
             candidate-tests.log
             candidate-smoke.log
             candidate-capture.log
+            /tmp/build-left.log
+            /tmp/build-right.log
           if-no-files-found: error
           retention-days: 7
