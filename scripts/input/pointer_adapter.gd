@@ -3,10 +3,13 @@ class_name PointerAdapter
 
 signal pointer_changed(state: PointerState)
 
+enum PointerSource { NONE, MOUSE, TOUCH }
+
 var state := PointerState.new()
 var _gameplay_suspended := false
 var _awaiting_release := false
 var _physical_pressed := false
+var _active_source := PointerSource.NONE
 var _active_touch_index := -1
 
 func suspend_gameplay_input() -> void:
@@ -30,15 +33,34 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		_physical_pressed = event.pressed
-		if _consume_boundary_event(_physical_pressed, event.position):
+		if event.pressed:
+			if _active_source == PointerSource.TOUCH:
+				return
+			_active_source = PointerSource.MOUSE
+			_physical_pressed = true
+			if _consume_boundary_event(true, event.position):
+				return
+			state.set_frame(true, event.position, Vector2.ZERO, Vector2.ZERO, false)
+			pointer_changed.emit(state)
 			return
-		state.set_frame(event.pressed, event.position, Vector2.ZERO, Vector2.ZERO, not event.pressed)
+
+		if _active_source == PointerSource.TOUCH:
+			return
+		_physical_pressed = false
+		_active_source = PointerSource.NONE
+		if _consume_boundary_event(false, event.position):
+			return
+		state.set_frame(false, event.position, Vector2.ZERO, Vector2.ZERO, true)
 		pointer_changed.emit(state)
 		return
 
 	if event is InputEventMouseMotion:
-		_physical_pressed = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		if _active_source == PointerSource.TOUCH:
+			return
+		var mouse_pressed := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		if _active_source == PointerSource.NONE and mouse_pressed:
+			_active_source = PointerSource.MOUSE
+		_physical_pressed = mouse_pressed
 		if _consume_boundary_event(_physical_pressed, event.position):
 			return
 		state.set_frame(
@@ -53,7 +75,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if _active_touch_index == -1:
+			if _active_source == PointerSource.MOUSE:
+				return
+			if _active_source == PointerSource.NONE:
+				_active_source = PointerSource.TOUCH
 				_active_touch_index = event.index
 			elif event.index != _active_touch_index:
 				return
@@ -64,10 +89,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			pointer_changed.emit(state)
 			return
 
-		if event.index != _active_touch_index:
+		if _active_source != PointerSource.TOUCH or event.index != _active_touch_index:
 			return
 		_physical_pressed = false
 		_active_touch_index = -1
+		_active_source = PointerSource.NONE
 		if _consume_boundary_event(false, event.position):
 			return
 		state.set_frame(false, event.position, Vector2.ZERO, Vector2.ZERO, true)
@@ -75,7 +101,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventScreenDrag:
-		if _active_touch_index == -1:
+		if _active_source == PointerSource.MOUSE:
+			return
+		if _active_source == PointerSource.NONE:
+			_active_source = PointerSource.TOUCH
 			_active_touch_index = event.index
 		elif event.index != _active_touch_index:
 			return
