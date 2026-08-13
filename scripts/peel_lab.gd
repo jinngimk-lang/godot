@@ -1,5 +1,7 @@
 extends Node3D
 
+const AUTHORED_PRESENTATION_SCALE := 2.25
+
 var _camera: Camera3D
 var _cup: MeshInstance3D
 var _label: LabelVisual
@@ -175,16 +177,18 @@ func _build_world() -> void:
 	_left_hand.name = "LeftHand"
 	add_child(_left_hand)
 	_left_hand.setup(false)
-	_left_hand.snap_to(Vector3(-0.60, 0.30, 0.34))
-	_left_hand.rotation_degrees = Vector3(18, -28, -48)
+	_scale_authored_hand(_left_hand)
+	_left_hand.snap_to(Vector3(0.58, 0.24, 0.38))
+	_left_hand.rotation_degrees = Vector3(14, 42, 45)
 	_left_hand.set_pinch_amount(0.38)
 
 	_right_hand = HandVisual.new()
 	_right_hand.name = "RightHand"
 	add_child(_right_hand)
 	_right_hand.setup(true)
+	_scale_authored_hand(_right_hand)
 	_right_hand.snap_to(Vector3(-0.72, 0.28, 0.88))
-	_right_hand.rotation_degrees = Vector3(-8, 8, 15)
+	_right_hand.rotation_degrees = Vector3(18, -22, -8)
 
 	_pointer = PointerAdapter.new()
 	_pointer.name = "PointerAdapter"
@@ -275,12 +279,19 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	if event.keycode == KEY_ESCAPE:
-		_paused = not _paused
+		if _paused:
+			_paused = false
+			_pointer.resume_input()
+		else:
+			_paused = true
+			_pointer.suspend_input()
 		_audio.reset_feedback()
 		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
 		return
 	if event.keycode == KEY_R:
-		_paused = false
+		if _paused:
+			_paused = false
+			_pointer.resume_input()
 		if event.shift_pressed:
 			_session.restart_run()
 			_apply_current_variant()
@@ -310,6 +321,8 @@ func _apply_current_variant() -> void:
 	_cup.material_override = _material(cup_color, 0.94)
 
 func _reset_session() -> void:
+	if _pointer != null:
+		_pointer.quarantine_until_release()
 	if _controller != null:
 		_controller.reset()
 	if _lifecycle != null:
@@ -345,6 +358,11 @@ func _reset_session() -> void:
 	if _audio != null:
 		_audio.reset_feedback()
 	_update_hud("", "ATTACHED", 0.0)
+
+func _scale_authored_hand(hand: HandVisual) -> void:
+	var authored_root := hand.get_node_or_null("AuthoredHand") as Node3D
+	if authored_root != null:
+		authored_root.scale = Vector3.ONE * AUTHORED_PRESENTATION_SCALE
 
 func _screen_to_plane(screen_position: Vector2, z_depth: float) -> Vector3:
 	var origin := _camera.project_ray_origin(screen_position)

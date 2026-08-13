@@ -52,5 +52,63 @@ func run() -> Array[String]:
 	if state.released_this_frame or state.relative != Vector2.ZERO or state.velocity != Vector2.ZERO:
 		failures.append("clear_transients should clear release, relative and velocity only")
 
+	# Pause/suspend must ignore pointer activity and require a release only when
+	# the boundary ends while a pointer is still held.
+	adapter.suspend_input()
+	touch.position = Vector2(400, 260)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("suspended input must not latch a touch press")
+
+	drag.position = Vector2(430, 250)
+	drag.screen_relative = Vector2(30, -10)
+	drag.screen_velocity = Vector2(700, -300)
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if state.pressed or state.relative != Vector2.ZERO or state.velocity != Vector2.ZERO:
+		failures.append("suspended input must quarantine touch drag motion")
+
+	adapter.resume_input()
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("resume while touch is held must stay quarantined until release")
+
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if state.pressed or state.released_this_frame:
+		failures.append("boundary-clearing release must not leak as gameplay release")
+
+	touch.position = Vector2(460, 245)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed:
+		failures.append("fresh press after boundary release should re-arm pointer input")
+
+	# Reset quarantine must clear a held pointer immediately, ignore drag while
+	# still held, and re-arm after the physical release.
+	adapter.quarantine_until_release()
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("quarantine_until_release must neutralize a held pointer")
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("quarantined drag must not re-latch pointer press")
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	touch.position = Vector2(480, 240)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed:
+		failures.append("pointer should accept a fresh press after quarantine release")
+
 	adapter.free()
 	return failures
