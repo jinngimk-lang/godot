@@ -107,5 +107,50 @@ func run() -> Array[String]:
 	if not adapter.consume_frame().pressed:
 		failures.append("fresh post-resume touch should re-arm normally")
 
+	# Multi-touch ownership: the first active touch owns the gameplay pointer
+	# until it releases. A second finger must not teleport or release that pointer.
+	touch.index = 0
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	adapter.clear_transients()
+	var primary_position := Vector2(510, 260)
+	touch.position = primary_position
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position:
+		failures.append("primary touch should acquire gameplay pointer ownership")
+
+	var secondary := InputEventScreenTouch.new()
+	secondary.index = 1
+	secondary.position = Vector2(810, 470)
+	secondary.pressed = true
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position:
+		failures.append("RED: secondary touch press must not steal gameplay pointer ownership")
+
+	secondary.pressed = false
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position or state.released_this_frame:
+		failures.append("RED: secondary touch release must not release the active primary touch")
+
+	drag.index = 0
+	drag.position = Vector2(540, 245)
+	drag.screen_relative = Vector2(30, -15)
+	drag.screen_velocity = Vector2(620, -280)
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position:
+		failures.append("primary drag should retain ownership after secondary-touch noise")
+
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if state.pressed or not state.released_this_frame:
+		failures.append("primary owner release should end the gameplay pointer")
+
 	adapter.free()
 	return failures
