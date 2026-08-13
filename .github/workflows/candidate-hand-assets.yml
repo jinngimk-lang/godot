@@ -36,7 +36,7 @@ jobs:
           curl -L --fail --retry 3 -o /tmp/hand-src/animations_hand_l.blend "$base/animations/animations_hand_l.blend"
           curl -L --fail --retry 3 -o /tmp/hand-src/animations_hand_r.blend "$base/animations/animations_hand_r.blend"
 
-      - name: Combine semi-realistic meshes with authored actions
+      - name: Combine semi-realistic meshes, materials and authored actions
         shell: bash
         run: |
           set -euo pipefail
@@ -55,15 +55,51 @@ jobs:
           if len(armature.data.bones) != 26:
               raise RuntimeError(f"unexpected armature bone count: {len(armature.data.bones)}")
 
-          wanted_meshes = [f"mesh_Hand_{suffix}", f"mesh_Hand_Nails_{suffix}"]
-          meshes = []
-          for name in wanted_meshes:
-              obj = bpy.data.objects.get(name)
+          hand = bpy.data.objects.get(f"mesh_Hand_{suffix}")
+          nails = bpy.data.objects.get(f"mesh_Hand_Nails_{suffix}")
+          for obj, label in [(hand, "hand"), (nails, "nails")]:
               if obj is None or obj.type != "MESH" or len(obj.data.vertices) <= 0:
-                  raise RuntimeError(f"required render mesh missing or empty: {name}")
-              meshes.append(obj)
-          total_vertices = sum(len(obj.data.vertices) for obj in meshes)
-          print("CANDIDATE_SOURCE_MESHES", [(obj.name, len(obj.data.vertices)) for obj in meshes], "total=", total_vertices)
+                  raise RuntimeError(f"required {label} render mesh missing or empty")
+              obj.hide_viewport = False
+              obj.hide_render = False
+          print("CANDIDATE_SOURCE_MESHES", [(hand.name, len(hand.data.vertices)), (nails.name, len(nails.data.vertices))])
+
+          def make_material(name, base_color, roughness):
+              mat = bpy.data.materials.get(name) or bpy.data.materials.new(name=name)
+              mat.name = name
+              mat.use_nodes = True
+              mat.diffuse_color = base_color
+              bsdf = mat.node_tree.nodes.get("Principled BSDF")
+              if bsdf is None:
+                  raise RuntimeError(f"{name} has no Principled BSDF")
+              bsdf.inputs["Base Color"].default_value = base_color
+              bsdf.inputs["Roughness"].default_value = roughness
+              bsdf.inputs["Metallic"].default_value = 0.0
+              return mat
+
+          # Clean, warm semi-realistic palette: visible form and nails without pore-level realism.
+          skin = make_material("HandSkin", (0.72, 0.46, 0.35, 1.0), 0.62)
+          nail = make_material("HandNail", (0.90, 0.67, 0.61, 1.0), 0.46)
+          hand.data.materials.clear()
+          hand.data.materials.append(skin)
+          nails.data.materials.clear()
+          nails.data.materials.append(nail)
+
+          # Join geometry so one skinned mesh carries both material surfaces. This avoids
+          # Blender's selected-object glTF exporter dropping the separate nail object.
+          bpy.ops.object.select_all(action="DESELECT")
+          hand.select_set(True)
+          nails.select_set(True)
+          bpy.context.view_layer.objects.active = hand
+          bpy.ops.object.join()
+          joined = bpy.context.view_layer.objects.active
+          joined.name = f"PeelCalmHand_{suffix}"
+          if len(joined.data.vertices) < 3000:
+              raise RuntimeError(f"joined hand+nails lost geometry: {len(joined.data.vertices)} vertices")
+          material_names = [slot.material.name if slot.material else "" for slot in joined.material_slots]
+          if "HandSkin" not in material_names or "HandNail" not in material_names:
+              raise RuntimeError(f"joined hand lost semantic material slots: {material_names}")
+          print("CANDIDATE_JOINED", joined.name, len(joined.data.vertices), material_names)
 
           with bpy.data.libraries.load(animation_path, link=False) as (data_from, data_to):
               data_to.actions = list(data_from.actions)
@@ -79,10 +115,7 @@ jobs:
 
           bpy.ops.object.select_all(action="DESELECT")
           armature.select_set(True)
-          for obj in meshes:
-              obj.hide_viewport = False
-              obj.hide_render = False
-              obj.select_set(True)
+          joined.select_set(True)
           bpy.context.view_layer.objects.active = armature
 
           operator = bpy.ops.export_scene.gltf
@@ -177,6 +210,7 @@ jobs:
               if hand != null:
                 _collect_meshes(hand, meshes)
               var vertices := 0
+              var materials: Array[String] = []
               for mesh_instance in meshes:
                 if mesh_instance.mesh == null:
                   continue
@@ -184,9 +218,12 @@ jobs:
                   var arrays := mesh_instance.mesh.surface_get_arrays(surface_index)
                   if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
                     vertices += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
-              print("CANDIDATE_HAND_DIAG %s meshes=%d vertices=%d" % [hand_name, meshes.size(), vertices])
-              if meshes.is_empty() or vertices <= 0:
-                push_error("CANDIDATE_CAPTURE: %s still has no renderable mesh" % hand_name)
+                  var material := mesh_instance.mesh.surface_get_material(surface_index)
+                  if material != null and not material.resource_name.is_empty() and not materials.has(material.resource_name):
+                    materials.append(material.resource_name)
+              print("CANDIDATE_HAND_DIAG %s meshes=%d vertices=%d materials=%s" % [hand_name, meshes.size(), vertices, str(materials)])
+              if meshes.is_empty() or vertices <= 0 or not materials.has("HandSkin") or not materials.has("HandNail"):
+                push_error("CANDIDATE_CAPTURE: %s does not have complete render presentation" % hand_name)
                 quit(1)
                 return
             var image := root.get_texture().get_image()
