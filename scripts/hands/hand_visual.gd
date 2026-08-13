@@ -64,6 +64,11 @@ func get_finger_count() -> int:
 		count += 1
 	return count
 
+# Explicitly exposes the presentation backend so tests/callers need not infer it from child meshes.
+func is_using_authored_asset() -> bool:
+	var asset_path: String = RIGHT_HAND_ASSET if _is_right_hand else LEFT_HAND_ASSET
+	return _model_root != null or ResourceLoader.exists(asset_path)
+
 func get_pinch_world_position() -> Vector3:
 	if _pinch_point == null:
 		return global_position
