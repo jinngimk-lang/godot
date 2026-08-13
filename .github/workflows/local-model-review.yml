@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   challenge:
-    name: qwen7b-completion-challenger
+    name: qwen3b-completion-challenger
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 18
     steps:
       - name: Checkout exact complete-playable candidate
         uses: actions/checkout@v6
@@ -49,11 +49,11 @@ jobs:
           cat /tmp/ollama-server.log
           exit 1
 
-      - name: Pull stronger zero-balance code model
+      - name: Pull zero-balance code model
         shell: bash
         run: |
           set -euo pipefail
-          ollama pull qwen2.5-coder:7b
+          ollama pull qwen2.5-coder:3b
 
       - name: Run narrow adversarial review
         shell: bash
@@ -95,7 +95,7 @@ jobs:
             cat /tmp/review-packet.txt
           } > /tmp/review-prompt.txt
 
-          ollama run qwen2.5-coder:7b < /tmp/review-prompt.txt | tee /tmp/review-report.txt
+          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-report.txt
           test -s /tmp/review-report.txt
           grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt
           for field in TRACE_1 TRACE_2 TRACE_3 DEFECT MIN_TEST; do
@@ -106,5 +106,5 @@ jobs:
         if: always()
         shell: bash
         run: |
-          echo '===== QWEN 7B COMPLETION CHALLENGER ====='
+          echo '===== QWEN 3B COMPLETION CHALLENGER ====='
           if [ -f /tmp/review-report.txt ]; then cat /tmp/review-report.txt; else echo 'No conforming report produced.'; fi
