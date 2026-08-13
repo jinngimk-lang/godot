@@ -46,9 +46,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			pointer_changed.emit(state)
 			return
 
-		# A release may only end an already-owned mouse gesture. A stray release
-		# after an ignored/old press must not manufacture a gameplay release.
-		if _active_source != PointerSource.MOUSE:
+		# A release may only end an already-owned mouse gesture. A neutral mouse-up
+		# with no owner may still update hover position, but it must not manufacture
+		# a gameplay release. While touch owns, even its position is ignored.
+		if _active_source == PointerSource.TOUCH:
+			return
+		if _active_source == PointerSource.NONE:
+			_physical_pressed = false
+			if _consume_boundary_event(false, event.position):
+				return
+			state.set_frame(false, event.position, Vector2.ZERO, Vector2.ZERO, false)
+			pointer_changed.emit(state)
 			return
 		_physical_pressed = false
 		_active_source = PointerSource.NONE
