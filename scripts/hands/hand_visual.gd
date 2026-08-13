@@ -115,8 +115,8 @@ func _build_pinch_anchors() -> void:
 func _update_pinch_anchors() -> void:
 	if _skeleton == null or _thumb_tip == null or _index_tip == null or _pinch_point == null:
 		return
-	var thumb_position := _bone_position(_tip_bone_name("Thumb"))
-	var index_position := _bone_position(_tip_bone_name("Index"))
+	var thumb_position: Variant = _bone_position(_tip_bone_name("Thumb"))
+	var index_position: Variant = _bone_position(_tip_bone_name("Index"))
 	if thumb_position != null:
 		_thumb_tip.position = thumb_position as Vector3
 	if index_position != null:
