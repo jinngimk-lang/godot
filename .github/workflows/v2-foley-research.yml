@@ -18,23 +18,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download verified CC0 source archive
+      - name: Verify OpenGameArt paper source route
         shell: bash
         run: |
           set -euo pipefail
-          curl -L --fail --retry 3 -o /tmp/MoreSounds.zip \
-            https://opengameart.org/sites/default/files/MoreSounds.zip
-          sha256sum /tmp/MoreSounds.zip
-          unzip -q /tmp/MoreSounds.zip -d /tmp/more_sounds
+          curl -L --fail --retry 3 -o /tmp/paper1.mp3 \
+            https://opengameart.org/sites/default/files/paper_sound_-_1.mp3
+          curl -L --fail --retry 3 -o /tmp/paper4.mp3 \
+            https://opengameart.org/sites/default/files/paper_sound_-_4.mp3
+          file /tmp/paper1.mp3 /tmp/paper4.mp3
+          sha256sum /tmp/paper1.mp3 /tmp/paper4.mp3
 
-      - name: List paper and tape candidates
+      - name: Discover Freesound CC0 preview routes
         shell: bash
         run: |
           set -euo pipefail
-          echo '--- candidate files ---'
-          find /tmp/more_sounds -type f | sed 's#^/tmp/more_sounds/##' | sort | grep -Ei 'paper|tape|mask|rip|tear|stapl|velcro' || true
-          echo '--- candidate audio metadata ---'
-          while IFS= read -r f; do
-            printf '%s | ' "${f#/tmp/more_sounds/}"
-            ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f" 2>/dev/null || echo 'unknown'
-          done < <(find /tmp/more_sounds -type f | sort | grep -Ei 'paper|tape|mask|rip|tear|stapl|velcro' || true)
+          for id in 795714 795801; do
+            page="/tmp/freesound-${id}.html"
+            curl -L --fail --retry 3 -A 'Mozilla/5.0' -o "$page" \
+              "https://freesound.org/people/Geoff-Bremner-Audio/sounds/${id}/"
+            echo "--- sound ${id} preview candidates ---"
+            grep -Eo 'https://[^"[:space:]]+(preview|previews)[^"[:space:]]+\.(mp3|ogg)' "$page" | sed 's/&amp;/\&/g' | sort -u || true
+            grep -Eo 'https://cdn\.freesound\.org/[^"[:space:]]+\.(mp3|ogg)' "$page" | sed 's/&amp;/\&/g' | sort -u || true
+          done
