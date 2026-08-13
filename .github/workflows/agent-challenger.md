@@ -19,7 +19,6 @@ permissions:
   actions: read
 engine: codex
 tools:
-  bash:
   github:
     toolsets: [repos, issues, pull_requests, actions]
 safe-outputs:
