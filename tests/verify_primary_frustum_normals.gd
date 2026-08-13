@@ -26,7 +26,7 @@ func _run() -> void:
 		quit(1)
 		return
 	var cup_mesh := cup.mesh as CylinderMesh
-	var slope := (cup_mesh.top_radius - cup_mesh.bottom_radius) / maxf(cup_mesh.height, 0.001)
+	var slope: float = (cup_mesh.top_radius - cup_mesh.bottom_radius) / maxf(cup_mesh.height, 0.001)
 
 	# Non-sampled partial peel: verify attached columns use the tapered normal,
 	# the immediately free column remains a bend/curve normal, and the seam does
@@ -35,26 +35,27 @@ func _run() -> void:
 	var front := label.get_front_position(progress)
 	label.set_phase("PEELING")
 	label.set_peel(progress, front + Vector3(-0.34, 0.13, 0.31))
-	var partial := _mesh_arrays(label)
+	var partial: Array = _mesh_arrays(label)
 	if partial.is_empty():
 		quit(1)
 		return
 	var vertices := partial[0] as PackedVector3Array
 	var normals := partial[1] as PackedVector3Array
-	var first_attached := clampi(int(ceil(progress * float(label.segments))), 1, label.segments)
-	var last_free := first_attached - 1
+	var first_attached: int = clampi(int(ceil(progress * float(label.segments))), 1, label.segments)
+	var last_free: int = first_attached - 1
 	var min_attached_dot := 1.0
 	var min_seam_dot := 1.0
-	for row in [0, 1]:
-		var free_normal := normals[last_free * 2 + row].normalized()
-		var attached_index := first_attached * 2 + row
-		var vertex := vertices[attached_index]
-		var mesh_normal := normals[attached_index].normalized()
-		var cup_local := cup.to_local(label.to_global(vertex))
-		var radial := Vector3(cup_local.x, 0.0, cup_local.z).normalized()
-		var expected := Vector3(radial.x, -slope, radial.z).normalized()
-		var world_normal := (label.global_transform.basis * mesh_normal).normalized()
-		var cup_normal := (cup.global_transform.basis.inverse() * world_normal).normalized()
+	for row_value in [0, 1]:
+		var row: int = int(row_value)
+		var free_normal: Vector3 = normals[last_free * 2 + row].normalized()
+		var attached_index: int = first_attached * 2 + row
+		var vertex: Vector3 = vertices[attached_index]
+		var mesh_normal: Vector3 = normals[attached_index].normalized()
+		var cup_local: Vector3 = cup.to_local(label.to_global(vertex))
+		var radial: Vector3 = Vector3(cup_local.x, 0.0, cup_local.z).normalized()
+		var expected: Vector3 = Vector3(radial.x, -slope, radial.z).normalized()
+		var world_normal: Vector3 = (label.global_transform.basis * mesh_normal).normalized()
+		var cup_normal: Vector3 = (cup.global_transform.basis.inverse() * world_normal).normalized()
 		min_attached_dot = minf(min_attached_dot, cup_normal.dot(expected))
 		min_seam_dot = minf(min_seam_dot, free_normal.dot(mesh_normal))
 		if absf(free_normal.y) > CURVE_Y_EPS:
@@ -79,7 +80,7 @@ func _run() -> void:
 	# the existing curve-normal path rather than retaining a hidden taper snap.
 	label.set_phase("DETACHING")
 	label.set_detach_alpha(0.55)
-	var detach_grip := label.get_front_position(1.0) + Vector3(-0.30, 0.16, 0.26)
+	var detach_grip: Vector3 = label.get_front_position(1.0) + Vector3(-0.30, 0.16, 0.26)
 	label.set_peel(1.0, detach_grip)
 	if not _all_normals_curve_like(label, "DETACHING"):
 		quit(1)
@@ -130,7 +131,7 @@ func _mesh_arrays(label: LabelVisual) -> Array:
 	if label.mesh == null or label.mesh.get_surface_count() == 0:
 		push_error("PRIMARY_NORMAL_VERIFY: label has no render surface")
 		return []
-	var arrays := label.mesh.surface_get_arrays(0)
+	var arrays: Array = label.mesh.surface_get_arrays(0)
 	if arrays.size() <= Mesh.ARRAY_NORMAL:
 		push_error("PRIMARY_NORMAL_VERIFY: label surface arrays incomplete")
 		return []
@@ -140,7 +141,7 @@ func _mesh_arrays(label: LabelVisual) -> Array:
 	return [arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_NORMAL]]
 
 func _all_normals_curve_like(label: LabelVisual, context: String) -> bool:
-	var arrays := _mesh_arrays(label)
+	var arrays: Array = _mesh_arrays(label)
 	if arrays.is_empty():
 		return false
 	var normals := arrays[1] as PackedVector3Array
