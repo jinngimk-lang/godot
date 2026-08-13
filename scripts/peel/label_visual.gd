@@ -6,6 +6,7 @@ class_name LabelVisual
 @export var label_y := 0.72
 @export var cup_radius := 0.53
 @export var segments := 28
+@export var surface_offset := 0.018
 
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
@@ -18,8 +19,13 @@ func _ready() -> void:
 	set_peel(0.0, get_front_position(0.0))
 
 func get_front_position(progress: float) -> Vector3:
-	var p := clampf(progress, 0.0, 1.0)
-	return Vector3(lerpf(-label_width * 0.5, label_width * 0.5, p), label_y, cup_radius + 0.018)
+	return CupSurface.attached_point(
+		clampf(progress, 0.0, 1.0),
+		label_width,
+		cup_radius,
+		label_y,
+		surface_offset
+	)
 
 func set_peel(progress: float, grip_local: Vector3) -> void:
 	var p := clampf(progress, 0.0, 1.0)
@@ -29,16 +35,17 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		var u := float(i) / float(segments)
 		var center := _point_for(u, p, grip_local)
 		var vertical := Vector3(0.0, label_height * 0.5, 0.0)
-		_mesh.surface_set_normal(Vector3(0, 0, 1))
+		var normal := _normal_for(u, p, center)
+		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(u, 0.0))
 		_mesh.surface_add_vertex(center + vertical)
-		_mesh.surface_set_normal(Vector3(0, 0, 1))
+		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(u, 1.0))
 		_mesh.surface_add_vertex(center - vertical)
 	_mesh.surface_end()
 
 func _point_for(u: float, progress: float, grip: Vector3) -> Vector3:
-	var attached := Vector3(lerpf(-label_width * 0.5, label_width * 0.5, u), label_y, cup_radius + 0.018)
+	var attached := CupSurface.attached_point(u, label_width, cup_radius, label_y, surface_offset)
 	if progress <= 0.0001 or u > progress:
 		return attached
 	var front := get_front_position(progress)
@@ -46,3 +53,11 @@ func _point_for(u: float, progress: float, grip: Vector3) -> Vector3:
 	var arc := sin(t * PI)
 	var curl := sin(t * PI * 2.0) * (1.0 - t)
 	return grip.lerp(front, t) + Vector3(0.0, arc * 0.11 + curl * 0.035, arc * 0.16)
+
+func _normal_for(u: float, progress: float, center: Vector3) -> Vector3:
+	if progress <= 0.0001 or u > progress:
+		return CupSurface.attached_normal(u, label_width, cup_radius, surface_offset)
+	var radial := Vector3(center.x, 0.0, center.z)
+	if radial.length_squared() <= 0.000001:
+		return Vector3(0, 0, 1)
+	return radial.normalized()
