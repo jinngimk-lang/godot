@@ -50,23 +50,80 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Completion handling must be factored so the actual detach path can be
-	# exercised repeatedly without fabricating pointer events in this smoke.
 	if not scene.has_method("_handle_detached_label"):
-		push_error("RED: scene missing repeatable detached-label completion handler")
+		push_error("RESET_SMOKE: scene missing repeatable detached-label completion handler")
 		quit(1)
 		return
 
-	var first_id := String(session.current_variant().get("id", ""))
-	var scores := [100, 90, 80, 70, 60]
-	for i in range(scores.size()):
-		scene.set("_pending_score", scores[i])
+	# First detach: even a duplicated detach callback must never double-count.
+	scene.set("_pending_score", 100)
+	scene.call("_handle_detached_label")
+	scene.call("_handle_detached_label")
+	if session.get_clean_peels() != 1 or session.get_total_score() != 100:
+		push_error("RED: duplicate detach callback must record progression exactly once")
+		quit(1)
+		return
+	scene.set("_reset_timer", 0.0)
+	await process_frame
+
+	# Second detach unlocks Silky Long. Pause must freeze the pending next-item timer.
+	scene.set("_pending_score", 90)
+	scene.call("_handle_detached_label")
+	if session.get_clean_peels() != 2 or session.get_unlocked_count() != 2:
+		push_error("RESET_SMOKE: second clean peel must unlock the second tactile feel")
+		quit(1)
+		return
+	var timer_before_pause := float(scene.get("_reset_timer"))
+	var escape := InputEventKey.new()
+	escape.pressed = true
+	escape.keycode = KEY_ESCAPE
+	scene.call("_unhandled_key_input", escape)
+	if not bool(scene.get("_paused")) or not hud.text.contains("PAUSED"):
+		push_error("RESET_SMOKE: Esc must enter a visible pause state")
+		quit(1)
+		return
+	scene.call("_process", 0.75)
+	if absf(float(scene.get("_reset_timer")) - timer_before_pause) > 0.001:
+		push_error("RED: pause during the next-item delay must freeze the timer")
+		quit(1)
+		return
+	scene.call("_unhandled_key_input", escape)
+	if bool(scene.get("_paused")):
+		push_error("RESET_SMOKE: second Esc must resume play")
+		quit(1)
+		return
+
+	# R after a completed peel means 'next now', not replaying the already-counted item.
+	var before_skip_id := String(session.current_variant().get("id", ""))
+	var reset_key := InputEventKey.new()
+	reset_key.pressed = true
+	reset_key.keycode = KEY_R
+	scene.call("_unhandled_key_input", reset_key)
+	if session.get_clean_peels() != 2 or session.get_total_score() != 190:
+		push_error("RESET_SMOKE: skipping the completion delay must not change earned progression")
+		quit(1)
+		return
+	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
+		push_error("RED: R during completion delay must consume the pending next-item transition")
+		quit(1)
+		return
+	var after_skip_id := String(session.current_variant().get("id", ""))
+	if before_skip_id == after_skip_id or after_skip_id != "silky_long":
+		push_error("RED: R during completion delay must advance immediately to the next unlocked tactile feel")
+		quit(1)
+		return
+
+	# Ordinary R on an active fresh label resets only that label and preserves the run.
+	scene.call("_unhandled_key_input", reset_key)
+	if session.get_clean_peels() != 2 or session.get_total_score() != 190 or String(session.current_variant().get("id", "")) != "silky_long":
+		push_error("RESET_SMOKE: ordinary R must preserve progression and the current tactile feel")
+		quit(1)
+		return
+
+	# Three more completions exercise repeated next-item rotation and unlock the third feel.
+	for score in [80, 70, 60]:
+		scene.set("_pending_score", score)
 		scene.call("_handle_detached_label")
-		if session.get_clean_peels() != i + 1:
-			push_error("RESET_SMOKE: each detach must record exactly one clean peel")
-			quit(1)
-			return
-		# Collapse the presentation delay while keeping the same production next-item path.
 		scene.set("_reset_timer", 0.0)
 		await process_frame
 
@@ -78,27 +135,15 @@ func _run() -> void:
 		push_error("RESET_SMOKE: repeated completion score should accumulate exactly once per label")
 		quit(1)
 		return
-	if String(session.current_variant().get("id", "")) == first_id:
-		push_error("RESET_SMOKE: repeated next-item flow must rotate away from the initial tactile feel")
-		quit(1)
-		return
 
-	# Pause is player-facing and reversible without destroying progression.
-	var escape := InputEventKey.new()
-	escape.pressed = true
-	escape.keycode = KEY_ESCAPE
-	scene.call("_unhandled_key_input", escape)
-	if not bool(scene.get("_paused")) or not hud.text.contains("PAUSED"):
-		push_error("RESET_SMOKE: Esc must enter a visible pause state")
+	# A completed sixth label creates another pending transition; Shift+R must cancel it
+	# while clearing the whole run, so no stale auto-advance can fire afterwards.
+	scene.set("_pending_score", 50)
+	scene.call("_handle_detached_label")
+	if session.get_clean_peels() != 6 or float(scene.get("_reset_timer")) <= 0.0:
+		push_error("RESET_SMOKE: fixture must enter a pending next-item transition")
 		quit(1)
 		return
-	scene.call("_unhandled_key_input", escape)
-	if bool(scene.get("_paused")):
-		push_error("RESET_SMOKE: second Esc must resume play")
-		quit(1)
-		return
-
-	# Shift+R is a deterministic full-run restart, separate from ordinary label reset.
 	var restart := InputEventKey.new()
 	restart.pressed = true
 	restart.keycode = KEY_R
@@ -112,8 +157,17 @@ func _run() -> void:
 		push_error("RESET_SMOKE: full restart must restore warm_paper")
 		quit(1)
 		return
+	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
+		push_error("RED: Shift+R during completion delay must cancel stale pending auto-advance")
+		quit(1)
+		return
+	scene.call("_process", 3.0)
+	if String(session.current_variant().get("id", "")) != "warm_paper" or session.get_clean_peels() != 0:
+		push_error("RED: stale next-item transition must not fire after full-run restart")
+		quit(1)
+		return
 
-	print("PASS: repeated complete -> next -> unlock -> pause -> restart flow")
+	print("PASS: exact-once detach -> frozen pause -> next-now R -> repeated unlock -> full restart")
 	scene.queue_free()
 	await process_frame
 	quit(0)
