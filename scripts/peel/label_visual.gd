@@ -147,17 +147,21 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 	var vertical := Vector3(0.0, label_height * 0.5, 0.0)
 	for i in range(points.size()):
 		var center := points[i]
-		var normal := _normal_from_points(points, i)
+		var curve_normal := _normal_from_points(points, i)
 		var u := float(i) / float(points.size() - 1)
 		var top_vertex := center + vertical
 		var bottom_vertex := center - vertical
+		var top_normal := curve_normal
+		var bottom_normal := curve_normal
 		if _is_attached_u(u):
 			top_vertex = _frustum_edge_point(u, label_y + label_height * 0.5)
 			bottom_vertex = _frustum_edge_point(u, label_y - label_height * 0.5)
-		_mesh.surface_set_normal(normal)
+			top_normal = _frustum_edge_normal(top_vertex)
+			bottom_normal = _frustum_edge_normal(bottom_vertex)
+		_mesh.surface_set_normal(top_normal)
 		_mesh.surface_set_uv(Vector2(u, 0.0))
 		_mesh.surface_add_vertex(top_vertex)
-		_mesh.surface_set_normal(normal)
+		_mesh.surface_set_normal(bottom_normal)
 		_mesh.surface_set_uv(Vector2(u, 1.0))
 		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
@@ -195,6 +199,14 @@ func _frustum_edge_point(u: float, y: float) -> Vector3:
 		_cup_height,
 		_cup_center_y,
 		surface_offset
+	)
+
+func _frustum_edge_normal(point: Vector3) -> Vector3:
+	return CupSurface.frustum_surface_normal(
+		point,
+		_cup_bottom_radius,
+		_cup_top_radius,
+		_cup_height
 	)
 
 func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
