@@ -1,0 +1,40 @@
+name: V2 Foley Research
+
+on:
+  push:
+    branches:
+      - feat/tactile-upgrade-v2
+    paths:
+      - .github/workflows/v2-foley-research.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download verified CC0 source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/MoreSounds.zip \
+            https://opengameart.org/sites/default/files/MoreSounds.zip
+          sha256sum /tmp/MoreSounds.zip
+          unzip -q /tmp/MoreSounds.zip -d /tmp/more_sounds
+
+      - name: List paper and tape candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- candidate files ---'
+          find /tmp/more_sounds -type f | sed 's#^/tmp/more_sounds/##' | sort | grep -Ei 'paper|tape|mask|rip|tear|stapl|velcro' || true
+          echo '--- candidate audio metadata ---'
+          while IFS= read -r f; do
+            printf '%s | ' "${f#/tmp/more_sounds/}"
+            ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f" 2>/dev/null || echo 'unknown'
+          done < <(find /tmp/more_sounds -type f | sort | grep -Ei 'paper|tape|mask|rip|tear|stapl|velcro' || true)
