@@ -91,6 +91,13 @@ jobs:
           test -f tests/smoke_reset_loop.gd
           ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
 
+      - name: PRIMARY onboarding layout verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/verify_primary_onboarding_layout.gd
+          ./godot --headless --path . --script res://tests/verify_primary_onboarding_layout.gd
+
       - name: Pause input isolation smoke
         shell: bash
         run: |
