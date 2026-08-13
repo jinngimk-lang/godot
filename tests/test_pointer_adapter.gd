@@ -107,5 +107,69 @@ func run() -> Array[String]:
 	if not adapter.consume_frame().pressed:
 		failures.append("fresh post-resume touch should re-arm normally")
 
+	# Multi-touch ownership: the first active touch owns the gameplay pointer
+	# until it releases. A second finger must not teleport or release that pointer.
+	touch.index = 0
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	adapter.clear_transients()
+	var primary_position := Vector2(510, 260)
+	touch.position = primary_position
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position:
+		failures.append("primary touch should acquire gameplay pointer ownership")
+
+	var secondary := InputEventScreenTouch.new()
+	secondary.index = 1
+	secondary.position = Vector2(810, 470)
+	secondary.pressed = true
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position:
+		failures.append("RED: secondary touch press must not steal gameplay pointer ownership")
+
+	secondary.pressed = false
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != primary_position or state.released_this_frame:
+		failures.append("RED: secondary touch release must not release the active primary touch")
+
+	drag.index = 0
+	drag.position = Vector2(540, 245)
+	drag.screen_relative = Vector2(30, -15)
+	drag.screen_velocity = Vector2(620, -280)
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position:
+		failures.append("primary drag should retain ownership after secondary-touch noise")
+
+	# Godot marks mouse events synthesized from touch with DEVICE_ID_EMULATION.
+	# The synthetic mouse half of the same physical gesture must not become a
+	# second gameplay pointer source.
+	var emulated_mouse := InputEventMouseButton.new()
+	emulated_mouse.device = InputEvent.DEVICE_ID_EMULATION
+	emulated_mouse.button_index = MOUSE_BUTTON_LEFT
+	emulated_mouse.position = Vector2(930, 510)
+	emulated_mouse.pressed = true
+	adapter._unhandled_input(emulated_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position:
+		failures.append("RED: emulated mouse press from touch must not steal active touch ownership")
+
+	emulated_mouse.pressed = false
+	adapter._unhandled_input(emulated_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position or state.released_this_frame:
+		failures.append("RED: emulated mouse release from touch must not release active touch ownership")
+
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if state.pressed or not state.released_this_frame:
+		failures.append("primary owner release should end the gameplay pointer")
+
 	adapter.free()
 	return failures
