@@ -15,19 +15,55 @@ var _detach_alpha := 0.0
 var _held_direction := Vector3.LEFT
 var _last_grip := Vector3.ZERO
 var _last_progress := 0.0
+var _uses_frustum_profile := false
+var _cup_bottom_radius := 0.0
+var _cup_top_radius := 0.0
+var _cup_height := 0.0
+var _cup_center_y := 0.0
 
 func _ready() -> void:
 	mesh = _mesh
 	_material.albedo_color = Color(0.97, 0.955, 0.90, 1.0)
 	_material.roughness = 0.9
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_try_configure_from_runtime_cup()
 	set_peel(0.0, get_front_position(0.0))
+
+func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
+	_cup_bottom_radius = maxf(bottom_radius, 0.001)
+	_cup_top_radius = maxf(top_radius, 0.001)
+	_cup_height = maxf(absf(cup_height), 0.001)
+	_cup_center_y = cup_center_y
+	_uses_frustum_profile = true
+	cup_radius = CupSurface.frustum_radius_at_y(
+		label_y,
+		_cup_bottom_radius,
+		_cup_top_radius,
+		_cup_height,
+		_cup_center_y
+	)
+	if is_inside_tree() and mesh != null:
+		var grip := _last_grip
+		if grip.length_squared() <= 0.000001:
+			grip = get_front_position(_last_progress)
+		set_peel(_last_progress, grip)
+
+func get_center_cup_radius() -> float:
+	if not _uses_frustum_profile:
+		return cup_radius
+	return CupSurface.frustum_radius_at_y(
+		label_y,
+		_cup_bottom_radius,
+		_cup_top_radius,
+		_cup_height,
+		_cup_center_y
+	)
 
 func get_front_position(progress: float) -> Vector3:
 	return CupSurface.attached_point(
 		clampf(progress, 0.0, 1.0),
 		label_width,
-		cup_radius,
+		get_center_cup_radius(),
 		label_y,
 		surface_offset
 	)
@@ -64,13 +100,14 @@ func get_effective_grip(progress: float, desired_grip: Vector3) -> Vector3:
 		progress,
 		desired_grip,
 		label_width,
-		cup_radius,
+		get_center_cup_radius(),
 		label_y,
 		surface_offset
 	)
 
 func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3Array:
 	var p := clampf(progress, 0.0, 1.0)
+	var center_radius := get_center_cup_radius()
 	if _phase_name == "HELD":
 		return LabelGeometry.held_points(desired_grip, _held_direction, label_width, segments)
 	if _phase_name == "DETACHING":
@@ -78,7 +115,7 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 			1.0,
 			desired_grip,
 			label_width,
-			cup_radius,
+			center_radius,
 			label_y,
 			surface_offset,
 			segments
@@ -92,7 +129,7 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 		p,
 		desired_grip,
 		label_width,
-		cup_radius,
+		center_radius,
 		label_y,
 		surface_offset,
 		segments
@@ -112,13 +149,53 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		var center := points[i]
 		var normal := _normal_from_points(points, i)
 		var u := float(i) / float(points.size() - 1)
+		var top_vertex := center + vertical
+		var bottom_vertex := center - vertical
+		if _is_attached_u(u):
+			top_vertex = _frustum_edge_point(u, label_y + label_height * 0.5)
+			bottom_vertex = _frustum_edge_point(u, label_y - label_height * 0.5)
 		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(u, 0.0))
-		_mesh.surface_add_vertex(center + vertical)
+		_mesh.surface_add_vertex(top_vertex)
 		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(u, 1.0))
-		_mesh.surface_add_vertex(center - vertical)
+		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
+
+func _try_configure_from_runtime_cup() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var cup := parent.get_node_or_null("Cup") as MeshInstance3D
+	if cup == null or not (cup.mesh is CylinderMesh):
+		return
+	var cup_mesh := cup.mesh as CylinderMesh
+	var cup_center_local := to_local(cup.global_position).y
+	configure_cup_frustum(
+		cup_mesh.bottom_radius,
+		cup_mesh.top_radius,
+		cup_mesh.height,
+		cup_center_local
+	)
+
+func _is_attached_u(u: float) -> bool:
+	if not _uses_frustum_profile:
+		return false
+	if not (_phase_name in ["ATTACHED", "PEELING"]):
+		return false
+	return u + 0.000001 >= _last_progress
+
+func _frustum_edge_point(u: float, y: float) -> Vector3:
+	return CupSurface.attached_point_on_frustum(
+		u,
+		label_width,
+		y,
+		_cup_bottom_radius,
+		_cup_top_radius,
+		_cup_height,
+		_cup_center_y,
+		surface_offset
+	)
 
 func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
 	var left_index := maxi(index - 1, 0)
