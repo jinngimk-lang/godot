@@ -2,11 +2,27 @@ extends Node3D
 class_name CafePresentation
 
 var _applied := false
+var _cup: MeshInstance3D
+var _cup_seam: MeshInstance3D
+var _cup_base_fold: MeshInstance3D
+var _cup_lip_shadow: MeshInstance3D
+var _cup_seam_material: StandardMaterial3D
+var _cup_base_material: StandardMaterial3D
+var _cup_lip_material: StandardMaterial3D
+var _cup_base_local := Transform3D.IDENTITY
+var _cup_lip_local := Transform3D.IDENTITY
+var _last_cup_color := Color(-1.0, -1.0, -1.0, -1.0)
 
 func _ready() -> void:
 	# This child becomes ready before PeelLab builds its procedural world.
 	# Defer one turn so the parent-created lights/table/lid exist first.
 	call_deferred("_apply")
+
+func _process(_delta: float) -> void:
+	if not _applied or _cup == null:
+		return
+	_sync_cup_detail_transform()
+	_sync_cup_detail_palette()
 
 func _apply() -> void:
 	if _applied:
@@ -16,8 +32,11 @@ func _apply() -> void:
 	_build_backdrop()
 	_build_lid_detail()
 	_build_ground_shadow()
+	_build_cup_structure()
 	_tune_parent_lighting()
 	_tune_parent_surfaces()
+	_sync_cup_detail_transform()
+	_sync_cup_detail_palette()
 
 func _build_world_environment() -> void:
 	var world := WorldEnvironment.new()
@@ -99,6 +118,117 @@ func _build_ground_shadow() -> void:
 	shadow.material_override = material
 	add_child(shadow)
 
+func _build_cup_structure() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
+	if _cup == null or not (_cup.mesh is CylinderMesh):
+		_cup = null
+		return
+	var cup_mesh := _cup.mesh as CylinderMesh
+	var height := maxf(cup_mesh.height, 0.001)
+
+	_cup_seam = MeshInstance3D.new()
+	_cup_seam.name = "CupPaperSeam"
+	_cup_seam.mesh = _build_paper_seam_mesh(cup_mesh)
+	_cup_seam_material = _semantic_material("CupPaperSeam", 0.98)
+	_cup_seam_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_cup_seam.material_override = _cup_seam_material
+	add_child(_cup_seam)
+
+	_cup_base_fold = MeshInstance3D.new()
+	_cup_base_fold.name = "CupBaseFold"
+	var fold_mesh := CylinderMesh.new()
+	var fold_y := -height * 0.5 + 0.055
+	var fold_t := clampf((fold_y + height * 0.5) / height, 0.0, 1.0)
+	var fold_radius := lerpf(cup_mesh.bottom_radius, cup_mesh.top_radius, fold_t)
+	fold_mesh.bottom_radius = fold_radius + 0.008
+	fold_mesh.top_radius = fold_radius + 0.011
+	fold_mesh.height = 0.032
+	_cup_base_fold.mesh = fold_mesh
+	_cup_base_material = _semantic_material("CupBaseFold", 0.98)
+	_cup_base_fold.material_override = _cup_base_material
+	_cup_base_local = Transform3D(Basis.IDENTITY, Vector3(0.0, fold_y, 0.0))
+	add_child(_cup_base_fold)
+
+	_cup_lip_shadow = MeshInstance3D.new()
+	_cup_lip_shadow.name = "CupLipShadow"
+	var lip_mesh := CylinderMesh.new()
+	lip_mesh.bottom_radius = cup_mesh.top_radius + 0.008
+	lip_mesh.top_radius = cup_mesh.top_radius + 0.010
+	lip_mesh.height = 0.018
+	_cup_lip_shadow.mesh = lip_mesh
+	_cup_lip_material = _semantic_material("CupLipShadow", 1.0)
+	_cup_lip_shadow.material_override = _cup_lip_material
+	_cup_lip_local = Transform3D(Basis.IDENTITY, Vector3(0.0, height * 0.5 - 0.009, 0.0))
+	add_child(_cup_lip_shadow)
+
+func _build_paper_seam_mesh(cup_mesh: CylinderMesh) -> ArrayMesh:
+	var height := maxf(cup_mesh.height, 0.001)
+	var lower_y := -height * 0.42
+	var upper_y := height * 0.42
+	var seam_angle := 1.28
+	var half_width_angle := 0.011
+	var lower_t := clampf((lower_y + height * 0.5) / height, 0.0, 1.0)
+	var upper_t := clampf((upper_y + height * 0.5) / height, 0.0, 1.0)
+	var lower_radius := lerpf(cup_mesh.bottom_radius, cup_mesh.top_radius, lower_t) + 0.0035
+	var upper_radius := lerpf(cup_mesh.bottom_radius, cup_mesh.top_radius, upper_t) + 0.0035
+	var left_angle := seam_angle - half_width_angle
+	var right_angle := seam_angle + half_width_angle
+	var vertices := PackedVector3Array([
+		Vector3(sin(left_angle) * lower_radius, lower_y, cos(left_angle) * lower_radius),
+		Vector3(sin(right_angle) * lower_radius, lower_y, cos(right_angle) * lower_radius),
+		Vector3(sin(left_angle) * upper_radius, upper_y, cos(left_angle) * upper_radius),
+		Vector3(sin(right_angle) * upper_radius, upper_y, cos(right_angle) * upper_radius),
+	])
+	var slope := (cup_mesh.top_radius - cup_mesh.bottom_radius) / height
+	var outward := Vector3(sin(seam_angle), -slope, cos(seam_angle)).normalized()
+	var normals := PackedVector3Array([outward, outward, outward, outward])
+	var indices := PackedInt32Array([0, 1, 2, 1, 3, 2])
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+func _sync_cup_detail_transform() -> void:
+	if _cup == null:
+		return
+	var cup_in_presentation := global_transform.affine_inverse() * _cup.global_transform
+	if _cup_seam != null:
+		_cup_seam.transform = cup_in_presentation
+	if _cup_base_fold != null:
+		_cup_base_fold.transform = cup_in_presentation * _cup_base_local
+	if _cup_lip_shadow != null:
+		_cup_lip_shadow.transform = cup_in_presentation * _cup_lip_local
+
+func _sync_cup_detail_palette() -> void:
+	if _cup == null or not (_cup.material_override is StandardMaterial3D):
+		return
+	var cup_material := _cup.material_override as StandardMaterial3D
+	var cup_color := cup_material.albedo_color
+	if cup_color.is_equal_approx(_last_cup_color):
+		return
+	_last_cup_color = cup_color
+	if _cup_seam_material != null:
+		_cup_seam_material.albedo_color = _scaled_color(cup_color, 0.78)
+	if _cup_base_material != null:
+		_cup_base_material.albedo_color = _scaled_color(cup_color, 0.88)
+	if _cup_lip_material != null:
+		_cup_lip_material.albedo_color = _scaled_color(cup_color, 0.55)
+
+func _scaled_color(color: Color, scale: float) -> Color:
+	return Color(
+		clampf(color.r * scale, 0.0, 1.0),
+		clampf(color.g * scale, 0.0, 1.0),
+		clampf(color.b * scale, 0.0, 1.0),
+		color.a
+	)
+
 func _tune_parent_lighting() -> void:
 	var parent := get_parent()
 	if parent == null:
@@ -131,6 +261,12 @@ func _tune_parent_surfaces() -> void:
 	var lid := parent.get_node_or_null("Lid") as MeshInstance3D
 	if lid != null:
 		lid.material_override = _material(Color(0.070, 0.063, 0.059, 1.0), 0.58)
+
+func _semantic_material(resource_name: String, roughness: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.resource_name = resource_name
+	material.roughness = roughness
+	return material
 
 func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
