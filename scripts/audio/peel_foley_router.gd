@@ -1,6 +1,9 @@
 extends RefCounted
 class_name PeelFoleyRouter
 
+const PAPER_MOTION_SPEED := 0.35
+const PAPER_RELEASE_AMOUNT := 0.005
+
 var _micro_cooldown := 0.0
 var _paper_cooldown := 0.0
 var _final_emitted := false
@@ -39,7 +42,8 @@ func update(
 	else:
 		events.append("fast")
 
-	if safe_tension >= 10.0 and _paper_cooldown <= 0.0:
+	var paper_is_moving := safe_speed >= PAPER_MOTION_SPEED or safe_released >= PAPER_RELEASE_AMOUNT
+	if safe_tension >= 10.0 and paper_is_moving and _paper_cooldown <= 0.0:
 		events.append("paper_flex")
 		_paper_cooldown = 0.16
 
