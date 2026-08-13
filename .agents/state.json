@@ -2,7 +2,7 @@
   "runtime": "openai-codex-action",
   "builder": "peel-builder",
   "challenger": "peel-challenger",
-  "status": "INSTALLING",
+  "status": "INSTALLED_PENDING_ACTIVATION",
   "acceptance": "UNVERIFIED",
   "activation_secret": "OPENAI_API_KEY",
   "max_handoff_round": 20,
