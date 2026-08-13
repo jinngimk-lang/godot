@@ -29,13 +29,10 @@ func run() -> Array[String]:
 	if not events.has("fast"):
 		failures.append("high-speed active peel should select fast foley")
 
-	# Paper flex is motion feedback, not a metronome for held tension. Once the
-	# cooldown has expired, a stationary held peel must stay quiet until either
-	# the pointer moves again or the label actually releases more material.
 	router.reset()
 	events = router.update(true, 0.0, 18.0, 0.0, false, 0.20)
 	if events.has("paper_flex"):
-		failures.append("RED: stationary sustained peel tension must not retrigger paper_flex")
+		failures.append("stationary sustained peel tension must not retrigger paper_flex")
 
 	events = router.update(true, 0.7, 18.0, 0.0, false, 0.20)
 	if not events.has("paper_flex"):
@@ -45,6 +42,34 @@ func run() -> Array[String]:
 	if not events.has("paper_flex"):
 		failures.append("incremental label release should allow paper_flex even at near-zero pointer speed")
 
+	# Verifier-only boundary attacks for the proposed motion gate.
+	router.reset()
+	events = router.update(true, 0.349, 18.0, 0.0, false, 0.20)
+	if events.has("paper_flex"):
+		failures.append("VERIFY: speed immediately below motion threshold must not emit paper_flex")
+	events = router.update(true, 0.350, 18.0, 0.0, false, 0.20)
+	if not events.has("paper_flex"):
+		failures.append("VERIFY: exact motion threshold should emit paper_flex")
+
+	# A previous legitimate flex must not turn cooldown expiry into a stationary
+	# metronome. Long idle time should merely re-arm, not synthesize motion.
+	events = router.update(true, 0.0, 18.0, 0.0, false, 0.50)
+	if events.has("paper_flex"):
+		failures.append("VERIFY: cooldown expiry while stationary must remain silent")
+	events = router.update(true, 0.0, 18.0, 0.005, false, 0.016)
+	if not events.has("paper_flex"):
+		failures.append("VERIFY: exact incremental-release threshold should re-arm paper_flex without pointer motion")
+
+	# Non-finite motion inputs must sanitize to stationary rather than bypassing
+	# the physical-motion gate.
+	router.reset()
+	events = router.update(true, NAN, 18.0, 0.0, false, 0.50)
+	if events.has("paper_flex"):
+		failures.append("VERIFY: non-finite speed must not bypass paper motion gate")
+	events = router.update(true, 0.0, 18.0, NAN, false, 0.50)
+	if events.has("paper_flex"):
+		failures.append("VERIFY: non-finite released amount must not bypass paper motion gate")
+
 	events = router.update(true, 3.0, 18.0, 0.05, false, 0.20)
 	if not events.has("micro_release"):
 		failures.append("meaningful incremental release should emit micro_release")
@@ -52,12 +77,18 @@ func run() -> Array[String]:
 	if events.has("micro_release"):
 		failures.append("micro_release must be cooldown limited")
 
+	# Final detach remains exact-once and independent of the new paper gate.
+	router.reset()
 	events = router.update(false, 0.0, 0.0, 0.0, true, 0.016)
 	if not events.has("final_release"):
 		failures.append("detach transition should emit final_release")
-	events = router.update(false, 0.0, 0.0, 0.0, true, 0.016)
+	if events.has("paper_flex"):
+		failures.append("VERIFY: inactive final detach must not add paper_flex")
+	events = router.update(false, 0.0, 0.0, 0.0, true, 0.50)
 	if events.has("final_release"):
 		failures.append("final_release must emit once until reset")
+	if events.has("paper_flex"):
+		failures.append("VERIFY: repeated detached frames must stay free of paper_flex")
 
 	router.reset()
 	events = router.update(false, 0.0, 0.0, 0.0, true, 0.016)
