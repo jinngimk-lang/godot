@@ -17,7 +17,13 @@ func run() -> Array[String]:
 	if not failures.is_empty():
 		return failures
 
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		failures.append("HandVisual test requires an active SceneTree")
+		return failures
+
 	var hand = hand_script.new()
+	tree.root.add_child(hand)
 	hand.setup(true)
 	if hand.get_finger_count() != 5:
 		failures.append("HandVisual must expose five fingers")
