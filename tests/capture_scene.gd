@@ -69,15 +69,21 @@ func _print_hand_diagnostics(scene: Node, hand_name: String) -> void:
 		for surface_index in range(mesh_instance.mesh.get_surface_count()):
 			var arrays := mesh_instance.mesh.surface_get_arrays(surface_index)
 			if arrays.size() > Mesh.ARRAY_VERTEX:
-				var vertices = arrays[Mesh.ARRAY_VERTEX]
-				if vertices != null:
-					total_vertices += vertices.size()
-		var local_size := mesh_instance.mesh.get_aabb().size * mesh_instance.global_transform.basis.get_scale().abs()
+				var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+				total_vertices += vertices.size()
+		var local_size: Vector3 = mesh_instance.mesh.get_aabb().size * mesh_instance.global_transform.basis.get_scale().abs()
 		max_local_extent = maxf(max_local_extent, maxf(local_size.x, maxf(local_size.y, local_size.z)))
-	var pinch := hand.get_pinch_world_position() if hand.has_method("get_pinch_world_position") else hand.global_position
-	var authored := hand.is_using_authored_asset() if hand.has_method("is_using_authored_asset") else false
-	var screen := camera.unproject_position(pinch) if camera != null else Vector2.ZERO
-	var behind := camera.is_position_behind(pinch) if camera != null else false
+	var pinch: Vector3 = hand.global_position
+	if hand.has_method("get_pinch_world_position"):
+		pinch = hand.call("get_pinch_world_position") as Vector3
+	var authored := false
+	if hand.has_method("is_using_authored_asset"):
+		authored = bool(hand.call("is_using_authored_asset"))
+	var screen := Vector2.ZERO
+	var behind := false
+	if camera != null:
+		screen = camera.unproject_position(pinch)
+		behind = camera.is_position_behind(pinch)
 	print("HAND_DIAG %s authored=%s root=%s rot=%s scale=%s meshes=%d vertices=%d max_extent=%.5f pinch=%s screen=%s behind=%s" % [
 		hand_name,
 		str(authored),
