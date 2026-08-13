@@ -27,28 +27,26 @@ jobs:
           chmod +x godot
           ./godot --version
 
-      - name: Headless import
+      - name: Headless import and parse guard
         shell: bash
         run: |
           set -euo pipefail
-          ./godot --headless --editor --path . --quit
+          ./godot --headless --editor --path . --quit 2>&1 | tee godot-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" godot-import.log; then
+            echo "Godot reported a script parse/load failure during import."
+            exit 1
+          fi
 
       - name: Unit tests
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f tests/test_runner.gd ]]; then
-            ./godot --headless --path . --script res://tests/test_runner.gd
-          else
-            echo "No unit test runner yet; scaffold phase."
-          fi
+          test -f tests/test_runner.gd
+          ./godot --headless --path . --script res://tests/test_runner.gd
 
       - name: Scene smoke
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f tests/smoke_scene.gd ]]; then
-            ./godot --headless --path . --script res://tests/smoke_scene.gd
-          else
-            echo "No scene smoke script yet; scaffold phase."
-          fi
+          test -f tests/smoke_scene.gd
+          ./godot --headless --path . --script res://tests/smoke_scene.gd
