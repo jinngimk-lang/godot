@@ -1,0 +1,265 @@
+name: Peel Builder Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Canonical GitHub Issue number
+        required: true
+        type: string
+      challenger_feedback:
+        description: Optional Challenger feedback from the previous exact-head review
+        required: false
+        default: ""
+        type: string
+      round:
+        description: Bounded handoff round
+        required: false
+        default: "0"
+        type: string
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: peel-builder-${{ inputs.task_id || github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.actor == 'jinngimk-lang' && startsWith(github.event.issue.title, '[AGENT-TASK]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TASK_ID: ${{ inputs.task_id || github.event.issue.number }}
+      CHALLENGER_FEEDBACK: ${{ inputs.challenger_feedback || '' }}
+      AGENT_ROUND: ${{ inputs.round || '0' }}
+      MAX_AGENT_ROUND: "20"
+
+    steps:
+      - name: Checkout canonical main without stored write credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve task and current Builder artifact
+        id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$TASK_ID" =~ ^[0-9]+$ ]]; then
+            echo "Invalid task id: $TASK_ID" >&2
+            exit 1
+          fi
+          if ! [[ "$AGENT_ROUND" =~ ^[0-9]+$ ]] || [ "$AGENT_ROUND" -gt "$MAX_AGENT_ROUND" ]; then
+            echo "Agent round limit reached or invalid: $AGENT_ROUND" >&2
+            exit 1
+          fi
+
+          gh issue view "$TASK_ID" --json number,title,body,state,comments > /tmp/peel-task.json
+          printf '%s' "$CHALLENGER_FEEDBACK" > /tmp/challenger-feedback.txt
+
+          marker="TASK-ID: #${TASK_ID}"
+          existing="$({ gh pr list --state open --limit 100 --json number,title,body,headRefName,headRefOid; } | \
+            jq -r --arg marker "$marker" \
+              '.[] | select((.title | startswith("[builder]")) and ((.body // "") | contains($marker))) | [.number,.headRefName,.headRefOid] | @tsv' | head -n 1)"
+
+          if [ -n "$existing" ]; then
+            IFS=$'\t' read -r pr_number branch_name old_head <<< "$existing"
+            git fetch origin "${branch_name}:refs/remotes/origin/${branch_name}"
+            git switch -C "$branch_name" "origin/$branch_name"
+            echo "existing_pr=$pr_number" >> "$GITHUB_OUTPUT"
+          else
+            pr_number="0"
+            branch_name="agent/builder-task-${TASK_ID}"
+            git switch -c "$branch_name"
+            echo "existing_pr=0" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "branch_name=$branch_name" >> "$GITHUB_OUTPUT"
+          echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
+          echo "round=$AGENT_ROUND" >> "$GITHUB_OUTPUT"
+
+      - name: Install Godot 4.7.1 before sandboxing Codex
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  /tmp/godot.zip" | sha256sum -c -
+          unzip -q /tmp/godot.zip -d /tmp/peel-godot
+          mv /tmp/peel-godot/Godot_v4.7.1-stable_linux.x86_64 ./godot
+          chmod +x ./godot
+          ./godot --version
+
+      - name: Prepare Builder prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .agent-builder-prompt.md <<'PROMPT'
+          You are peel-builder, the implementation half of a two-agent team for Peel Calm.
+          Your counterpart peel-challenger runs in a separate GitHub Actions workflow and will independently attack your exact PR head after this run.
+
+          First read, in order:
+          - .agents/PROJECT_KNOWLEDGE.md
+          - .agents/protocol.md
+          - .agents/CONTACTS.md
+          - /tmp/peel-task.json
+          - /tmp/challenger-feedback.txt
+          - relevant docs/superpowers/specs and plans
+          - README.md, current production code, tests, and Godot CI workflow
+
+          Mission for this run:
+          1. Advance the canonical task toward the coherent complete-playable Peel Calm described in the task and PROJECT_KNOWLEDGE.
+          2. If Challenger feedback contains a reproducible defect, fix that before adding breadth.
+          3. Otherwise select the highest-priority incomplete acceptance item and implement one substantial coherent batch.
+          4. Preserve every owner-reported V1/V2 regression fix: true final detach, bounded paper geometry, printed label surface, non-abstract authored hand path, real repository-local Foley, mouse/touch contracts, score/reset one-shot behavior.
+          5. Prefer RED -> GREEN for machine-observable behavior. Add or strengthen deterministic tests.
+          6. Use ./godot for headless import/tests/smoke while working. Network access is intentionally unavailable inside Codex; do not make runtime depend on downloads.
+          7. Do not edit .github/, .agents/, secrets, repository policy, or billing configuration. Do not commit or push; the deterministic wrapper does that after verification.
+          8. Do not claim subjective hand feel, audio pleasantness, or visual beauty is proven. Mark those experiential properties UNVERIFIED for owner playtest.
+          9. Keep the project directly runnable from a fresh clone/ZIP with Godot 4.7.1.
+
+          Before finishing, inspect your own diff, run relevant tests, and leave the workspace in the best reviewable state you can. In your final message summarize the falsifiable claim, tests run, major files changed, and remaining UNVERIFIED items.
+          PROMPT
+
+      - name: Run independent Builder Codex
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .agent-builder-prompt.md
+          output-file: /tmp/builder-report.md
+          permission-profile: ":workspace"
+          safety-strategy: drop-sudo
+          effort: medium
+          allow-bots: true
+
+      - name: Remove runtime-only prompt and reject protected edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .agent-builder-prompt.md godot godot-import.log
+          protected="$(git status --porcelain --untracked-files=all -- .github .agents)"
+          if [ -n "$protected" ]; then
+            echo "Builder attempted protected infrastructure edits:" >&2
+            echo "$protected" >&2
+            exit 1
+          fi
+
+      - name: Deterministic Godot 4.7.1 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q /tmp/godot.zip -d /tmp/peel-godot-verify
+          mv /tmp/peel-godot-verify/Godot_v4.7.1-stable_linux.x86_64 ./godot
+          chmod +x ./godot
+
+          ./godot --headless --editor --path . --quit 2>&1 | tee /tmp/builder-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" /tmp/builder-import.log; then
+            echo "Godot reported a script parse/load failure." >&2
+            exit 1
+          fi
+          ./godot --headless --path . --script res://tests/test_runner.gd | tee /tmp/builder-unit.log
+          ./godot --headless --path . --script res://tests/smoke_scene.gd | tee /tmp/builder-smoke.log
+          rm -f ./godot
+
+      - name: Commit and push verified Builder batch
+        id: push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "peel-builder[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all -- ':!.github' ':!.agents'
+          if git diff --cached --quiet; then
+            echo "No reviewable project change was produced." >&2
+            exit 1
+          fi
+          git commit -m "feat: builder advances Peel Calm task #${TASK_ID}"
+          gh auth setup-git
+          git push --set-upstream origin "$BRANCH_NAME"
+          head_sha="$(git rev-parse HEAD)"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the single Builder PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
+          EXISTING_PR: ${{ steps.context.outputs.existing_pr }}
+          HEAD_SHA: ${{ steps.push.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report=/tmp/builder-report.md
+          if [ ! -s "$report" ]; then
+            printf 'Builder produced code and deterministic checks passed; no textual report was emitted.\n' > "$report"
+          fi
+
+          if [ "$EXISTING_PR" = "0" ]; then
+            body=/tmp/builder-pr-body.md
+            {
+              echo "TASK-ID: #${TASK_ID}"
+              echo "FROM: peel-builder"
+              echo
+              echo "Current Builder report:"
+              cat "$report"
+              echo
+              echo "Deterministic wrapper: Godot 4.7.1 import + unit + scene smoke passed before push."
+              echo "Challenger must independently re-check the exact head; this is not self-verification."
+            } > "$body"
+            gh pr create --base main --head "$BRANCH_NAME" --draft \
+              --title "[builder] Complete Peel Calm task #${TASK_ID}" --body-file "$body"
+            pr_number="$(gh pr view "$BRANCH_NAME" --json number -q .number)"
+          else
+            pr_number="$EXISTING_PR"
+          fi
+
+          comment=/tmp/builder-comment.md
+          {
+            echo "TYPE: CLAIM"
+            echo "FROM: peel-builder"
+            echo "TO: peel-challenger"
+            echo "ARTIFACT: PR #${pr_number}"
+            echo "SHA: ${HEAD_SHA}"
+            echo "CLAIM: This Builder batch passes Godot 4.7.1 import/unit/smoke and advances the canonical complete-version task without knowingly regressing prior tactile fixes."
+            echo "EVIDENCE: deterministic wrapper passed before push; Builder report follows."
+            cat "$report"
+            echo "NEXT_ACTION: Challenger independently inspect and attempt to falsify this exact head."
+          } > "$comment"
+          gh pr comment "$pr_number" --body-file "$comment"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch independent Challenger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.push.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          next_round=$((AGENT_ROUND + 1))
+          if [ "$next_round" -gt "$MAX_AGENT_ROUND" ]; then
+            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED; FROM: peel-builder; TO: owner; ARTIFACT: Issue #${TASK_ID}; SHA: ${HEAD_SHA}; CLAIM: bounded autonomous handoff limit reached; EVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}; NEXT_ACTION: inspect current Builder PR before extending autonomous API budget."
+            exit 0
+          fi
+          gh workflow run agent-challenger.yml --ref main \
+            -f task_id="$TASK_ID" \
+            -f pr_number="$PR_NUMBER" \
+            -f expected_head_sha="$HEAD_SHA" \
+            -f round="$next_round"

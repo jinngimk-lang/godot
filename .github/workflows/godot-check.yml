@@ -3,6 +3,7 @@ name: Godot Check
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +15,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Dual-agent runtime static guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/agent-builder.yml
+          test -f .github/workflows/agent-challenger.yml
+          test -f .agents/PROJECT_KNOWLEDGE.md
+          grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-builder.yml
+          grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-challenger.yml
+          if grep -ERn 'OPENAI_API_KEY[[:space:]]*[:=][[:space:]]*(sk-|[A-Za-z0-9_-]{30,})' .github .agents; then
+            echo "Possible committed API key material detected."
+            exit 1
+          fi
 
       - name: Install Godot 4.7.1
         shell: bash

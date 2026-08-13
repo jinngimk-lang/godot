@@ -1,0 +1,351 @@
+name: Peel Challenger Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Canonical GitHub Issue number
+        required: true
+        type: string
+      pr_number:
+        description: Builder pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact Builder head to challenge
+        required: true
+        type: string
+      round:
+        description: Bounded handoff round
+        required: false
+        default: "1"
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: peel-challenger-${{ inputs.pr_number }}-${{ inputs.expected_head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TASK_ID: ${{ inputs.task_id }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      AGENT_ROUND: ${{ inputs.round || '1' }}
+      MAX_AGENT_ROUND: "20"
+
+    steps:
+      - name: Checkout exact Builder head without stored credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact artifact and collect independent context
+        id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$TASK_ID" =~ ^[0-9]+$ && "$PR_NUMBER" =~ ^[0-9]+$ && "$AGENT_ROUND" =~ ^[0-9]+$ ]]; then
+            echo "Invalid numeric dispatch input." >&2
+            exit 1
+          fi
+          if [ "$AGENT_ROUND" -gt "$MAX_AGENT_ROUND" ]; then
+            echo "Agent round limit reached: $AGENT_ROUND" >&2
+            exit 1
+          fi
+
+          gh issue view "$TASK_ID" --json number,title,body,state,comments > /tmp/peel-task.json
+          gh pr view "$PR_NUMBER" --json number,title,body,state,isDraft,headRefName,headRefOid,baseRefName,baseRefOid,mergeable > /tmp/builder-pr.json
+          current_head="$(jq -r .headRefOid /tmp/builder-pr.json)"
+          if [ "$current_head" != "$EXPECTED_HEAD_SHA" ]; then
+            cat > /tmp/stale-comment.md <<EOF
+          TYPE: UNVERIFIED
+          FROM: peel-challenger
+          TO: peel-builder
+          ARTIFACT: PR #${PR_NUMBER}
+          SHA: ${EXPECTED_HEAD_SHA}
+          CLAIM: Requested evidence is stale because the PR head moved.
+          EVIDENCE: current head is ${current_head}.
+          NEXT_ACTION: use the newer Builder handoff; do not reuse this run as verification.
+          EOF
+            gh pr comment "$PR_NUMBER" --body-file /tmp/stale-comment.md
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "stale=false" >> "$GITHUB_OUTPUT"
+
+          git fetch origin main
+          git diff --binary "origin/main...${EXPECTED_HEAD_SHA}" > /tmp/builder.patch
+          git log --oneline "origin/main..${EXPECTED_HEAD_SHA}" > /tmp/builder-commits.txt
+
+      - name: Install Godot 4.7.1
+        if: steps.context.outputs.stale != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  /tmp/godot.zip" | sha256sum -c -
+          unzip -q /tmp/godot.zip -d /tmp/peel-godot
+          mv /tmp/peel-godot/Godot_v4.7.1-stable_linux.x86_64 ./godot
+          chmod +x ./godot
+          ./godot --version
+
+      - name: Run independent deterministic verification
+        if: steps.context.outputs.stale != 'true'
+        id: verify
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/challenger-verify.log
+
+          ./godot --headless --editor --path . --quit > /tmp/import.out 2>&1
+          import_rc=$?
+          cat /tmp/import.out >> /tmp/challenger-verify.log
+          grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" /tmp/import.out >/dev/null 2>&1
+          parse_guard_hit=$?
+
+          ./godot --headless --path . --script res://tests/test_runner.gd > /tmp/unit.out 2>&1
+          unit_rc=$?
+          cat /tmp/unit.out >> /tmp/challenger-verify.log
+
+          ./godot --headless --path . --script res://tests/smoke_scene.gd > /tmp/smoke.out 2>&1
+          smoke_rc=$?
+          cat /tmp/smoke.out >> /tmp/challenger-verify.log
+
+          if [ "$import_rc" -eq 0 ] && [ "$parse_guard_hit" -ne 0 ] && [ "$unit_rc" -eq 0 ] && [ "$smoke_rc" -eq 0 ]; then
+            ci_ok=true
+          else
+            ci_ok=false
+          fi
+          echo "ci_ok=$ci_ok" >> "$GITHUB_OUTPUT"
+          echo "import_rc=$import_rc" >> "$GITHUB_OUTPUT"
+          echo "unit_rc=$unit_rc" >> "$GITHUB_OUTPUT"
+          echo "smoke_rc=$smoke_rc" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Prepare Challenger prompt
+        if: steps.context.outputs.stale != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .agent-challenger-prompt.md <<'PROMPT'
+          You are peel-challenger, the independent adversarial half of the Peel Calm two-agent team.
+          You did not implement this Builder batch. Treat Builder claims as hypotheses, never as evidence.
+
+          Read:
+          - .agents/PROJECT_KNOWLEDGE.md
+          - .agents/protocol.md
+          - .agents/CONTACTS.md
+          - /tmp/peel-task.json
+          - /tmp/builder-pr.json
+          - /tmp/builder.patch
+          - /tmp/builder-commits.txt
+          - /tmp/challenger-verify.log
+          - current relevant specs/plans, production files and tests
+
+          Independently attack the exact checked-out Builder head. At minimum:
+          1. Construct at least one concrete counterexample or boundary scenario beyond existing happy paths.
+          2. Check state-machine completion/reset one-shot behavior, finite/monotonic peel math, bounded/HELD geometry, re-grab and touch/mouse behavior when relevant.
+          3. Check missing resources, hard-coded local paths, scene/runtime wiring, authored hands, print texture, real Foley and third-party asset provenance when touched.
+          4. Check that presentation code did not become gameplay authority.
+          5. Check all owner V1/V2 regression failures in PROJECT_KNOWLEDGE when relevant.
+          6. Check whether the canonical complete-version task still has machine-verifiable acceptance items missing. Do not mistake one green batch for a complete game.
+          7. Never claim CI proves subjective hand naturalness, audio pleasantness, visual beauty or tactile satisfaction; those stay experiential UNVERIFIED until owner playtest.
+
+          The deterministic wrapper has separately run Godot 4.7.1 import, parser guard, all unit suites and scene smoke; inspect its log rather than trusting Builder's self-report.
+
+          Return a strict JSON verdict. VERIFIED means this exact batch is technically sound under available evidence. NEEDS_FIX means you found a reproducible defect or deterministic check failure. UNVERIFIED means observability is insufficient for a claim that must not be guessed.
+
+          Set complete_machine_scope=true only if the canonical task's entire machine-verifiable complete-playable acceptance scope is already satisfied by this PR. If the batch is VERIFIED but the complete game still has machine work remaining, set continue_build=true and list the highest-priority remaining items. If all remaining uncertainty is experiential owner playtest, set continue_build=false.
+          PROMPT
+
+      - name: Run independent Challenger Codex
+        if: steps.context.outputs.stale != 'true'
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .agent-challenger-prompt.md
+          output-file: /tmp/challenger-result.json
+          output-schema: |
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "verdict": {"type": "string", "enum": ["VERIFIED", "NEEDS_FIX", "UNVERIFIED"]},
+                "summary": {"type": "string"},
+                "counterexample": {"type": "string"},
+                "acceptance_test": {"type": "string"},
+                "complete_machine_scope": {"type": "boolean"},
+                "continue_build": {"type": "boolean"},
+                "remaining_machine_items": {"type": "array", "items": {"type": "string"}},
+                "experiential_unverified": {"type": "array", "items": {"type": "string"}}
+              },
+              "required": ["verdict", "summary", "counterexample", "acceptance_test", "complete_machine_scope", "continue_build", "remaining_machine_items", "experiential_unverified"]
+            }
+          permission-profile: ":read-only"
+          safety-strategy: drop-sudo
+          effort: high
+          allow-bots: true
+
+      - name: Normalize verdict against deterministic evidence
+        if: steps.context.outputs.stale != 'true'
+        id: verdict
+        shell: bash
+        env:
+          CI_OK: ${{ steps.verify.outputs.ci_ok }}
+        run: |
+          set -euo pipefail
+          rm -f .agent-challenger-prompt.md godot
+          jq -e '.verdict and (.complete_machine_scope|type=="boolean") and (.continue_build|type=="boolean")' /tmp/challenger-result.json >/dev/null
+          verdict="$(jq -r .verdict /tmp/challenger-result.json)"
+          if [ "$CI_OK" != "true" ]; then
+            verdict="NEEDS_FIX"
+          fi
+          echo "effective_verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "complete_machine_scope=$(jq -r .complete_machine_scope /tmp/challenger-result.json)" >> "$GITHUB_OUTPUT"
+          echo "continue_build=$(jq -r .continue_build /tmp/challenger-result.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact-head Challenger evidence
+        if: steps.context.outputs.stale != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERDICT: ${{ steps.verdict.outputs.effective_verdict }}
+          CI_OK: ${{ steps.verify.outputs.ci_ok }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          comment=/tmp/challenger-comment.md
+          {
+            echo "TYPE: ${VERDICT}"
+            echo "FROM: peel-challenger"
+            echo "TO: peel-builder"
+            echo "ARTIFACT: PR #${PR_NUMBER}"
+            echo "SHA: ${EXPECTED_HEAD_SHA}"
+            echo "CLAIM: Independent Challenger verdict for this exact Builder head."
+            echo "EVIDENCE: independent Godot 4.7.1 deterministic checks ci_ok=${CI_OK}; structured adversarial review follows."
+            echo '```json'
+            cat /tmp/challenger-result.json
+            echo
+            echo '```'
+            echo "NEXT_ACTION: follow the verdict and canonical task state; stale evidence must never be reused for a later head."
+          } > "$comment"
+          gh pr comment "$PR_NUMBER" --body-file "$comment"
+
+      - name: Handoff repair or next complete-version batch to Builder
+        if: >-
+          steps.context.outputs.stale != 'true' &&
+          (steps.verdict.outputs.effective_verdict != 'VERIFIED' ||
+           steps.verdict.outputs.continue_build == 'true' ||
+           steps.verdict.outputs.complete_machine_scope != 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERDICT: ${{ steps.verdict.outputs.effective_verdict }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          next_round=$((AGENT_ROUND + 1))
+          if [ "$next_round" -gt "$MAX_AGENT_ROUND" ]; then
+            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED; FROM: peel-challenger; TO: owner; ARTIFACT: PR #${PR_NUMBER}; SHA: ${EXPECTED_HEAD_SHA}; CLAIM: bounded autonomous handoff limit reached before complete-machine acceptance; EVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}; NEXT_ACTION: inspect current PR evidence before extending autonomous API budget."
+            exit 0
+          fi
+          feedback="$(jq -c --arg verdict "$VERDICT" '. + {effective_verdict:$verdict}' /tmp/challenger-result.json)"
+          gh workflow run agent-builder.yml --ref main \
+            -f task_id="$TASK_ID" \
+            -f challenger_feedback="$feedback" \
+            -f round="$next_round"
+
+      - name: Protected exact-head merge after independent complete verdict
+        if: >-
+          steps.context.outputs.stale != 'true' &&
+          steps.verdict.outputs.effective_verdict == 'VERIFIED' &&
+          steps.verdict.outputs.continue_build == 'false' &&
+          steps.verdict.outputs.complete_machine_scope == 'true'
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_head="$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)"
+          if [ "$current_head" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "PR head moved after Challenger review; refusing merge." >&2
+            exit 1
+          fi
+          gh pr ready "$PR_NUMBER" >/dev/null 2>&1 || true
+          response="$(gh api --method PUT \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            -f sha="$EXPECTED_HEAD_SHA" \
+            -f merge_method=merge)"
+          if [ "$(jq -r .merged <<< "$response")" != "true" ]; then
+            jq . <<< "$response" >&2
+            exit 1
+          fi
+          merge_sha="$(jq -r .sha <<< "$response")"
+          echo "merge_sha=$merge_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch and wait for merged-main Godot verification
+        if: steps.merge.outputs.merge_sha != ''
+        id: mainverify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run godot-check.yml --ref main
+          run_id=""
+          conclusion=""
+          for _ in $(seq 1 90); do
+            row="$(gh run list --workflow godot-check.yml --event workflow_dispatch --commit "$MERGE_SHA" --limit 10 --json databaseId,status,conclusion,headSha --jq '.[0] // empty')"
+            if [ -n "$row" ]; then
+              run_id="$(jq -r .databaseId <<< "$row")"
+              status="$(jq -r .status <<< "$row")"
+              conclusion="$(jq -r '.conclusion // ""' <<< "$row")"
+              if [ "$status" = "completed" ]; then
+                break
+              fi
+            fi
+            sleep 4
+          done
+          if [ -z "$run_id" ] || [ "$conclusion" != "success" ]; then
+            echo "Merged-main verification failed or was not observed: run=$run_id conclusion=$conclusion" >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Record ACCEPTED and close master task
+        if: steps.mainverify.outputs.run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          MAIN_RUN_ID: ${{ steps.mainverify.outputs.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=/tmp/accepted.md
+          {
+            echo "TYPE: ACCEPTED"
+            echo "FROM: peel-challenger"
+            echo "TO: owner"
+            echo "ARTIFACT: merged main"
+            echo "SHA: ${MERGE_SHA}"
+            echo "CLAIM: Machine-verifiable complete-playable scope passed independent exact-head challenge, protected merge, and merged-main Godot 4.7.1 verification."
+            echo "EVIDENCE: Builder PR #${PR_NUMBER}; merged-main Godot Check run ${MAIN_RUN_ID}."
+            echo "NEXT_ACTION: owner downloads/clones main and performs the experiential screenshot/playtest round for hand feel, Foley and overall satisfaction."
+          } > "$body"
+          gh issue close "$TASK_ID" --comment "$(cat "$body")"
