@@ -1,6 +1,7 @@
 extends Node3D
 
 var _camera: Camera3D
+var _cup: MeshInstance3D
 var _label: LabelVisual
 var _label_print: LabelPrint
 var _lifecycle: LabelLifecycle
@@ -12,27 +13,34 @@ var _audio: PeelAudio
 var _hud: Label
 var _reward: Label
 var _edge_marker: MeshInstance3D
+var _session: SessionModel
 var _release_count := 0
 var _reset_timer := -1.0
 var _completed_this_frame := false
 var _pending_score := 0
+var _advance_after_reset := false
+var _paused := false
 
 func _ready() -> void:
 	_build_world()
-	_controller = PeelController.new({
-		"base_adhesion": 11.0,
-		"release_increment": 0.038,
-		"speed_gain": 0.018,
-		"angle_gain": 0.3
-	})
+	_session = SessionModel.new()
 	_lifecycle = LabelLifecycle.new(0.16)
-	_controller.completed.connect(_on_completed)
+	_apply_current_variant()
 	_reset_session()
 
 func _process(delta: float) -> void:
+	if _paused:
+		_audio.reset_feedback()
+		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
+		_pointer.clear_transients()
+		return
+
 	if _reset_timer >= 0.0:
 		_reset_timer -= delta
 		if _reset_timer <= 0.0:
+			if _advance_after_reset:
+				_session.advance_item()
+				_apply_current_variant()
 			_reset_session()
 
 	var progress: float = _controller.get_progress()
@@ -76,7 +84,12 @@ func _process(delta: float) -> void:
 	_audio.set_feedback(active_peel, speed, tension, released_amount, detached_now, delta)
 
 	if detached_now:
-		_reward.text = "CLEAN PEEL  +%d" % _pending_score
+		var progress_result: Dictionary = _session.record_clean_peel(_pending_score)
+		var reward_text := "CLEAN PEEL  +%d" % _pending_score
+		if bool(progress_result.get("unlocked_new", false)):
+			reward_text += "\nNEW FEEL UNLOCKED"
+		_reward.text = reward_text
+		_advance_after_reset = true
 		_reset_timer = 2.15
 
 	_update_hud(state_name, phase_name, progress)
@@ -121,16 +134,16 @@ func _build_world() -> void:
 	table.material_override = _material(Color(0.26, 0.20, 0.17), 0.88)
 	add_child(table)
 
-	var cup := MeshInstance3D.new()
-	cup.name = "Cup"
+	_cup = MeshInstance3D.new()
+	_cup.name = "Cup"
 	var cup_mesh := CylinderMesh.new()
 	cup_mesh.top_radius = 0.54
 	cup_mesh.bottom_radius = 0.45
 	cup_mesh.height = 1.48
-	cup.mesh = cup_mesh
-	cup.position = Vector3(0, 0.05, 0)
-	cup.material_override = _material(Color(0.89, 0.84, 0.74), 0.94)
-	add_child(cup)
+	_cup.mesh = cup_mesh
+	_cup.position = Vector3(0, 0.05, 0)
+	_cup.material_override = _material(Color(0.89, 0.84, 0.74), 0.94)
+	add_child(_cup)
 
 	var lid := MeshInstance3D.new()
 	lid.name = "Lid"
@@ -152,7 +165,6 @@ func _build_world() -> void:
 	_label_print = LabelPrint.new()
 	_label_print.name = "LabelPrint"
 	add_child(_label_print)
-	_label_print.set_order("A17", "OAT LATTE")
 	_label.set_print_texture(_label_print.get_texture())
 
 	_edge_marker = MeshInstance3D.new()
@@ -197,28 +209,51 @@ func _build_hud() -> void:
 	_hud = Label.new()
 	_hud.name = "Instructions"
 	_hud.position = Vector2(28, 24)
-	_hud.size = Vector2(760, 100)
+	_hud.size = Vector2(900, 120)
 	_hud.add_theme_font_size_override("font_size", 19)
 	_hud.add_theme_color_override("font_color", Color(0.93, 0.90, 0.84, 0.92))
 	layer.add_child(_hud)
 
 	_reward = Label.new()
 	_reward.name = "Reward"
-	_reward.position = Vector2(400, 576)
-	_reward.size = Vector2(480, 90)
+	_reward.position = Vector2(370, 555)
+	_reward.size = Vector2(540, 120)
 	_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_reward.add_theme_font_size_override("font_size", 34)
+	_reward.add_theme_font_size_override("font_size", 30)
 	_reward.add_theme_color_override("font_color", Color(0.98, 0.92, 0.76, 1.0))
 	layer.add_child(_reward)
 
 func _update_hud(state_name: String, phase_name: String, progress: float) -> void:
+	if _session == null:
+		return
+	var variant := _session.current_variant()
+	if _paused:
+		_hud.text = "PAUSED\nEsc Resume   •   R Reset Label   •   Shift+R Restart Run"
+		return
+
 	var percent := int(round(progress * 100.0))
-	var hint := "Find the warm dot • hold left mouse • pull slowly"
+	var hint := "Touch the gold edge • hold left mouse • pull gently"
+	if state_name == "EDGE_HOVER":
+		hint = "Hold left mouse, then pull away from the cup"
+	elif state_name in ["EDGE_LIFT", "PINCHED"]:
+		hint = "Keep holding • begin a slow steady pull"
+	elif state_name == "PEELING":
+		hint = "Steady pull • listen for each adhesive release"
+	elif state_name == "RELEASED":
+		hint = "Re-grab the gold edge to continue"
 	if phase_name == "DETACHING":
-		hint = "Final adhesive releasing…"
+		hint = "Last bit of adhesive…"
 	elif phase_name == "HELD":
-		hint = "Clean peel — label fully detached"
-	_hud.text = "Peel %d%%   •   %s\n%s   •   R = reset" % [percent, phase_name, hint]
+		hint = "Clean peel — nice."
+
+	_hud.text = "%s   •   Peel %d%%\n%s\nStamps %d   •   Score %d   •   Feels %d/3   •   Esc Pause   •   R Reset   •   Shift+R Restart Run" % [
+		String(variant.get("name", "Peel Calm")),
+		percent,
+		hint,
+		_session.get_clean_peels(),
+		_session.get_total_score(),
+		_session.get_unlocked_count()
+	]
 
 func _on_completed() -> void:
 	_completed_this_frame = true
@@ -226,8 +261,33 @@ func _on_completed() -> void:
 	_pending_score = ScoreModel.score(100.0, 1.0, continuity)
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_ESCAPE:
+		_paused = not _paused
+		_audio.reset_feedback()
+		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
+		return
+	if event.keycode == KEY_R:
+		_paused = false
+		if event.shift_pressed:
+			_session.restart_run()
+			_apply_current_variant()
 		_reset_session()
+
+func _apply_current_variant() -> void:
+	var variant := _session.current_variant()
+	_controller = PeelController.new({
+		"base_adhesion": float(variant.get("base_adhesion", 11.0)),
+		"release_increment": float(variant.get("release_increment", 0.038)),
+		"speed_gain": float(variant.get("speed_gain", 0.018)),
+		"angle_gain": float(variant.get("angle_gain", 0.30))
+	})
+	_controller.completed.connect(_on_completed)
+	_label.label_width = float(variant.get("label_width", 1.20))
+	_label.label_height = float(variant.get("label_height", 0.42))
+	var cup_color: Color = variant.get("cup_color", Color(0.89, 0.84, 0.74))
+	_cup.material_override = _material(cup_color, 0.94)
 
 func _reset_session() -> void:
 	if _controller != null:
@@ -238,6 +298,7 @@ func _reset_session() -> void:
 	_pending_score = 0
 	_completed_this_frame = false
 	_reset_timer = -1.0
+	_advance_after_reset = false
 	if _reward != null:
 		_reward.text = ""
 	var fresh_grip_world := Vector3.ZERO
@@ -249,8 +310,10 @@ func _reset_session() -> void:
 		_label.set_peel(0.0, front)
 		fresh_grip_world = _label.to_global(front)
 		has_fresh_grip = true
-	if _label_print != null:
-		_label_print.set_order("A17", "OAT LATTE")
+	if _label_print != null and _session != null:
+		var variant := _session.current_variant()
+		var order_code := "P%02d" % (_session.get_clean_peels() + 1)
+		_label_print.set_order(order_code, String(variant.get("drink", "OAT LATTE")))
 	if _right_hand != null:
 		_right_hand.set_pinch_amount(0.18)
 		_right_hand.tick(0.0)
@@ -260,6 +323,7 @@ func _reset_session() -> void:
 			_right_hand.set_grip_target(fresh_grip_world)
 	if _audio != null:
 		_audio.reset_feedback()
+	_update_hud("", "ATTACHED", 0.0)
 
 func _screen_to_plane(screen_position: Vector2, z_depth: float) -> Vector3:
 	var origin := _camera.project_ray_origin(screen_position)
