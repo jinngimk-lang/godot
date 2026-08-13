@@ -209,6 +209,47 @@ func run() -> Array[String]:
 	state = adapter.consume_frame()
 	if state.pressed or not state.released_this_frame:
 		failures.append("real mouse owner release should end the gameplay pointer")
+	adapter.clear_transients()
+
+	# Lingering-secondary ownership: an ignored second finger that remains held
+	# after the primary releases may emit drag events, but those are continuation
+	# events and must not silently become a new gesture without a fresh press.
+	touch.index = 0
+	touch.position = Vector2(520, 270)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	secondary.index = 1
+	secondary.position = Vector2(760, 420)
+	secondary.pressed = true
+	adapter._unhandled_input(secondary)
+
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	adapter.clear_transients()
+	drag.index = 1
+	drag.position = Vector2(790, 400)
+	drag.screen_relative = Vector2(30, -20)
+	drag.screen_velocity = Vector2(500, -260)
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("still-held secondary touch must not inherit ownership through drag after primary release")
+
+	secondary.position = drag.position
+	secondary.pressed = false
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if state.pressed or state.released_this_frame:
+		failures.append("ignored lingering secondary release must remain neutral")
+
+	secondary.position = Vector2(800, 395)
+	secondary.pressed = true
+	adapter._unhandled_input(secondary)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != secondary.position:
+		failures.append("fresh secondary press after release should establish new ownership")
+	secondary.pressed = false
+	adapter._unhandled_input(secondary)
 
 	adapter.free()
 	return failures
