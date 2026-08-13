@@ -12,6 +12,7 @@ func _init() -> void:
 		"res://tests/test_peel_model.gd",
 		"res://tests/test_pointer_state.gd",
 		"res://tests/test_pointer_adapter.gd",
+		"res://tests/test_touch_owner_handoff_challenger.gd",
 		"res://tests/test_score_model.gd",
 		"res://tests/test_peel_controller.gd",
 		"res://tests/test_label_visual_geometry.gd",
