@@ -90,6 +90,9 @@ func get_hand_position() -> Vector2:
 func get_state_name() -> String:
 	return State.keys()[_state]
 
+func get_model_config() -> Dictionary:
+	return _model.get_config()
+
 func _advance_peel(pointer: PointerState, delta: float) -> void:
 	var pull_vec: Vector2 = _hand_position - _edge_position
 	var tension: float = pull_vec.length() * _tension_per_pixel
