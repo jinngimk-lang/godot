@@ -1,6 +1,6 @@
 # Peel Calm Shared Project Knowledge
 
-This file is compact operational memory for both repository agents. It does not replace specs, plans, tests, Git history, the canonical cross-PR coordination Hub in Issue #5, the current complete-playable task ledger in Issue #7, PR evidence, or owner playtest evidence. Inspect those sources whenever a detail matters, and treat stale exact-head evidence as invalid after a head/base changes.
+This file is compact operational memory for both repository agents. It does not replace specs, plans, tests, Git history, the canonical cross-PR coordination Hub in Issue #5, phase-specific task/evidence ledgers such as the complete-playable record in Issue #7, PR evidence, or owner playtest evidence. Discover the active task/PR from Hub #5 and current repository state rather than assuming a historical task issue is still current. Inspect the relevant sources whenever a detail matters, and treat stale exact-head evidence as invalid after a head/base changes.
 
 ## Product thesis
 
@@ -208,7 +208,7 @@ Automatable acceptance should include:
 - mergeability/base-drift check immediately before integration;
 - fresh post-merge `main` verification.
 
-Do **not** describe a merge as protected unless branch protection is actually configured and observed. At present, evidence discipline and independent review are the safety mechanism; repository settings must be checked rather than assumed.
+Do **not** describe a merge as protected unless branch protection is actually configured and observed. Query repository settings before making that claim; evidence discipline, exact-head checks, independent review, and post-merge verification remain required regardless of protection state.
 
 For visible presentation changes, use a non-headless capture where practical. Capture-only branches/workflows must not silently become production dependencies.
 
@@ -223,9 +223,9 @@ Those remain `UNVERIFIED` until owner local playtest evidence exists.
 
 ## Multi-agent coordination protocol
 
-Issue #5 is the canonical cross-PR coordination Hub. Use it for role declaration, narrow file/path claims, ownership collisions, handoffs, blockers, releases, and current cross-task state. PR comments carry change-local evidence and review conclusions. Issue #7 is the current complete-playable Peel Calm task/evidence ledger; it may summarize task-specific progress, but it does not replace Hub #5.
+Issue #5 is the canonical cross-PR coordination Hub. Use it for role declaration, narrow file/path claims, ownership collisions, handoffs, blockers, releases, and cross-task state. PR comments carry change-local evidence and review conclusions. Issue #7 is the complete-playable Peel Calm phase/task evidence ledger; it is useful historical evidence for that phase, but it is not a permanent current-task entrypoint. Discover the active task issue/PR from Hub #5 and current repository state instead of assuming #7 remains current.
 
-- Before starting a meaningful line, inspect current `main`, open PRs, active branches, recent Issue #5 ownership/handoff state, the relevant PR discussion, and task-specific Issue #7 evidence when working on the complete-playable slice.
+- Before starting a meaningful line, inspect current `main`, open PRs, active branches, recent Issue #5 ownership/handoff state, the relevant PR discussion, and the currently active task issue/PR discovered from that state. Consult Issue #7 when complete-playable phase history is relevant rather than treating it as permanently active.
 - Every cross-PR coordination comment should declare `AGENT`, `ROLE`, `TASK`, `BASE_SHA`, `BRANCH`, `FILES_CLAIMED`, `STATUS`, `EVIDENCE`, `BLOCKER`, and `NEXT_ACTION` as required by Hub #5.
 - State path claims/collision boundaries before production writes when two agents are active; do not edit another agent's claimed production paths unless explicitly taking over after a handoff/blocker.
 - Prefer isolated, narrowly scoped branches/PRs so repairs can be challenged, replayed, merged, or discarded independently.
