@@ -8,6 +8,10 @@ config/name="Peel Calm"
 run/main_scene="res://scenes/peel_lab/peel_lab.tscn"
 config/features=PackedStringArray("4.7")
 
+[autoload]
+
+VerifyDefaultLaunchGenericError="*res://tests/verify_default_launch_generic_error.gd"
+
 [display]
 
 window/size/viewport_width=1280
