@@ -240,15 +240,24 @@ func _reset_session() -> void:
 	_reset_timer = -1.0
 	if _reward != null:
 		_reward.text = ""
+	var fresh_grip_world := Vector3.ZERO
+	var has_fresh_grip := false
 	if _label != null:
 		_label.set_phase("ATTACHED")
 		_label.set_detach_alpha(0.0)
 		var front := _label.get_front_position(0.0)
 		_label.set_peel(0.0, front)
+		fresh_grip_world = _label.to_global(front)
+		has_fresh_grip = true
 	if _label_print != null:
 		_label_print.set_order("A17", "OAT LATTE")
 	if _right_hand != null:
 		_right_hand.set_pinch_amount(0.18)
+		_right_hand.tick(0.0)
+		if has_fresh_grip:
+			var current_pinch := _right_hand.get_pinch_world_position()
+			_right_hand.position += fresh_grip_world - current_pinch
+			_right_hand.set_grip_target(fresh_grip_world)
 	if _audio != null:
 		_audio.reset_feedback()
 
