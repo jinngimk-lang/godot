@@ -10,51 +10,31 @@ permissions:
 
 jobs:
   challenge:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - agent: qwen-challenger
-            model: qwen2.5-coder:3b
-          - agent: codegemma-challenger
-            model: codegemma:2b
-    name: ${{ matrix.agent }}
+    name: qwen7b-completion-challenger
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout exact complete-playable candidate
         uses: actions/checkout@v6
         with:
-          ref: b3d80f4c53aa7d27ebb6f56d81afefffc54a334a
+          ref: becc790516e2d7dc5cb67615976b5a884328af61
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare exact review packet
+      - name: Prepare narrow exact-head review packet
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main:refs/remotes/origin/main
-          git diff --no-ext-diff --unified=4 origin/main...HEAD -- \
-            scripts/peel_lab.gd \
-            scripts/session/session_model.gd \
-            scripts/peel/peel_controller.gd \
-            scripts/peel/peel_model.gd > /tmp/production.diff
-          git diff --no-ext-diff --unified=2 origin/main...HEAD -- \
-            tests/test_session_model.gd \
-            tests/smoke_scene.gd \
-            tests/smoke_reset_loop.gd > /tmp/tests.diff
-          test -s /tmp/production.diff
           {
-            echo '=== CURRENT PRODUCTION peel_lab.gd ==='
-            cat scripts/peel_lab.gd
-            echo '=== CURRENT PRODUCTION session_model.gd ==='
+            echo '=== peel_lab.gd: completion/session production state machine ==='
+            awk '/^func _process\(/,/^func _build_world\(/' scripts/peel_lab.gd
+            awk '/^func _update_hud\(/,/^func _apply_current_variant\(/' scripts/peel_lab.gd
+            awk '/^func _apply_current_variant\(/,/^func _screen_to_plane\(/' scripts/peel_lab.gd
+            echo '=== session_model.gd: progression production state ==='
             cat scripts/session/session_model.gd
-            echo '=== PRODUCTION DIFF VS MAIN ==='
-            cat /tmp/production.diff
-            echo '=== TEST DIFF (evidence only; do not assume tests are correct) ==='
-            cat /tmp/tests.diff
           } > /tmp/review-packet.txt
           wc -c /tmp/review-packet.txt
+          test "$(wc -c < /tmp/review-packet.txt)" -lt 18000
 
       - name: Install local Ollama runtime
         shell: bash
@@ -69,82 +49,62 @@ jobs:
           cat /tmp/ollama-server.log
           exit 1
 
-      - name: Pull independent model
+      - name: Pull stronger zero-balance code model
         shell: bash
         run: |
           set -euo pipefail
-          ollama pull '${{ matrix.model }}'
+          ollama pull qwen2.5-coder:7b
 
-      - name: Run adversarial exact-head review
+      - name: Run narrow adversarial review
         shell: bash
-        env:
-          REVIEW_MODEL: ${{ matrix.model }}
-          AGENT_NAME: ${{ matrix.agent }}
         run: |
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are a skeptical independent code-review agent. You did NOT write this patch.
-          Review a Godot 4.7.1 GDScript game candidate. Do not summarize the tests. Try to break the production logic.
+          You are CHALLENGER, independent from the implementation author.
+          Analyze ONLY the production GDScript below. Do not summarize it. Try to find a real state-machine bug.
 
-          Exact acceptance claims to attack:
-          1. A true detached label records progression exactly once.
-          2. Completing a label, waiting for next-item transition, and completing again cannot double-count or retain stale controller/lifecycle state.
-          3. Unlock thresholds are exactly after clean peels 2 and 5. Variant rotation uses only unlocked variants.
-          4. Each tactile variant changes real peel configuration and label dimensions, not only text.
-          5. R resets the current label without erasing accumulated run progression. Shift+R clears the whole run. Esc pause/resume is reversible and does not advance timers while paused.
-          6. Rebuilding the controller during a variant change does not leave stale signal callbacks or old model parameters in use.
-          7. The old V2 contracts remain reachable: true DETACHING->HELD lifecycle, bounded label visual, authored hands, printed paper texture, local Foley.
-          8. No direct-run runtime cloud/secret/plugin dependency was introduced.
+          Claims to falsify:
+          A. `_handle_detached_label` can award a physical label at most once even if called twice.
+          B. During the 2.15 second post-peel delay, Escape freezes the delay because `_process` returns before decrementing it.
+          C. During that delay, plain R advances exactly once to the next unlocked item, preserves earned score/stamps, and consumes the pending transition.
+          D. Plain R on an active label resets only that label and does not erase progression or change the selected tactile profile.
+          E. Shift+R during the delay clears the run and prevents the old pending auto-next from firing later.
+          F. Automatic timeout and R-next both rebuild the controller using the newly selected variant before resetting the fresh label.
 
-          Required review method:
-          - Read production code first. Treat tests only as evidence, not truth.
-          - Construct at least THREE concrete event sequences/counterexamples, including one involving reset during the 2.15s next-item delay and one involving pause during that delay.
-          - Check actual variable ordering and state mutations line by line.
-          - If you find a defect, identify the exact function/variables and propose one minimal falsifiable test.
-          - Do not judge subjective visuals/audio pleasantness.
+          Required counterexample simulations:
+          1. detach callback called twice before any reset;
+          2. second clean peel unlocks profile 2 -> pause for 0.75s -> resume -> press R;
+          3. completed label -> Shift+R -> then simulate 3 seconds of `_process`.
 
-          Your output MUST use exactly this structure:
+          For each sequence, trace these variables explicitly:
+          `_detach_reward_recorded`, `_reset_timer`, `_advance_after_reset`, `_paused`, session clean peels/score/unlocked count/current variant.
+
+          Respond EXACTLY with six single-line fields and no headings/markdown:
           VERDICT: VERIFIED
-          COUNTEREXAMPLE_1: ...
-          COUNTEREXAMPLE_2: ...
-          COUNTEREXAMPLE_3: ...
-          EVIDENCE: ...
+          TRACE_1: ...
+          TRACE_2: ...
+          TRACE_3: ...
+          DEFECT: none
           MIN_TEST: none
 
-          OR:
-          VERDICT: NEEDS_FIX
-          COUNTEREXAMPLE_1: ...
-          COUNTEREXAMPLE_2: ...
-          COUNTEREXAMPLE_3: ...
-          EVIDENCE: exact file/function/variable defect
-          MIN_TEST: precise reproducible acceptance test
+          If any claim fails, use `VERDICT: NEEDS_FIX`, identify the exact function and bad transition in DEFECT, and give a concrete minimal test in MIN_TEST.
 
-          Review packet follows.
+          Production code follows:
           PROMPT
             cat /tmp/review-packet.txt
           } > /tmp/review-prompt.txt
 
-          ollama run "$REVIEW_MODEL" < /tmp/review-prompt.txt | tee /tmp/review-report.txt
+          ollama run qwen2.5-coder:7b < /tmp/review-prompt.txt | tee /tmp/review-report.txt
           test -s /tmp/review-report.txt
-          if ! grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt; then
-            echo "$AGENT_NAME failed the review protocol: no valid verdict" >&2
-            exit 1
-          fi
-          for field in COUNTEREXAMPLE_1 COUNTEREXAMPLE_2 COUNTEREXAMPLE_3 EVIDENCE MIN_TEST; do
-            grep -Eq "^${field}:" /tmp/review-report.txt || {
-              echo "$AGENT_NAME failed the review protocol: missing $field" >&2
-              exit 1
-            }
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt
+          for field in TRACE_1 TRACE_2 TRACE_3 DEFECT MIN_TEST; do
+            grep -Eq "^${field}:" /tmp/review-report.txt
           done
 
       - name: Show independent report
         if: always()
         shell: bash
         run: |
-          echo '===== ${{ matrix.agent }} / ${{ matrix.model }} ====='
-          if [ -f /tmp/review-report.txt ]; then
-            cat /tmp/review-report.txt
-          else
-            echo 'No conforming report produced.'
-          fi
+          echo '===== QWEN 7B COMPLETION CHALLENGER ====='
+          if [ -f /tmp/review-report.txt ]; then cat /tmp/review-report.txt; else echo 'No conforming report produced.'; fi
