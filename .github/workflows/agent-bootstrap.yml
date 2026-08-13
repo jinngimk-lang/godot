@@ -1,0 +1,52 @@
+name: Agent Workflow Compile
+
+on:
+  push:
+    branches:
+      - feat/dual-agent-runtime-v1
+    paths:
+      - .github/workflows/agent-builder.md
+      - .github/workflows/agent-challenger.md
+      - .github/workflows/agent-bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned gh-aw compiler
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh extension install github/gh-aw --pin v0.83.4
+          gh aw version
+
+      - name: Compile and strict-validate agent workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh aw compile agent-builder --strict
+          gh aw compile agent-challenger --strict
+          test -s .github/workflows/agent-builder.lock.yml
+          test -s .github/workflows/agent-challenger.lock.yml
+
+      - name: Upload compiled workflows
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-agent-workflows
+          path: |
+            .github/workflows/agent-builder.lock.yml
+            .github/workflows/agent-challenger.lock.yml
+            .github/aw/actions-lock.json
+          if-no-files-found: error
