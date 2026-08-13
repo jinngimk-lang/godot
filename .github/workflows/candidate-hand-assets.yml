@@ -1,0 +1,235 @@
+name: Candidate Renderable Hand Assets
+
+on:
+  push:
+    branches:
+      - assist/fix-authored-hand-render-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install authoring and display tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy xvfb libgl1-mesa-dri libglx-mesa0
+          blender --version
+
+      - name: Download pinned CC0 hand sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hand-src
+          base="https://raw.githubusercontent.com/GodotVR/godot-xr-tools/2d8db860d1adbee97c0968c4b07afe9348263926/addons/godot-xr-tools/hands/blend"
+          curl -L --fail --retry 3 -o /tmp/hand-src/hand_l.blend "$base/hand_l.blend"
+          curl -L --fail --retry 3 -o /tmp/hand-src/hand_r.blend "$base/hand_r.blend"
+          curl -L --fail --retry 3 -o /tmp/hand-src/animations_hand_l.blend "$base/animations/animations_hand_l.blend"
+          curl -L --fail --retry 3 -o /tmp/hand-src/animations_hand_r.blend "$base/animations/animations_hand_r.blend"
+
+      - name: Combine semi-realistic meshes with authored actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/build_hand.py <<'PY'
+          import bpy
+          import os
+          import sys
+
+          args = sys.argv[sys.argv.index("--") + 1:]
+          static_path, animation_path, output_path, suffix = args
+          bpy.ops.wm.open_mainfile(filepath=static_path)
+
+          armature = bpy.data.objects.get("Armature")
+          if armature is None or armature.type != "ARMATURE":
+              raise RuntimeError("static hand source has no Armature object")
+          if len(armature.data.bones) != 26:
+              raise RuntimeError(f"unexpected armature bone count: {len(armature.data.bones)}")
+
+          wanted_meshes = [f"mesh_Hand_{suffix}", f"mesh_Hand_Nails_{suffix}"]
+          meshes = []
+          for name in wanted_meshes:
+              obj = bpy.data.objects.get(name)
+              if obj is None or obj.type != "MESH" or len(obj.data.vertices) <= 0:
+                  raise RuntimeError(f"required render mesh missing or empty: {name}")
+              meshes.append(obj)
+          total_vertices = sum(len(obj.data.vertices) for obj in meshes)
+          print("CANDIDATE_SOURCE_MESHES", [(obj.name, len(obj.data.vertices)) for obj in meshes], "total=", total_vertices)
+
+          with bpy.data.libraries.load(animation_path, link=False) as (data_from, data_to):
+              data_to.actions = list(data_from.actions)
+          actions = [action for action in data_to.actions if action is not None]
+          action_names = [action.name for action in actions]
+          for required in ["Default pose", "Cup", "Hold", "Pinch Tight", "Pinch Up"]:
+              if required not in action_names:
+                  raise RuntimeError(f"required authored action missing after append: {required}")
+          print("CANDIDATE_ACTIONS", action_names)
+
+          armature.animation_data_create()
+          armature.animation_data.action = bpy.data.actions.get("Default pose")
+
+          bpy.ops.object.select_all(action="DESELECT")
+          armature.select_set(True)
+          for obj in meshes:
+              obj.hide_viewport = False
+              obj.hide_render = False
+              obj.select_set(True)
+          bpy.context.view_layer.objects.active = armature
+
+          operator = bpy.ops.export_scene.gltf
+          rna = operator.get_rna_type()
+          properties = set(rna.properties.keys())
+          kwargs = {
+              "filepath": output_path,
+              "export_format": "GLB",
+              "use_selection": True,
+              "export_animations": True,
+              "export_skins": True,
+          }
+          if "export_animation_mode" in properties:
+              enum_items = [item.identifier for item in rna.properties["export_animation_mode"].enum_items]
+              print("GLTF_ANIMATION_MODES", enum_items)
+              if "ACTIONS" in enum_items:
+                  kwargs["export_animation_mode"] = "ACTIONS"
+              elif "ACTIVE_ACTIONS" in enum_items:
+                  kwargs["export_animation_mode"] = "ACTIVE_ACTIONS"
+          if "export_nla_strips" in properties and "export_animation_mode" not in kwargs:
+              kwargs["export_nla_strips"] = False
+          if "export_force_sampling" in properties:
+              kwargs["export_force_sampling"] = True
+
+          print("GLTF_EXPORT_KWARGS", kwargs)
+          result = operator(**kwargs)
+          if "FINISHED" not in result:
+              raise RuntimeError(f"glTF export did not finish: {result}")
+          if not os.path.exists(output_path) or os.path.getsize(output_path) <= 4096:
+              raise RuntimeError("candidate GLB missing or implausibly small")
+          print("CANDIDATE_GLB", output_path, os.path.getsize(output_path))
+          PY
+
+          blender -b --python /tmp/build_hand.py -- \
+            /tmp/hand-src/hand_l.blend /tmp/hand-src/animations_hand_l.blend \
+            "$GITHUB_WORKSPACE/assets/models/hands/hand_left.glb" L
+          blender -b --python /tmp/build_hand.py -- \
+            /tmp/hand-src/hand_r.blend /tmp/hand-src/animations_hand_r.blend \
+            "$GITHUB_WORKSPACE/assets/models/hands/hand_right.glb" R
+          sha256sum assets/models/hands/hand_left.glb assets/models/hands/hand_right.glb
+          ls -lh assets/models/hands/hand_*.glb
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Import and run canonical tests against candidate assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee candidate-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" candidate-import.log; then
+            echo "Godot reported a script parse/load failure during candidate import."
+            exit 1
+          fi
+          ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee candidate-tests.log
+          ./godot --headless --path . --script res://tests/smoke_scene.gd 2>&1 | tee candidate-smoke.log
+
+      - name: Capture candidate scene frame
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          cat > tests/_candidate_capture.gd <<'GD'
+          extends SceneTree
+
+          func _init() -> void:
+            call_deferred("_run")
+
+          func _run() -> void:
+            var packed := load("res://scenes/peel_lab/peel_lab.tscn") as PackedScene
+            if packed == null:
+              push_error("CANDIDATE_CAPTURE: scene failed to load")
+              quit(1)
+              return
+            var scene := packed.instantiate()
+            root.add_child(scene)
+            for _frame in range(24):
+              await process_frame
+            for hand_name in ["LeftHand", "RightHand"]:
+              var hand := scene.get_node_or_null(hand_name)
+              var meshes: Array[MeshInstance3D] = []
+              if hand != null:
+                _collect_meshes(hand, meshes)
+              var vertices := 0
+              for mesh_instance in meshes:
+                if mesh_instance.mesh == null:
+                  continue
+                for surface_index in range(mesh_instance.mesh.get_surface_count()):
+                  var arrays := mesh_instance.mesh.surface_get_arrays(surface_index)
+                  if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+                    vertices += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+              print("CANDIDATE_HAND_DIAG %s meshes=%d vertices=%d" % [hand_name, meshes.size(), vertices])
+              if meshes.is_empty() or vertices <= 0:
+                push_error("CANDIDATE_CAPTURE: %s still has no renderable mesh" % hand_name)
+                quit(1)
+                return
+            var image := root.get_texture().get_image()
+            if image == null or image.is_empty():
+              push_error("CANDIDATE_CAPTURE: viewport image empty")
+              quit(1)
+              return
+            DirAccess.make_dir_recursive_absolute(OS.get_environment("GITHUB_WORKSPACE").path_join("artifacts"))
+            var path := OS.get_environment("GITHUB_WORKSPACE").path_join("artifacts/peel_scene_candidate.png")
+            var err := image.save_png(path)
+            if err != OK:
+              push_error("CANDIDATE_CAPTURE: save failed")
+              quit(1)
+              return
+            print("CANDIDATE_CAPTURE_OK: %s" % path)
+            scene.queue_free()
+            await process_frame
+            quit(0)
+
+          func _collect_meshes(node: Node, output: Array[MeshInstance3D]) -> void:
+            if node is MeshInstance3D:
+              output.append(node as MeshInstance3D)
+            for child in node.get_children():
+              _collect_meshes(child, output)
+          GD
+          mkdir -p artifacts
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 45s \
+            ./godot --path . --display-driver x11 --rendering-method gl_compatibility \
+            --script res://tests/_candidate_capture.gd 2>&1 | tee candidate-capture.log
+          test -s artifacts/peel_scene_candidate.png
+          file artifacts/peel_scene_candidate.png
+
+      - name: Upload candidate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderable-hand-candidate
+          path: |
+            assets/models/hands/hand_left.glb
+            assets/models/hands/hand_right.glb
+            artifacts/peel_scene_candidate.png
+            candidate-import.log
+            candidate-tests.log
+            candidate-smoke.log
+            candidate-capture.log
+          if-no-files-found: error
+          retention-days: 7
