@@ -57,10 +57,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if _active_source == PointerSource.TOUCH:
 			return
-		var mouse_pressed := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-		if _active_source == PointerSource.NONE and mouse_pressed:
-			_active_source = PointerSource.MOUSE
-		_physical_pressed = mouse_pressed
+		# Motion may continue an already-owned mouse gesture, but it must never
+		# establish ownership after a competing source's press was ignored.
+		_physical_pressed = _active_source == PointerSource.MOUSE
 		if _consume_boundary_event(_physical_pressed, event.position):
 			return
 		state.set_frame(
@@ -101,12 +100,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventScreenDrag:
-		if _active_source == PointerSource.MOUSE:
-			return
-		if _active_source == PointerSource.NONE:
-			_active_source = PointerSource.TOUCH
-			_active_touch_index = event.index
-		elif event.index != _active_touch_index:
+		# A drag is continuation evidence, never a fresh ownership event. This
+		# prevents an ignored still-held secondary finger from inheriting the
+		# gesture after the previous owner releases.
+		if _active_source != PointerSource.TOUCH or event.index != _active_touch_index:
 			return
 		_physical_pressed = true
 		if _consume_boundary_event(true, event.position):
