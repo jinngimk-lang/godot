@@ -74,7 +74,6 @@ jobs:
           ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
 
       - name: Pause input isolation smoke
-        if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -82,7 +81,6 @@ jobs:
           ./godot --headless --path . --script res://tests/smoke_pause_input_isolation.gd
 
       - name: Reset input isolation smoke
-        if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
