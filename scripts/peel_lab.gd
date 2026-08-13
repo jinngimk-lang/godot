@@ -30,36 +30,37 @@ func _process(delta: float) -> void:
 		if _reset_timer <= 0.0:
 			_reset_session()
 
-	var progress := _controller.get_progress()
-	var front_world := _label.get_front_position(progress)
+	var progress: float = _controller.get_progress()
+	var front_world: Vector3 = _label.get_front_position(progress)
 	_edge_marker.position = front_world
-	var edge_screen := _camera.unproject_position(front_world)
+	var edge_screen: Vector2 = _camera.unproject_position(front_world)
 	_controller.set_edge_position(edge_screen)
 
-	var state := _pointer.consume_frame()
-	var before := progress
-	var result := _controller.process_pointer(state, delta)
-	progress = result.progress
-	var released_amount := maxf(progress - before, 0.0)
+	var state: PointerState = _pointer.consume_frame()
+	var before: float = progress
+	var result: Dictionary = _controller.process_pointer(state, delta)
+	progress = float(result["progress"])
+	var released_amount: float = maxf(progress - before, 0.0)
 
 	if state.released_this_frame and progress > 0.0 and not _controller.is_complete():
 		_release_count += 1
 
-	var grip_world := _screen_to_plane(result.hand_position, _label.cup_radius + 0.44)
+	var hand_screen: Vector2 = result["hand_position"] as Vector2
+	var grip_world: Vector3 = _screen_to_plane(hand_screen, _label.cup_radius + 0.44)
 	_label.set_peel(progress, grip_world)
 	_right_hand.set_target(grip_world + Vector3(0.0, -0.18, 0.18))
 	_right_hand.tick(delta)
 
-	var tension := result.hand_position.distance_to(edge_screen) * 0.65
-	var speed := state.velocity.length() / 100.0
-	if result.state == "PEELING":
+	var tension: float = hand_screen.distance_to(edge_screen) * 0.65
+	var speed: float = state.velocity.length() / 100.0
+	if String(result["state"]) == "PEELING":
 		_audio.set_peel_feedback(speed, tension, released_amount)
 		if released_amount > 0.025:
 			_audio.trigger_release_tick()
 	else:
 		_audio.quiet()
 
-	_update_hud(result.state, progress)
+	_update_hud(String(result["state"]), progress)
 	_pointer.clear_transients()
 
 func _build_world() -> void:
