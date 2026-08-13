@@ -1,0 +1,28 @@
+name: Copilot Free Probe
+
+on:
+  push:
+    branches: [feat/free-dual-agent-runtime]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  copilot-requests: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+      - name: Probe Copilot entitlement
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          output="$(copilot -p 'Return exactly COPILOT_OK and nothing else.' --no-ask-user)"
+          printf '%s\n' "$output"
+          grep -Fq 'COPILOT_OK' <<< "$output"
