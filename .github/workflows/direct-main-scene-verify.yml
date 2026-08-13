@@ -1,0 +1,75 @@
+name: Direct Main Scene Verify
+
+on:
+  push:
+    branches:
+      - verify/direct-main-scene-v4
+
+permissions:
+  contents: read
+
+jobs:
+  direct-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Fresh import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee direct-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" direct-import.log; then
+            echo "Fresh import reported a parse/load failure."
+            exit 1
+          fi
+
+      - name: Launch configured main scene headlessly
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --quit-after 20 --verbose 2>&1 | tee direct-headless.log
+          if grep -E "SCRIPT ERROR:|ERROR: Failed to load|ERROR: Cannot open|ERROR: Parameter.*null" direct-headless.log; then
+            echo "Configured main scene emitted a runtime/load error."
+            exit 1
+          fi
+
+      - name: Launch configured main scene like F5 under X11
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 45s \
+            ./godot --path . --display-driver x11 --audio-driver Dummy \
+            --rendering-method gl_compatibility --quit-after 45 --verbose \
+            2>&1 | tee direct-x11.log
+          if grep -E "SCRIPT ERROR:|ERROR: Failed to load|ERROR: Cannot open|ERROR: Parameter.*null" direct-x11.log; then
+            echo "Graphical configured main scene emitted a runtime/load error."
+            exit 1
+          fi
+          grep -Fq "peel_lab.tscn" direct-x11.log || {
+            echo "Verbose direct-run log did not prove the configured peel_lab main scene loaded."
+            exit 1
+          }
