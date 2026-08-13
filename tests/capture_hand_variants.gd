@@ -2,42 +2,38 @@ extends SceneTree
 
 const VARIANTS := [
 	{
-		"name": "baseline",
-		"left_pos": Vector3(-0.60, 0.30, 0.34),
-		"left_rot": Vector3(18, -28, -48),
-		"right_rot": Vector3(-8, 8, 15)
+		"name": "support_a",
+		"left_pos": Vector3(0.52, 0.20, 0.28),
+		"left_rot": Vector3(8, 34, 54)
 	},
 	{
-		"name": "spread_a",
-		"left_pos": Vector3(0.68, 0.22, 0.62),
-		"left_rot": Vector3(12, 28, 48),
-		"right_rot": Vector3(-18, -18, 32)
+		"name": "support_b",
+		"left_pos": Vector3(0.58, 0.10, 0.22),
+		"left_rot": Vector3(0, 45, 65)
 	},
 	{
-		"name": "spread_b",
-		"left_pos": Vector3(0.74, 0.10, 0.72),
-		"left_rot": Vector3(4, 38, 58),
-		"right_rot": Vector3(-28, -12, 36)
+		"name": "support_c",
+		"left_pos": Vector3(0.48, 0.28, 0.38),
+		"left_rot": Vector3(18, 22, 60)
 	},
 	{
-		"name": "spread_c",
-		"left_pos": Vector3(0.66, 0.34, 0.72),
-		"left_rot": Vector3(18, 18, 58),
-		"right_rot": Vector3(8, -28, 40)
+		"name": "support_d",
+		"left_pos": Vector3(0.58, 0.24, 0.38),
+		"left_rot": Vector3(14, 42, 45)
 	},
 	{
-		"name": "right_open_a",
-		"left_pos": Vector3(0.72, 0.22, 0.70),
-		"left_rot": Vector3(10, 30, 52),
-		"right_rot": Vector3(-18, -38, 58)
+		"name": "support_e",
+		"left_pos": Vector3(0.50, 0.08, 0.36),
+		"left_rot": Vector3(-4, 35, 70)
 	},
 	{
-		"name": "right_open_b",
-		"left_pos": Vector3(0.70, 0.18, 0.66),
-		"left_rot": Vector3(8, 34, 54),
-		"right_rot": Vector3(18, -22, -8)
+		"name": "support_f",
+		"left_pos": Vector3(0.62, 0.28, 0.24),
+		"left_rot": Vector3(20, 50, 55)
 	}
 ]
+
+const RIGHT_ROT := Vector3(18, -22, -8)
 
 func _init() -> void:
 	call_deferred("_capture")
@@ -70,12 +66,12 @@ func _capture() -> void:
 			quit(1)
 			return
 
-		# Freeze the main scene so the candidate is stable while we adjust only hand presentation.
+		# Freeze the scene and vary presentation only. Keep the right-hand pinch target exact.
 		scene.process_mode = Node.PROCESS_MODE_DISABLED
 		var grip_target := right.get_pinch_world_position()
 		left.position = variant["left_pos"] as Vector3
 		left.rotation_degrees = variant["left_rot"] as Vector3
-		right.rotation_degrees = variant["right_rot"] as Vector3
+		right.rotation_degrees = RIGHT_ROT
 		right.set_grip_target(grip_target)
 		for _step in range(8):
 			right.tick(0.1)
