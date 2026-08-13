@@ -19,6 +19,7 @@ var _reset_timer := -1.0
 var _completed_this_frame := false
 var _pending_score := 0
 var _advance_after_reset := false
+var _detach_reward_recorded := false
 var _paused := false
 
 func _ready() -> void:
@@ -39,9 +40,9 @@ func _process(delta: float) -> void:
 		_reset_timer -= delta
 		if _reset_timer <= 0.0:
 			if _advance_after_reset:
-				_session.advance_item()
-				_apply_current_variant()
-			_reset_session()
+				_advance_to_next_item()
+			else:
+				_reset_session()
 
 	var progress: float = _controller.get_progress()
 	var front_world: Vector3 = _label.get_front_position(progress)
@@ -221,8 +222,11 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 	if _session == null:
 		return
 	var variant := _session.current_variant()
+	var reset_hint := "R Reset Label"
+	if _reset_timer >= 0.0 and _advance_after_reset:
+		reset_hint = "R Next Now"
 	if _paused:
-		_hud.text = "PAUSED\nEsc Resume   •   R Reset Label   •   Shift+R Restart Run"
+		_hud.text = "PAUSED\nEsc Resume   •   %s   •   Shift+R Restart Run" % reset_hint
 		return
 
 	var percent := int(round(progress * 100.0))
@@ -240,13 +244,14 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 	elif phase_name == "HELD":
 		hint = "Clean peel — nice."
 
-	_hud.text = "%s   •   Peel %d%%\n%s\nStamps %d   •   Score %d   •   Feels %d/3   •   Esc Pause   •   R Reset   •   Shift+R Restart Run" % [
+	_hud.text = "%s   •   Peel %d%%\n%s\nStamps %d   •   Score %d   •   Feels %d/3   •   Esc Pause   •   %s   •   Shift+R Restart Run" % [
 		String(variant.get("name", "Peel Calm")),
 		percent,
 		hint,
 		_session.get_clean_peels(),
 		_session.get_total_score(),
-		_session.get_unlocked_count()
+		_session.get_unlocked_count(),
+		reset_hint
 	]
 
 func _on_completed() -> void:
@@ -255,6 +260,9 @@ func _on_completed() -> void:
 	_pending_score = ScoreModel.score(100.0, 1.0, continuity)
 
 func _handle_detached_label() -> void:
+	if _detach_reward_recorded:
+		return
+	_detach_reward_recorded = true
 	var progress_result: Dictionary = _session.record_clean_peel(_pending_score)
 	var reward_text := "CLEAN PEEL  +%d" % _pending_score
 	if bool(progress_result.get("unlocked_new", false)):
@@ -276,7 +284,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.shift_pressed:
 			_session.restart_run()
 			_apply_current_variant()
-		_reset_session()
+			_reset_session()
+		elif _reset_timer >= 0.0 and _advance_after_reset:
+			_advance_to_next_item()
+		else:
+			_reset_session()
+
+func _advance_to_next_item() -> void:
+	_session.advance_item()
+	_apply_current_variant()
+	_reset_session()
 
 func _apply_current_variant() -> void:
 	var variant := _session.current_variant()
@@ -302,6 +319,7 @@ func _reset_session() -> void:
 	_completed_this_frame = false
 	_reset_timer = -1.0
 	_advance_after_reset = false
+	_detach_reward_recorded = false
 	if _reward != null:
 		_reward.text = ""
 	var fresh_grip_world := Vector3.ZERO
