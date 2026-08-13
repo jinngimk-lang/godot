@@ -1,0 +1,54 @@
+name: Godot Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Headless import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f tests/test_runner.gd ]]; then
+            ./godot --headless --path . --script res://tests/test_runner.gd
+          else
+            echo "No unit test runner yet; scaffold phase."
+          fi
+
+      - name: Scene smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f tests/smoke_scene.gd ]]; then
+            ./godot --headless --path . --script res://tests/smoke_scene.gd
+          else
+            echo "No scene smoke script yet; scaffold phase."
+          fi
