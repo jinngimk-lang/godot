@@ -17,12 +17,33 @@ func _run() -> void:
 
 	var required := [
 		"Camera", "Cup", "PeelLabel", "LabelPrint", "LeftHand", "RightHand",
-		"PointerAdapter", "PeelAudio", "HUD"
+		"PointerAdapter", "PeelAudio", "HUD", "CafePresentation"
 	]
 	var failures: Array[String] = []
 	for child_name in required:
 		if not scene.has_node(child_name):
-			failures.append("missing runtime node: %s" % child_name)
+			failures.append("RED: missing runtime node: %s" % child_name)
+
+	var cafe_presentation := scene.get_node_or_null("CafePresentation") as Node3D
+	if cafe_presentation == null:
+		failures.append("RED: missing calm cafe presentation layer")
+	else:
+		for presentation_node in ["WorldEnvironment", "Backdrop", "LidInset"]:
+			if cafe_presentation.get_node_or_null(presentation_node) == null:
+				failures.append("RED: cafe presentation missing %s" % presentation_node)
+		var backdrop := cafe_presentation.get_node_or_null("Backdrop") as MeshInstance3D
+		if backdrop != null and (backdrop.mesh == null or backdrop.material_override == null):
+			failures.append("Cafe backdrop must have mesh and material")
+		var world_environment := cafe_presentation.get_node_or_null("WorldEnvironment") as WorldEnvironment
+		if world_environment != null and world_environment.environment == null:
+			failures.append("Cafe WorldEnvironment must own an Environment resource")
+
+	var key_light := scene.get_node_or_null("KeyLight") as DirectionalLight3D
+	var fill_light := scene.get_node_or_null("FillLight") as OmniLight3D
+	if key_light != null and key_light.light_energy > 1.0:
+		failures.append("Cafe presentation should keep key light below raw-demo intensity")
+	if fill_light != null and fill_light.light_energy > 1.25:
+		failures.append("Cafe presentation should keep fill light below raw-demo intensity")
 
 	for hand_name in ["LeftHand", "RightHand"]:
 		if not scene.has_node(hand_name):
@@ -138,7 +159,7 @@ func _run() -> void:
 			failures.append("player HUD must expose reset and pause affordances")
 
 	if failures.is_empty():
-		print("PASS: complete-playable tactile peel scene smoke with renderable authored hands")
+		print("PASS: complete-playable tactile peel scene smoke with cafe presentation and renderable authored hands")
 		scene.queue_free()
 		await process_frame
 		quit(0)
