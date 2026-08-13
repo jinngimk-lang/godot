@@ -15,8 +15,6 @@ func _capture() -> void:
 	var scene := packed.instantiate()
 	root.add_child(scene)
 
-	# Let imported GLBs, SubViewport label print, lighting and the first rendered
-	# frames settle before reading the viewport texture.
 	for _frame in range(24):
 		await process_frame
 
@@ -73,6 +71,9 @@ func _print_hand_diagnostics(scene: Node, hand_name: String) -> void:
 				total_vertices += vertices.size()
 		var local_size: Vector3 = mesh_instance.mesh.get_aabb().size * mesh_instance.global_transform.basis.get_scale().abs()
 		max_local_extent = maxf(max_local_extent, maxf(local_size.x, maxf(local_size.y, local_size.z)))
+		var aabb := mesh_instance.mesh.get_aabb()
+		var world_center := mesh_instance.to_global(aabb.get_center())
+		print("MESH_AABB %s node=%s local_pos=%s local_size=%s world_center=%s" % [hand_name, mesh_instance.name, str(aabb.position), str(aabb.size), str(world_center)])
 	var pinch: Vector3 = hand.global_position
 	if hand.has_method("get_pinch_world_position"):
 		pinch = hand.call("get_pinch_world_position") as Vector3
@@ -85,18 +86,26 @@ func _print_hand_diagnostics(scene: Node, hand_name: String) -> void:
 		screen = camera.unproject_position(pinch)
 		behind = camera.is_position_behind(pinch)
 	print("HAND_DIAG %s authored=%s root=%s rot=%s scale=%s meshes=%d vertices=%d max_extent=%.5f pinch=%s screen=%s behind=%s" % [
-		hand_name,
-		str(authored),
-		str(hand.global_position),
-		str(hand.rotation_degrees),
-		str(hand.scale),
-		meshes.size(),
-		total_vertices,
-		max_local_extent,
-		str(pinch),
-		str(screen),
-		str(behind)
+		hand_name, str(authored), str(hand.global_position), str(hand.rotation_degrees), str(hand.scale), meshes.size(), total_vertices, max_local_extent, str(pinch), str(screen), str(behind)
 	])
+	var skeleton := _find_skeleton(hand)
+	if skeleton != null:
+		for bone_id in range(skeleton.get_bone_count()):
+			var bone_name := skeleton.get_bone_name(bone_id)
+			var lower := bone_name.to_lower()
+			if lower.contains("wrist") or lower.contains("hand") or lower.contains("forearm") or lower.contains("arm"):
+				var pose := skeleton.get_bone_global_pose(bone_id)
+				var world_origin := skeleton.to_global(pose.origin)
+				print("BONE_DIAG %s id=%d name=%s parent=%d local=%s world=%s" % [hand_name, bone_id, bone_name, skeleton.get_bone_parent(bone_id), str(pose.origin), str(world_origin)])
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node as Skeleton3D
+	for child in node.get_children():
+		var found := _find_skeleton(child)
+		if found != null:
+			return found
+	return null
 
 func _collect_meshes(node: Node, output: Array[MeshInstance3D]) -> void:
 	if node is MeshInstance3D:
