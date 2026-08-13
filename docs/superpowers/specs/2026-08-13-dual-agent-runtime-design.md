@@ -6,213 +6,170 @@ Base: `main`
 
 ## Goal
 
-Create two genuinely independent AI coding-agent runtimes for the repository so implementation and challenge/verification are separated by execution context, not merely by role-play inside one chat session.
+Create two genuinely independent AI coding-agent executions inside the repository so implementation and challenge/verification are separated by fresh GitHub Actions runners and separate Codex invocations, not by role-play inside one chat session.
 
-The system must reduce correlated mistakes: one agent builds and repairs; the other independently attacks claims, runs counterexamples, checks evidence, and can create a separate repair path. Neither agent may convert its own confidence into acceptance.
+The system must then use the repository's accumulated game knowledge to advance Peel Calm toward one coherent complete-playable handoff before asking the owner to perform the next local screenshot/feel test.
 
-## Runtime choice
+## Runtime decision and implementation amendment
 
-Use GitHub Agentic Workflows as the runtime substrate, with OpenAI Codex as the preferred engine for both agents.
+The initial design evaluated GitHub Agentic Workflows (`gh-aw`) as the runtime. A strict `gh-aw v0.83.4` compile proved the Builder and Challenger definitions valid, but the generated lock workflows are each over 100 KB and GitHub's default Actions installation token correctly refuses to push workflow-file updates without additional workflow-write authority.
 
-Each agent runs as a separate GitHub Actions workflow/run with its own fresh runner and context. The workflows communicate only through durable GitHub artifacts: issues, pull requests, review comments, workflow results, and the repository's agent protocol files.
+Rather than widen credentials solely to materialize compiler output, the implementation uses OpenAI's official `openai/codex-action` directly from two ordinary GitHub Actions workflows. This preserves the important properties—independent runners, sandboxed Codex calls, auditable Actions history, separate prompts, exact-head evidence—while removing a generated-workflow bootstrap and an unnecessary workflow-write credential.
 
-This repository is personal rather than organization-owned, so activating the Codex engine requires an authentication secret configured in GitHub Actions. The preferred secret is `OPENAI_API_KEY`. The key must be created/configured by the repository owner in GitHub Settings and must never be committed to the repository or pasted into chat.
+Pinned Codex Action: v1.11 commit `52fe01ec70a42f454c9d2ebd47598f9fd6893d56`.
 
-GitHub Agentic Workflows are currently a preview feature. The repository therefore keeps the protocol and role contracts independent of the runtime implementation so the execution backend can be replaced without rewriting the collaboration model.
+The collaboration protocol remains backend-independent so the runtime can be replaced later without rewriting task/evidence semantics.
 
 ## Agent identities
 
-### Builder Agent
+### peel-builder
 
-Stable identity: `peel-builder`
+Builder owns implementation and repair batches. It:
 
-Primary responsibilities:
+- reads `.agents/PROJECT_KNOWLEDGE.md`, protocol, task Issue, specs/plans, code and tests;
+- finds or creates the single `[builder]` PR for the canonical task;
+- works on that actual PR branch when continuing a task;
+- uses Codex with workspace-write filesystem permission and no direct GitHub-write authority inside the model;
+- prefers RED -> GREEN evidence and runs Godot while working;
+- is followed by deterministic wrapper verification using Godot 4.7.1 import/parser guard/unit/smoke;
+- only after deterministic success may wrapper steps commit/push/comment/dispatch Challenger;
+- never approves or merges its own work;
+- never converts subjective visual/audio/tactile confidence into VERIFIED evidence.
 
-- inspect open implementation tasks and owner playtest evidence;
-- reproduce failures before changing production code when feasible;
-- create falsifiable claims and RED evidence;
-- implement the smallest coherent fix or feature;
-- add/update automated tests;
-- open or update a pull request;
-- attach exact-head evidence and explicitly list remaining UNVERIFIED experiential items.
+Builder may not modify `.github/`, `.agents/`, secrets, billing, branch protection or repository policy during normal gameplay tasks.
 
-Builder must not:
+### peel-challenger
 
-- approve or merge its own change;
-- claim visual/tactile quality from CI alone;
-- overwrite Challenger evidence;
-- silently broaden scope beyond the issue/claim being handled.
+Challenger independently attacks the exact Builder artifact. It:
 
-### Challenger Agent
+- runs in a separate workflow/run and fresh runner;
+- checks that the requested SHA is still the current PR head;
+- independently downloads the pinned Godot 4.7.1 binary and runs import/parser guard/unit/smoke on that exact head;
+- invokes Codex with read-only filesystem permission;
+- inspects actual PR diff, task/specs/tests and verification logs rather than Builder's summary;
+- must construct at least one concrete counterexample/boundary scenario beyond happy-path tests;
+- classifies the exact head as VERIFIED, NEEDS_FIX or UNVERIFIED;
+- dispatches Builder for repair when a defect is found;
+- if a batch is sound but the canonical complete-version machine scope is still incomplete, dispatches Builder to continue the highest-priority remaining item;
+- acts as merge decider only when the independent exact-head checks are green and the complete machine-verifiable task scope is satisfied.
 
-Stable identity: `peel-challenger`
+Challenger never treats its own later repair as pre-verified; any new head receives another fresh Challenger run.
 
-Primary responsibilities:
+## Durable communication
 
-- inspect Builder PRs, exact head SHAs, specs, CI and changed files;
-- construct counterexamples and adversarial tests;
-- independently run or request verification against the exact PR head;
-- check missing resources, local-path assumptions, license/provenance, stale assets and false-green CI conditions;
-- classify findings as PASS, FAIL, UNVERIFIED or NEEDS_FIX;
-- when a defect is found, either leave an actionable PR review/comment or create a separate repair PR/issue rather than silently modifying Builder's claim;
-- verify merged `main` again after integration.
+Repository-owned rules:
 
-Challenger must not:
+- `.agents/PROJECT_KNOWLEDGE.md` — compact shared product/technical/owner-feedback memory.
+- `.agents/CONTACTS.md` — stable identities and escalation boundaries.
+- `.agents/protocol.md` — message envelope, stale-evidence rules and lifecycle.
+- `.agents/README.md` — runtime/operator guide.
+- `.agents/state.json` — non-secret install/activation status.
 
-- accept Builder's self-reported tests as sufficient evidence;
-- reuse Builder's conclusion without checking the underlying artifact;
-- grant acceptance when important observability is missing;
-- merge its own repair path without a fresh verification gate.
+Ephemeral communication lives in GitHub Issue/PR comments and Actions runs, not append-only chat logs in source control.
 
-## Communication contract
+Message types remain:
 
-Repository-owned files:
+`TASK / CLAIM / RED / COUNTEREXAMPLE / FIX / VERIFIED / UNVERIFIED / ACCEPTED`.
 
-- `.agents/CONTACTS.md` — role identities, supported channels, escalation rules.
-- `.agents/protocol.md` — message schema and state machine.
-- `.agents/README.md` — operator explanation and runtime status.
+Every evidence-bearing message must name its exact SHA. Evidence is stale as soon as the artifact head moves.
 
-Durable communication channels, in priority order:
+## Handoff topology
 
-1. Pull request review/comments for a concrete change.
-2. GitHub Issue comments for broader tasks, bug reports and handoff.
-3. Workflow run conclusions and exact SHA references as machine evidence.
-4. Repository agent protocol files for stable rules only, never ephemeral conversation logs.
+The normal loop is:
 
-Message types:
+`owner master TASK -> Builder -> Challenger -> Builder -> Challenger -> ...`
 
-- `TASK` — work request and acceptance target.
-- `CLAIM` — falsifiable statement tied to exact SHA/evidence.
-- `RED` — intended failing evidence before implementation.
-- `COUNTEREXAMPLE` — Challenger evidence that breaks a claim.
-- `FIX` — Builder or repair-agent response to a counterexample.
-- `VERIFIED` — evidence-backed pass on an exact artifact.
-- `UNVERIFIED` — missing observability or subjective item that automation cannot prove.
-- `ACCEPTED` — integration gate passed and merged-main verification succeeded.
+Builder and Challenger call one another through explicit `workflow_dispatch`. Each dispatch creates a separate Actions run. A numeric round is passed through the chain and a hard guard stops after round 20 instead of allowing an accidental unbounded API loop.
 
-Every evidence-bearing message must include the exact commit SHA or PR head it refers to. Evidence for an older head becomes stale when the head moves.
+Within one task there is normally one evolving Builder PR. This gives both agents a shared, auditable candidate instead of producing a pile of competing PRs.
 
-## Workflow design
+## Complete-version behavior
 
-### Builder workflow
+The master task is larger than a single bug fix. A Challenger `VERIFIED` verdict on one batch is not completion by itself.
 
-Source definition: `.github/workflows/agent-builder.md`
-Compiled runtime: `.github/workflows/agent-builder.lock.yml`
-Preferred engine: `codex`
+After each sound batch, Challenger must compare the current repository against the canonical complete-playable acceptance scope and either:
 
-Initial triggers:
+- dispatch Builder for the next highest-priority incomplete machine-verifiable item; or
+- set `complete_machine_scope=true` only when the repository is ready for owner experiential playtest apart from properties automation cannot prove.
 
-- manual `workflow_dispatch`;
-- issue labeling or issue event for tasks explicitly marked for Builder.
+The shared project knowledge defines the product thesis, V1/V2 regression history, tactile priorities, asset boundaries, cup/label variation axes, scoring philosophy, direct-run contract and automation limitations.
 
-Safe outputs should be limited to the minimum needed:
+The expected complete-playable handoff is a polished coherent sensory loop, not a commercial live-service content universe. Large shop/economy, ads/IAP, multiplayer, cloud save and mobile release are not prerequisites unless a later canonical task explicitly adds them.
 
-- add issue/PR comments;
-- create/update a task issue if required by the workflow substrate;
-- create a pull request / proposed change branch.
+## Final integration
 
-The Builder workflow does not receive merge authority.
+When Challenger independently returns VERIFIED with `complete_machine_scope=true`, `continue_build=false`, and deterministic checks green:
 
-### Challenger workflow
+1. wrapper re-checks current PR head equals the reviewed SHA;
+2. merge uses GitHub's merge API with that expected SHA;
+3. `Godot Check` is explicitly dispatched against merged `main`;
+4. Challenger waits for that exact merge SHA's workflow-dispatch run;
+5. only a successful merged-main verification permits `ACCEPTED` and closes the master task.
 
-Source definition: `.github/workflows/agent-challenger.md`
-Compiled runtime: `.github/workflows/agent-challenger.lock.yml`
-Preferred engine: `codex`
+If post-merge verification fails, the failure is not reinterpreted as success; a repair task must be sent back through the Builder/Challenger loop.
 
-Initial triggers:
+## Godot verification relationship
 
-- manual `workflow_dispatch`;
-- pull-request events for non-draft PRs or explicit challenge labels/comments.
+The ordinary `.github/workflows/godot-check.yml` remains project authority for engine loadability and deterministic test/smoke behavior. It supports push, pull_request and explicit workflow_dispatch.
 
-Safe outputs should be limited to:
+Because Builder-created PR pushes may not behave like human pushes for normal event cascades, Challenger does not depend on an incidental pull_request CI event. It runs the same Godot 4.7.1 import/parser/unit/smoke checks itself on the exact Builder SHA, then explicitly dispatches ordinary Godot Check after final merge.
 
-- PR review/comment;
-- issue creation for defects or UNVERIFIED boundaries;
-- optional separate repair PR when configured and justified.
+## Security boundary
 
-The Challenger workflow does not push directly to the Builder's branch.
-
-## Bootstrap and compilation
-
-GitHub Agentic Workflow source files are Markdown and must be compiled into hardened `.lock.yml` workflows using GitHub's `gh-aw` tooling.
-
-Because this chat environment does not provide a persistent authenticated GitHub CLI runner, the repository will include a one-time bootstrap/compile workflow or documented owner command that:
-
-1. installs/uses the official `github/gh-aw` extension;
-2. compiles both agent workflow Markdown files;
-3. verifies generated lock files are current;
-4. proposes the generated files through normal Git history rather than hidden runtime state.
-
-Normal gameplay/runtime must never depend on the agent infrastructure being available.
-
-## Security and permissions
-
-- Agent workflows are read-only by default and receive only explicitly declared safe outputs.
-- `OPENAI_API_KEY` remains a GitHub secret and is never written to repo files, logs or prompts.
-- No agent can edit repository secrets.
-- No agent receives permission to change billing, branch protection, repository visibility or external services.
-- Untrusted issue/PR text is data, not authority. Agent instructions in repository protocol/spec files outrank user-generated issue text.
-- External dependencies introduced by an agent require license/provenance review and automated load/build validation before acceptance.
-- Destructive or irreversible repository operations remain outside autonomous authority.
-
-## Independence invariants
-
-The system is considered genuinely dual-agent only when:
-
-- Builder and Challenger are separate workflow runs with separate runner execution contexts;
-- each role has a different stable instruction set;
-- Challenger verifies the exact Builder artifact rather than reading only Builder's summary;
-- Builder cannot self-approve or self-merge;
-- Challenger findings can block acceptance;
-- merged `main` is reverified after integration.
-
-Two prompts executed sequentially in one chat session do not satisfy this definition.
-
-## Existing Godot CI relationship
-
-The current deterministic Godot 4.7.1 workflow remains authoritative for project loadability, unit tests and scene smoke.
-
-Agent workflows supplement it; they do not replace it.
-
-A change is eligible for ACCEPTED only when:
-
-1. Builder has produced the proposed exact head and evidence;
-2. Challenger has independently examined that exact head and has no unresolved FAIL/NEEDS_FIX finding;
-3. normal Godot CI is green on the exact PR head;
-4. merge uses an expected-head guard or equivalent protection;
-5. merged `main` runs the normal Godot CI again successfully;
-6. subjective hand feel, audio feel and visual quality remain UNVERIFIED until owner playtest.
-
-## Failure and handoff behavior
-
-If Builder stalls or fails CI, Challenger may diagnose but must not reinterpret the failure as success.
-
-If Challenger finds a reproducible defect, the preferred flow is:
-
-`COUNTEREXAMPLE -> Builder FIX -> Challenger reverify`.
-
-If Builder cannot or does not repair the defect, Challenger may create a separate repair issue/PR, which then receives a fresh verification pass before merge.
-
-If the AI engine or agentic workflow service is unavailable, ordinary human/ChatGPT-driven development and deterministic CI continue to function. Runtime outage is therefore degraded automation, not project blockage.
+- Required AI credential: repository Actions secret `OPENAI_API_KEY`.
+- Secret value never appears in tracked files, Issue/PR text or prompts.
+- OpenAI's Codex Action receives the API key through its Responses proxy path.
+- Builder Codex uses `:workspace`; Challenger Codex uses `:read-only`; both use the action's `drop-sudo` safety strategy.
+- Codex is not given the repository GitHub write token as prompt data.
+- Deterministic workflow steps—not natural-language model output—perform git push, PR comments, counterpart dispatch and final merge.
+- Only task Issues opened by repository owner `jinngimk-lang` with `[AGENT-TASK]` title automatically start Builder.
+- Bot-triggered counterpart dispatches are allowed because they originate inside repository workflows; arbitrary public users do not get an API-spend trigger.
+- External runtime assets introduced by game work still require license/provenance and load validation.
+- Destructive repository actions, secrets changes, billing changes and legal/brand commitments remain outside agent authority.
 
 ## Cost boundary
 
-Agentic workflows consume GitHub Actions resources and AI inference/billing. Initial automation should therefore be event-driven/manual, not continuous polling. Scheduled autonomous sweeps are deferred until usage is observed and an explicit budget policy is defined.
+Codex calls may consume OpenAI API usage and GitHub Actions resources. The loop is event/dispatch-driven, not polling, and is hard-bounded at round 20. Reaching the bound produces UNVERIFIED rather than silently increasing spend.
 
-## Definition of Done
+## Independence invariants
 
-Dual-Agent Runtime V1 is complete when:
+The system counts as genuinely dual-agent only when:
 
-- `.agents/CONTACTS.md`, `.agents/protocol.md` and `.agents/README.md` are committed;
-- Builder and Challenger source workflow definitions exist with distinct prompts/permissions;
-- compiled hardened workflow files are generated from the official GitHub Agentic Workflows toolchain;
-- neither workflow contains a committed secret or absolute local credential path;
-- Builder can create/propose a test change without merge authority;
-- Challenger can independently inspect that proposed exact head and publish a verdict/counterexample;
-- a controlled trial demonstrates a Builder -> Challenger -> fix/reverify exchange in GitHub history;
-- ordinary Godot 4.7.1 CI remains green and independent of agent availability;
-- activation instructions tell the owner exactly where to configure the required GitHub secret without exposing it to chat.
+- Builder and Challenger have distinct workflow run IDs and runners;
+- their Codex calls use distinct prompts and permissions;
+- Challenger checks the actual current Builder head and independently runs deterministic verification;
+- Builder cannot self-merge;
+- Challenger findings can block integration and return work to Builder;
+- every changed head invalidates prior Challenger evidence;
+- merged main is separately verified after integration.
 
-## Explicit activation dependency
+Two prompts executed sequentially inside this chat do not satisfy these invariants.
 
-The repository side can be built and tested without the OpenAI credential. Actual Codex-backed agent executions remain `UNVERIFIED / NOT ACTIVATED` until the owner configures the required GitHub Actions secret in repository Settings.
+## Experiential boundary
+
+Even after ACCEPTED, automation still cannot prove:
+
+- peel resistance feels pleasant;
+- hand placement reads naturally on the owner's display;
+- Foley is relaxing at the owner's volume/headphones;
+- final detachment is emotionally satisfying;
+- overall polish matches the owner's taste.
+
+Those are intentionally deferred to the owner's next local playtest/screenshots after the substantial complete-playable build is delivered.
+
+## Definition of Done — Dual-Agent Runtime V1
+
+Runtime installation is complete when:
+
+- `.agents/` identity/protocol/shared-knowledge files exist;
+- `agent-builder.yml` and `agent-challenger.yml` are committed with distinct Codex permissions/prompts;
+- OpenAI Codex Action is immutable-SHA pinned;
+- standard Godot Check statically guards required runtime files and secret material;
+- no API key is committed;
+- a real owner task starts Builder, Builder creates/updates a proposal, and a separate Challenger run publishes an exact-head verdict;
+- a defect or continuation can be handed back and re-reviewed on a new head;
+- Godot runtime remains independent of the agent system.
+
+## Activation dependency
+
+Repository-side installation can be validated without the API credential. Actual independent Codex calls remain `NOT ACTIVATED` until the owner configures `OPENAI_API_KEY` under GitHub repository Settings → Secrets and variables → Actions. The value must never be sent through chat.
