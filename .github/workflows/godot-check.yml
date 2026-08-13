@@ -58,8 +58,8 @@ jobs:
           set -euo pipefail
           grep -Fq 'run/main_scene="res://scenes/peel_lab/peel_lab.tscn"' project.godot
           timeout 30s ./godot --headless --path . --quit-after 20 --verbose 2>&1 | tee godot-default-launch.log
-          if grep -E "SCRIPT ERROR:|ERROR: Failed to load|ERROR: Cannot open|ERROR: Parameter.*null" godot-default-launch.log; then
-            echo "Configured default project launch emitted a runtime/load error."
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-default-launch.log; then
+            echo "Godot emitted an error while launching the configured default project entrypoint."
             exit 1
           fi
           grep -Fq 'Loading resource: res://scenes/peel_lab/peel_lab.tscn' godot-default-launch.log || {
