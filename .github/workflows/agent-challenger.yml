@@ -36,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      GH_TOKEN: ${{ github.token }}
       TASK_ID: ${{ inputs.task_id }}
       PR_NUMBER: ${{ inputs.pr_number }}
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -44,7 +43,7 @@ jobs:
       MAX_AGENT_ROUND: "20"
 
     steps:
-      - name: Checkout exact Builder head
+      - name: Checkout exact Builder head without stored credentials
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.expected_head_sha }}
@@ -53,6 +52,8 @@ jobs:
 
       - name: Verify exact artifact and collect independent context
         id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -220,10 +221,11 @@ jobs:
 
       - name: Publish exact-head Challenger evidence
         if: steps.context.outputs.stale != 'true'
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           VERDICT: ${{ steps.verdict.outputs.effective_verdict }}
           CI_OK: ${{ steps.verify.outputs.ci_ok }}
+        shell: bash
         run: |
           set -euo pipefail
           comment=/tmp/challenger-comment.md
@@ -249,14 +251,15 @@ jobs:
           (steps.verdict.outputs.effective_verdict != 'VERIFIED' ||
            steps.verdict.outputs.continue_build == 'true' ||
            steps.verdict.outputs.complete_machine_scope != 'true')
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           VERDICT: ${{ steps.verdict.outputs.effective_verdict }}
+        shell: bash
         run: |
           set -euo pipefail
           next_round=$((AGENT_ROUND + 1))
           if [ "$next_round" -gt "$MAX_AGENT_ROUND" ]; then
-            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED\nFROM: peel-challenger\nTO: owner\nARTIFACT: PR #${PR_NUMBER}\nSHA: ${EXPECTED_HEAD_SHA}\nCLAIM: Bounded autonomous handoff limit reached before complete-machine acceptance.\nEVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}.\nNEXT_ACTION: inspect current PR evidence before extending autonomous API budget."
+            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED; FROM: peel-challenger; TO: owner; ARTIFACT: PR #${PR_NUMBER}; SHA: ${EXPECTED_HEAD_SHA}; CLAIM: bounded autonomous handoff limit reached before complete-machine acceptance; EVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}; NEXT_ACTION: inspect current PR evidence before extending autonomous API budget."
             exit 0
           fi
           feedback="$(jq -c --arg verdict "$VERDICT" '. + {effective_verdict:$verdict}' /tmp/challenger-result.json)"
@@ -272,6 +275,8 @@ jobs:
           steps.verdict.outputs.continue_build == 'false' &&
           steps.verdict.outputs.complete_machine_scope == 'true'
         id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -296,9 +301,10 @@ jobs:
       - name: Dispatch and wait for merged-main Godot verification
         if: steps.merge.outputs.merge_sha != ''
         id: mainverify
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           gh workflow run godot-check.yml --ref main
@@ -324,10 +330,11 @@ jobs:
 
       - name: Record ACCEPTED and close master task
         if: steps.mainverify.outputs.run_id != ''
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
           MAIN_RUN_ID: ${{ steps.mainverify.outputs.run_id }}
+        shell: bash
         run: |
           set -euo pipefail
           body=/tmp/accepted.md
