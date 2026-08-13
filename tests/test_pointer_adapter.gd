@@ -145,6 +145,24 @@ func run() -> Array[String]:
 	if not state.pressed or state.position != drag.position:
 		failures.append("primary drag should retain ownership after secondary-touch noise")
 
+	# Godot defaults to emulating mouse from touch. The emulated mouse half of
+	# the same physical gesture must not become a second gameplay pointer source.
+	var emulated_mouse := InputEventMouseButton.new()
+	emulated_mouse.device = InputEvent.DEVICE_ID_EMULATION
+	emulated_mouse.button_index = MOUSE_BUTTON_LEFT
+	emulated_mouse.position = Vector2(930, 510)
+	emulated_mouse.pressed = true
+	adapter._unhandled_input(emulated_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position:
+		failures.append("RED: emulated mouse press from touch must not steal active touch ownership")
+
+	emulated_mouse.pressed = false
+	adapter._unhandled_input(emulated_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position or state.released_this_frame:
+		failures.append("RED: emulated mouse release from touch must not release active touch ownership")
+
 	touch.position = drag.position
 	touch.pressed = false
 	adapter._unhandled_input(touch)
