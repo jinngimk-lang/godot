@@ -29,6 +29,22 @@ func run() -> Array[String]:
 	if not events.has("fast"):
 		failures.append("high-speed active peel should select fast foley")
 
+	# Paper flex is motion feedback, not a metronome for held tension. Once the
+	# cooldown has expired, a stationary held peel must stay quiet until either
+	# the pointer moves again or the label actually releases more material.
+	router.reset()
+	events = router.update(true, 0.0, 18.0, 0.0, false, 0.20)
+	if events.has("paper_flex"):
+		failures.append("RED: stationary sustained peel tension must not retrigger paper_flex")
+
+	events = router.update(true, 0.7, 18.0, 0.0, false, 0.20)
+	if not events.has("paper_flex"):
+		failures.append("slow real pointer motion under tension should allow paper_flex")
+
+	events = router.update(true, 0.0, 18.0, 0.01, false, 0.20)
+	if not events.has("paper_flex"):
+		failures.append("incremental label release should allow paper_flex even at near-zero pointer speed")
+
 	events = router.update(true, 3.0, 18.0, 0.05, false, 0.20)
 	if not events.has("micro_release"):
 		failures.append("meaningful incremental release should emit micro_release")
