@@ -257,8 +257,20 @@ func _estimate_bone_tip(previous_name: String, distal_name: String, extension: f
 	if direction.length_squared() <= 0.000001:
 		return null
 	var skeleton_local_tip := distal_pose.origin + direction.normalized() * extension
-	var world_tip := _skeleton.to_global(skeleton_local_tip)
-	return to_local(world_tip)
+	return _descendant_point_to_local(_skeleton, skeleton_local_tip)
+
+func _descendant_point_to_local(descendant: Node3D, point: Vector3):
+	var current := descendant
+	var converted := point
+	while current != self:
+		if current.is_set_as_top_level():
+			return null
+		converted = current.transform * converted
+		var parent := current.get_parent()
+		if not (parent is Node3D):
+			return null
+		current = parent as Node3D
+	return converted
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
