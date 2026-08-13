@@ -11,6 +11,12 @@ func run() -> Array[String]:
 	if lifecycle_script == null:
 		failures.append("label lifecycle script did not load")
 		return failures
+	var method_names: Array[String] = []
+	for method in lifecycle_script.get_script_method_list():
+		method_names.append(String(method.get("name", "")))
+	if not method_names.has("get_detach_alpha"):
+		failures.append("RED: label lifecycle missing progressive detach alpha")
+		return failures
 
 	var lifecycle = lifecycle_script.new(0.16)
 	lifecycle.reset()
@@ -18,6 +24,8 @@ func run() -> Array[String]:
 		failures.append("reset lifecycle should be ATTACHED")
 	if lifecycle.is_detached():
 		failures.append("reset lifecycle must not be detached")
+	if lifecycle.get_detach_alpha() != 0.0:
+		failures.append("reset lifecycle detach alpha should be zero")
 
 	lifecycle.update(0.45, false, 0.016)
 	if lifecycle.get_phase_name() != "PEELING":
@@ -28,12 +36,21 @@ func run() -> Array[String]:
 	lifecycle.update(1.0, true, 0.016)
 	if lifecycle.get_phase_name() != "DETACHING":
 		failures.append("completion should enter DETACHING")
+	if lifecycle.get_detach_alpha() != 0.0:
+		failures.append("DETACHING should begin at zero blend")
 	if lifecycle.consume_detach_event():
 		failures.append("detach event should not fire before detach duration elapses")
 
-	lifecycle.update(1.0, false, 0.20)
+	lifecycle.update(1.0, false, 0.08)
+	var half_alpha: float = lifecycle.get_detach_alpha()
+	if half_alpha < 0.45 or half_alpha > 0.55:
+		failures.append("half detach duration should produce about half blend")
+
+	lifecycle.update(1.0, false, 0.10)
 	if lifecycle.get_phase_name() != "HELD":
 		failures.append("elapsed detach duration should enter HELD")
+	if lifecycle.get_detach_alpha() != 1.0:
+		failures.append("HELD lifecycle detach alpha should be one")
 	if not lifecycle.is_detached():
 		failures.append("HELD lifecycle must report detached")
 	if not lifecycle.consume_detach_event():
