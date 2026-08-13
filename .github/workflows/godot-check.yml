@@ -84,6 +84,13 @@ jobs:
           test -f tests/smoke_cafe_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_cafe_presentation.gd
 
+      - name: Forearm presentation smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_forearm_presentation.gd
+          ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
+
       - name: Repeated-session reset smoke
         shell: bash
         run: |
