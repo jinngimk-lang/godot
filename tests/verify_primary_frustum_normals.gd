@@ -2,7 +2,7 @@ extends SceneTree
 
 const MIN_ATTACHED_DOT := 0.999
 const MIN_SEAM_DOT := 0.94
-const CURVE_Y_EPS := 0.00001
+const CURVE_Y_EPS := 0.01
 
 func _init() -> void:
 	call_deferred("_run")
