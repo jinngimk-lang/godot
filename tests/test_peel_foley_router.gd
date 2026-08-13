@@ -45,6 +45,41 @@ func run() -> Array[String]:
 	if not events.has("paper_flex"):
 		failures.append("incremental label release should allow paper_flex even at near-zero pointer speed")
 
+	# Independent threshold/cooldown attack. Sub-threshold sensor jitter and tiny
+	# non-release deltas must remain quiet even after arbitrarily long idle time.
+	router.reset()
+	for i in range(6):
+		events = router.update(true, 0.349, 18.0, 0.0049, false, 0.50)
+		if events.has("paper_flex"):
+			failures.append("CHALLENGE: sub-threshold jitter/release must not accumulate into paper_flex")
+			break
+
+	# The inclusive motion threshold is the first legitimate re-arm point.
+	events = router.update(true, 0.35, 18.0, 0.0, false, 0.016)
+	if not events.has("paper_flex"):
+		failures.append("CHALLENGE: exact motion threshold should permit paper_flex")
+
+	# Cooldown expiry while stationary must not queue or backfill a delayed flex.
+	events = router.update(true, 0.0, 18.0, 0.0, false, 0.50)
+	if events.has("paper_flex"):
+		failures.append("CHALLENGE: stationary cooldown expiry must not backfill paper_flex")
+
+	# A real release can create paper motion without pointer motion, exactly at
+	# the declared release threshold.
+	events = router.update(true, 0.0, 18.0, 0.005, false, 0.016)
+	if not events.has("paper_flex"):
+		failures.append("CHALLENGE: exact incremental-release threshold should permit paper_flex")
+
+	# A second real release inside the paper cooldown must not double-trigger.
+	events = router.update(true, 0.0, 18.0, 0.02, false, 0.01)
+	if events.has("paper_flex"):
+		failures.append("CHALLENGE: paper_flex release feedback must remain cooldown limited")
+
+	# Once that cooldown expires, staying stationary still must not emit anything.
+	events = router.update(true, 0.0, 18.0, 0.0, false, 0.50)
+	if events.has("paper_flex"):
+		failures.append("CHALLENGE: expired release cooldown must stay quiet without new motion")
+
 	events = router.update(true, 3.0, 18.0, 0.05, false, 0.20)
 	if not events.has("micro_release"):
 		failures.append("meaningful incremental release should emit micro_release")
