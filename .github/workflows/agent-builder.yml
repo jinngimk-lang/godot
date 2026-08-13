@@ -38,22 +38,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      GH_TOKEN: ${{ github.token }}
       TASK_ID: ${{ inputs.task_id || github.event.issue.number }}
       CHALLENGER_FEEDBACK: ${{ inputs.challenger_feedback || '' }}
       AGENT_ROUND: ${{ inputs.round || '0' }}
       MAX_AGENT_ROUND: "20"
 
     steps:
-      - name: Checkout canonical main
+      - name: Checkout canonical main without stored write credentials
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Resolve task and current Builder artifact
         id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -150,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .agent-builder-prompt.md godot godot-import.log
-          protected="$(git diff --name-only -- .github .agents)"
+          protected="$(git status --porcelain --untracked-files=all -- .github .agents)"
           if [ -n "$protected" ]; then
             echo "Builder attempted protected infrastructure edits:" >&2
             echo "$protected" >&2
@@ -161,7 +162,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Recreate the verified engine binary removed from the candidate diff.
           unzip -q /tmp/godot.zip -d /tmp/peel-godot-verify
           mv /tmp/peel-godot-verify/Godot_v4.7.1-stable_linux.x86_64 ./godot
           chmod +x ./godot
@@ -177,9 +177,10 @@ jobs:
 
       - name: Commit and push verified Builder batch
         id: push
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
+        shell: bash
         run: |
           set -euo pipefail
           git config user.name "peel-builder[bot]"
@@ -190,17 +191,19 @@ jobs:
             exit 1
           fi
           git commit -m "feat: builder advances Peel Calm task #${TASK_ID}"
+          gh auth setup-git
           git push --set-upstream origin "$BRANCH_NAME"
           head_sha="$(git rev-parse HEAD)"
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Create or update the single Builder PR
         id: pr
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
           EXISTING_PR: ${{ steps.context.outputs.existing_pr }}
           HEAD_SHA: ${{ steps.push.outputs.head_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           report=/tmp/builder-report.md
@@ -243,15 +246,16 @@ jobs:
           echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch independent Challenger
-        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           HEAD_SHA: ${{ steps.push.outputs.head_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           next_round=$((AGENT_ROUND + 1))
           if [ "$next_round" -gt "$MAX_AGENT_ROUND" ]; then
-            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED\nFROM: peel-builder\nTO: owner\nARTIFACT: Issue #${TASK_ID}\nSHA: ${HEAD_SHA}\nCLAIM: Bounded autonomous handoff limit reached.\nEVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}.\nNEXT_ACTION: inspect current Builder PR before extending the autonomous budget."
+            gh issue comment "$TASK_ID" --body "TYPE: UNVERIFIED; FROM: peel-builder; TO: owner; ARTIFACT: Issue #${TASK_ID}; SHA: ${HEAD_SHA}; CLAIM: bounded autonomous handoff limit reached; EVIDENCE: round ${AGENT_ROUND}/${MAX_AGENT_ROUND}; NEXT_ACTION: inspect current Builder PR before extending autonomous API budget."
             exit 0
           fi
           gh workflow run agent-challenger.yml --ref main \
