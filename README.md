@@ -26,13 +26,13 @@ The repository is the complete runnable project. A fresh clone/ZIP is intended t
 - The right hand follows with damping rather than snapping directly to the cursor.
 - Releasing early preserves peel progress; re-grab the current gold edge to continue.
 - At 100%, the last adhesive bond releases over a short detach transition. The printed label becomes a free object held by the right hand and is no longer anchored to the cup.
-- After a clean detach, the game awards score/stamps and automatically presents the next item.
+- After a clean detach, the game awards score/stamps exactly once and automatically presents the next item after a short calm beat.
 
 Controls:
 
-- **Esc** — pause / resume
-- **R** — reset the current label without erasing run progression
-- **Shift+R** — restart the whole run, including score/stamps/unlocks
+- **Esc** — pause / resume; pausing also freezes the pending next-item delay.
+- **R** — reset the current active label without erasing run progression. After a completed clean peel, **R** skips the short presentation delay and moves to the next unlocked tactile item immediately.
+- **Shift+R** — restart the whole run, including score/stamps/unlocks, and cancel any pending next-item transition.
 - Close the game window normally when finished.
 
 Mouse is the current primary control. The input boundary also accepts touch event shapes, while mobile export and phone haptics remain deferred until the PC tactile experience is validated.
@@ -67,7 +67,8 @@ GitHub Actions uses the official Godot 4.7.1 Linux x86_64 release and verifies i
 - deterministic peel/input/score/lifecycle/geometry/hand/Foley tests;
 - deterministic session progression and real tactile-variant parameter tests;
 - main-scene smoke requiring authored hand assets, printed-label wiring and repository-local Foley;
-- repeated in-process reset and `complete -> next -> unlock -> pause -> restart` flow.
+- repeated in-process reset and `complete -> next -> unlock -> pause -> restart` flow;
+- duplicate detach-callback idempotence, pause-time freezing during the completion delay, immediate `R` next-item behavior, and stale-transition cancellation after `Shift+R`.
 
 A green CI run proves project/script/resource contracts and machine-observable gameplay behavior. It does **not** prove that resistance feels pleasant, hand placement looks natural enough on a particular display, Foley balance is relaxing on a particular speaker/headphone setup, or the visual style matches the owner's taste. Those remain experiential playtest items and should be judged by running the final `main` build locally.
 
