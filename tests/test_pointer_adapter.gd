@@ -62,8 +62,7 @@ func run() -> Array[String]:
 		adapter.free()
 		return failures
 
-	# Reset-style quarantine: a touch that was already held must stay neutral
-	# through drags until release, then a fresh press must work normally.
+	# Reset-style quarantine.
 	touch.position = Vector2(400, 260)
 	touch.pressed = true
 	adapter._unhandled_input(touch)
@@ -87,8 +86,7 @@ func run() -> Array[String]:
 	if not adapter.consume_frame().pressed:
 		failures.append("fresh touch after quarantine release should re-arm normally")
 
-	# Pause-style suspension: input received while suspended is tracked physically
-	# but never exposed to gameplay; resuming while held waits for a release.
+	# Pause-style suspension.
 	adapter.suspend_gameplay_input()
 	drag.position = Vector2(455, 245)
 	adapter._unhandled_input(drag)
@@ -107,8 +105,7 @@ func run() -> Array[String]:
 	if not adapter.consume_frame().pressed:
 		failures.append("fresh post-resume touch should re-arm normally")
 
-	# Multi-touch ownership: the first active touch owns the gameplay pointer
-	# until it releases. A second finger must not teleport or release that pointer.
+	# Multi-touch ownership.
 	touch.index = 0
 	touch.pressed = false
 	adapter._unhandled_input(touch)
@@ -128,13 +125,12 @@ func run() -> Array[String]:
 	adapter._unhandled_input(secondary)
 	state = adapter.consume_frame()
 	if not state.pressed or state.position != primary_position:
-		failures.append("RED: secondary touch press must not steal gameplay pointer ownership")
-
+		failures.append("secondary touch press must not steal gameplay pointer ownership")
 	secondary.pressed = false
 	adapter._unhandled_input(secondary)
 	state = adapter.consume_frame()
 	if not state.pressed or state.position != primary_position or state.released_this_frame:
-		failures.append("RED: secondary touch release must not release the active primary touch")
+		failures.append("secondary touch release must not release the active primary touch")
 
 	drag.index = 0
 	drag.position = Vector2(540, 245)
@@ -145,9 +141,7 @@ func run() -> Array[String]:
 	if not state.pressed or state.position != drag.position:
 		failures.append("primary drag should retain ownership after secondary-touch noise")
 
-	# Godot marks mouse events synthesized from touch with DEVICE_ID_EMULATION.
-	# The synthetic mouse half of the same physical gesture must not become a
-	# second gameplay pointer source.
+	# Emulated mouse duplicate from touch.
 	var emulated_mouse := InputEventMouseButton.new()
 	emulated_mouse.device = InputEvent.DEVICE_ID_EMULATION
 	emulated_mouse.button_index = MOUSE_BUTTON_LEFT
@@ -156,13 +150,29 @@ func run() -> Array[String]:
 	adapter._unhandled_input(emulated_mouse)
 	state = adapter.consume_frame()
 	if not state.pressed or state.position != drag.position:
-		failures.append("RED: emulated mouse press from touch must not steal active touch ownership")
-
+		failures.append("emulated mouse press from touch must not steal active touch ownership")
 	emulated_mouse.pressed = false
 	adapter._unhandled_input(emulated_mouse)
 	state = adapter.consume_frame()
 	if not state.pressed or state.position != drag.position or state.released_this_frame:
-		failures.append("RED: emulated mouse release from touch must not release active touch ownership")
+		failures.append("emulated mouse release from touch must not release active touch ownership")
+
+	# Hybrid-device ownership: a real mouse must not steal a real touch that
+	# already owns the gameplay gesture.
+	var real_mouse := InputEventMouseButton.new()
+	real_mouse.device = 0
+	real_mouse.button_index = MOUSE_BUTTON_LEFT
+	real_mouse.position = Vector2(1010, 560)
+	real_mouse.pressed = true
+	adapter._unhandled_input(real_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position:
+		failures.append("real mouse press must not steal an already-active touch gesture")
+	real_mouse.pressed = false
+	adapter._unhandled_input(real_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != drag.position or state.released_this_frame:
+		failures.append("real mouse release must not release an already-active touch gesture")
 
 	touch.position = drag.position
 	touch.pressed = false
@@ -170,6 +180,35 @@ func run() -> Array[String]:
 	state = adapter.consume_frame()
 	if state.pressed or not state.released_this_frame:
 		failures.append("primary owner release should end the gameplay pointer")
+	adapter.clear_transients()
+
+	# The inverse must also hold: once a real mouse press owns the gesture, a
+	# real touch cannot teleport or release it until the mouse releases.
+	real_mouse.position = Vector2(620, 320)
+	real_mouse.pressed = true
+	adapter._unhandled_input(real_mouse)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != real_mouse.position:
+		failures.append("real mouse press should acquire gameplay pointer ownership")
+
+	touch.index = 0
+	touch.position = Vector2(880, 430)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != real_mouse.position:
+		failures.append("touch press must not steal an already-active real mouse gesture")
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if not state.pressed or state.position != real_mouse.position or state.released_this_frame:
+		failures.append("touch release must not release an already-active real mouse gesture")
+
+	real_mouse.pressed = false
+	adapter._unhandled_input(real_mouse)
+	state = adapter.consume_frame()
+	if state.pressed or not state.released_this_frame:
+		failures.append("real mouse owner release should end the gameplay pointer")
 
 	adapter.free()
 	return failures
