@@ -23,6 +23,12 @@ func quarantine_current_press() -> void:
 	_neutralize_state(state.position)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
+
+	if event is InputEventMouseMotion and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
+
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		_physical_pressed = event.pressed
 		if _consume_boundary_event(_physical_pressed, event.position):
