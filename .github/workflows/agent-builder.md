@@ -26,7 +26,6 @@ checkout:
   fetch-depth: 0
 tools:
   edit:
-  bash:
   github:
     toolsets: [repos, issues, pull_requests, actions]
 safe-outputs:
@@ -100,7 +99,7 @@ When Challenger feedback is present, reproduce or inspect the stated counterexam
 
 # Evidence
 
-Use GitHub Actions/read tools to inspect available Godot CI evidence. If you can run useful local deterministic checks with tools available in the workspace, do so. Do not fabricate a Godot run if the binary is unavailable.
+Use GitHub Actions/read tools to inspect available Godot CI evidence. If useful deterministic checks are available in the workspace, run them through the tools the runtime explicitly grants. Do not fabricate a Godot run if the binary is unavailable.
 
 Before handoff, ensure the proposed code is internally coherent and relevant tests are added/updated. A proposal must state what remains unverified.
 
