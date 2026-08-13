@@ -57,3 +57,19 @@ static func attached_point_on_frustum(
 	var arc_length := lerpf(-safe_width * 0.5, safe_width * 0.5, safe_u)
 	var angle := arc_length / radius
 	return Vector3(sin(angle) * radius, y, cos(angle) * radius)
+
+static func frustum_surface_normal(
+	point: Vector3,
+	bottom_radius: float,
+	top_radius: float,
+	cup_height: float
+) -> Vector3:
+	var radial := Vector3(point.x, 0.0, point.z)
+	if radial.length_squared() <= 0.000001:
+		return Vector3.FORWARD
+	var height := maxf(absf(cup_height), 0.001)
+	var bottom := maxf(bottom_radius, 0.001)
+	var top := maxf(top_radius, 0.001)
+	var slope := (top - bottom) / height
+	radial = radial.normalized()
+	return Vector3(radial.x, -slope, radial.z).normalized()
