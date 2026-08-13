@@ -28,6 +28,11 @@ func run() -> Array[String]:
 		var vertex_count := _renderable_vertex_count(instance)
 		if vertex_count <= 0:
 			failures.append("authored hand must contain a non-empty renderable mesh: %s" % path)
+		var material_names := _material_names(instance)
+		if not material_names.has("HandSkin"):
+			failures.append("authored hand missing semantic skin material HandSkin: %s" % path)
+		if not material_names.has("HandNail"):
+			failures.append("authored hand missing semantic nail material HandNail: %s" % path)
 		instance.free()
 
 	var hand_script = load("res://scripts/hands/hand_visual.gd")
@@ -64,6 +69,22 @@ func _renderable_vertex_count(node: Node) -> int:
 	for child in node.get_children():
 		count += _renderable_vertex_count(child)
 	return count
+
+func _material_names(node: Node) -> Array[String]:
+	var names: Array[String] = []
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		var mesh: Mesh = mesh_instance.mesh
+		if mesh != null:
+			for surface_index in range(mesh.get_surface_count()):
+				var material := mesh.surface_get_material(surface_index)
+				if material != null and not material.resource_name.is_empty() and not names.has(material.resource_name):
+					names.append(material.resource_name)
+	for child in node.get_children():
+		for material_name in _material_names(child):
+			if not names.has(material_name):
+				names.append(material_name)
+	return names
 
 func _find_first(node: Node, class_name_text: String) -> Node:
 	if node.get_class() == class_name_text:
