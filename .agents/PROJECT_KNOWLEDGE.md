@@ -1,6 +1,6 @@
 # Peel Calm Shared Project Knowledge
 
-This file is compact operational memory for both repository agents. It does not replace specs, plans, tests, Git history, Issue #7, PR evidence, or owner playtest evidence. Inspect those sources whenever a detail matters, and treat stale exact-head evidence as invalid after a head/base changes.
+This file is compact operational memory for both repository agents. It does not replace specs, plans, tests, Git history, the canonical cross-PR coordination Hub in Issue #5, the current complete-playable task ledger in Issue #7, PR evidence, or owner playtest evidence. Inspect those sources whenever a detail matters, and treat stale exact-head evidence as invalid after a head/base changes.
 
 ## Product thesis
 
@@ -142,7 +142,7 @@ Current event vocabulary:
 - micro release;
 - final release.
 
-Idle must not sustain peel loops. Incremental releases may be cooldown-limited. Final release is an exact-once-per-cycle event and reset re-arms it. Use sample variation conservatively to avoid repetition. Do not reintroduce synthetic placeholder noise as the normal presentation path.
+Idle must not sustain peel loops. High tension by itself must not turn paper flex into a metronome: paper-flex events require real pointer motion or incremental label release, remain cooldown-limited, and must not be backfilled merely because a cooldown expired while stationary. Final release is an exact-once-per-cycle event and reset re-arms it. Use sample variation conservatively to avoid repetition. Do not reintroduce synthetic placeholder noise as the normal presentation path.
 
 Runtime Foley must remain repository-local. Asset source/license/provenance and transformation notes belong with the assets; do not introduce untracked external runtime downloads.
 
@@ -223,10 +223,11 @@ Those remain `UNVERIFIED` until owner local playtest evidence exists.
 
 ## Multi-agent coordination protocol
 
-Issue #7 is the current shared coordination bus for the complete playable project.
+Issue #5 is the canonical cross-PR coordination Hub. Use it for role declaration, narrow file/path claims, ownership collisions, handoffs, blockers, releases, and current cross-task state. PR comments carry change-local evidence and review conclusions. Issue #7 is the current complete-playable Peel Calm task/evidence ledger; it may summarize task-specific progress, but it does not replace Hub #5.
 
-- Before starting a meaningful line, inspect current `main`, open PRs, active branches, and recent Issue #7 handoffs.
-- State path claims/collision boundaries when two agents are active; do not edit another agent's claimed production paths unless explicitly taking over after a handoff/blocker.
+- Before starting a meaningful line, inspect current `main`, open PRs, active branches, recent Issue #5 ownership/handoff state, the relevant PR discussion, and task-specific Issue #7 evidence when working on the complete-playable slice.
+- Every cross-PR coordination comment should declare `AGENT`, `ROLE`, `TASK`, `BASE_SHA`, `BRANCH`, `FILES_CLAIMED`, `STATUS`, `EVIDENCE`, `BLOCKER`, and `NEXT_ACTION` as required by Hub #5.
+- State path claims/collision boundaries before production writes when two agents are active; do not edit another agent's claimed production paths unless explicitly taking over after a handoff/blocker.
 - Prefer isolated, narrowly scoped branches/PRs so repairs can be challenged, replayed, merged, or discarded independently.
 - A Challenger must try to falsify the exact candidate rather than merely repeat the author's tests.
 - Valid independent REDs are accepted into the contract; do not defend an implementation simply because its previous CI was green.
