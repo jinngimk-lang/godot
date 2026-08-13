@@ -1,0 +1,52 @@
+name: Procedural Hand Fallback Verify
+
+on:
+  push:
+    branches:
+      - verify/challenge-procedural-hand-fallback-v4
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fallback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Import without right authored GLB
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f assets/models/hands/hand_right.glb
+          ./godot --headless --editor --path . --quit 2>&1 | tee fallback-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" fallback-import.log; then
+            echo "Fallback verifier import failed to parse/load scripts."
+            exit 1
+          fi
+
+      - name: Verify procedural right-hand fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --script res://tests/verify_procedural_hand_fallback.gd 2>&1 | tee fallback.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" fallback.log; then
+            echo "Procedural fallback emitted a Godot/script error."
+            exit 1
+          fi
+          grep -Fq 'PASS: authored-right asset missing -> procedural fallback renders and follows grip' fallback.log
