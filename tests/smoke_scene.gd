@@ -24,13 +24,19 @@ func _run() -> void:
 		if not scene.has_node(child_name):
 			failures.append("missing runtime node: %s" % child_name)
 
-	if scene.has_node("RightHand"):
-		var right_hand = scene.get_node("RightHand")
-		if right_hand.get_finger_count() != 5:
-			failures.append("right hand must expose five fingers")
+	for hand_name in ["LeftHand", "RightHand"]:
+		if not scene.has_node(hand_name):
+			continue
+		var hand = scene.get_node(hand_name)
+		if hand.get_finger_count() != 5:
+			failures.append("%s must expose five fingers" % hand_name)
+		if not hand.is_using_authored_asset():
+			failures.append("%s must use repository-local authored GLB in normal runtime" % hand_name)
+		if hand.get_node_or_null("AuthoredHand") == null:
+			failures.append("%s missing authored hand scene instance" % hand_name)
 		for anchor in ["ThumbTip", "IndexTip", "PinchPoint"]:
-			if right_hand.find_child(anchor, true, false) == null:
-				failures.append("right hand missing pinch anchor: %s" % anchor)
+			if hand.find_child(anchor, true, false) == null:
+				failures.append("%s missing pinch anchor: %s" % [hand_name, anchor])
 
 	if scene.has_node("PeelAudio"):
 		var audio = scene.get_node("PeelAudio")
@@ -46,10 +52,12 @@ func _run() -> void:
 		"res://assets/audio/peel/adhesive_fast.wav",
 		"res://assets/audio/peel/paper_flex.wav",
 		"res://assets/audio/peel/micro_release.wav",
-		"res://assets/audio/peel/final_release.wav"
+		"res://assets/audio/peel/final_release.wav",
+		"res://assets/models/hands/hand_left.glb",
+		"res://assets/models/hands/hand_right.glb"
 	]:
 		if not ResourceLoader.exists(resource_path):
-			failures.append("missing repository-local foley resource: %s" % resource_path)
+			failures.append("missing repository-local tactile resource: %s" % resource_path)
 
 	var lifecycle = scene.get("_lifecycle")
 	if lifecycle == null:
