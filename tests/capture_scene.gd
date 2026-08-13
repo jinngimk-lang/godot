@@ -88,6 +88,22 @@ func _print_hand_diagnostics(scene: Node, hand_name: String) -> void:
 	print("HAND_DIAG %s authored=%s root=%s rot=%s scale=%s meshes=%d vertices=%d max_extent=%.5f pinch=%s screen=%s behind=%s" % [
 		hand_name, str(authored), str(hand.global_position), str(hand.rotation_degrees), str(hand.scale), meshes.size(), total_vertices, max_local_extent, str(pinch), str(screen), str(behind)
 	])
+	var authored_root := hand.get_node_or_null("AuthoredHand") as Node3D
+	if authored_root != null and camera != null:
+		var origin_world := authored_root.to_global(Vector3.ZERO)
+		var origin_screen := camera.unproject_position(origin_world)
+		for axis_info in [
+			["X", Vector3(0.16, 0.0, 0.0)],
+			["Y", Vector3(0.0, 0.16, 0.0)],
+			["Z", Vector3(0.0, 0.0, 0.16)]
+		]:
+			var axis_name := String(axis_info[0])
+			var axis_point := axis_info[1] as Vector3
+			var axis_world := authored_root.to_global(axis_point)
+			var axis_screen := camera.unproject_position(axis_world)
+			print("AXIS_DIAG %s %s origin=%s end=%s delta=%s world_delta=%s" % [
+				hand_name, axis_name, str(origin_screen), str(axis_screen), str(axis_screen - origin_screen), str(axis_world - origin_world)
+			])
 	var skeleton := _find_skeleton(hand)
 	if skeleton != null:
 		for bone_id in range(skeleton.get_bone_count()):
