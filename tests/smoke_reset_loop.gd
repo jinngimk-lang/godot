@@ -26,6 +26,19 @@ func _run() -> void:
 		quit(1)
 		return
 
+	# PC remains primary, but the same production PointerAdapter accepts direct
+	# touch. The first player-facing instruction must therefore not tell a touch
+	# player that a left mouse button is mandatory.
+	var onboarding := hud.text.to_lower()
+	if onboarding.contains("hold left mouse"):
+		push_error("RED: touch-ready onboarding must not make left mouse sound mandatory: %s" % hud.text)
+		quit(1)
+		return
+	if not onboarding.contains("mouse") or not onboarding.contains("touch"):
+		push_error("RED: onboarding must explicitly cover both mouse and touch input: %s" % hud.text)
+		quit(1)
+		return
+
 	# Current-label reset keeps the visible pinch aligned to the fresh edge.
 	var expected_grip_local := label.get_front_position(0.0)
 	var expected_grip_world := label.to_global(expected_grip_local)
