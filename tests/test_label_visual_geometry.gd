@@ -22,4 +22,5 @@ func run() -> Array[String]:
 	var right: Vector3 = label.get_front_position(1.0)
 	if left.x >= 0.0 or right.x <= 0.0:
 		failures.append("label endpoints should span both sides of the cup front")
+	label.free()
 	return failures
