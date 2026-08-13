@@ -84,13 +84,7 @@ func _process(delta: float) -> void:
 	_audio.set_feedback(active_peel, speed, tension, released_amount, detached_now, delta)
 
 	if detached_now:
-		var progress_result: Dictionary = _session.record_clean_peel(_pending_score)
-		var reward_text := "CLEAN PEEL  +%d" % _pending_score
-		if bool(progress_result.get("unlocked_new", false)):
-			reward_text += "\nNEW FEEL UNLOCKED"
-		_reward.text = reward_text
-		_advance_after_reset = true
-		_reset_timer = 2.15
+		_handle_detached_label()
 
 	_update_hud(state_name, phase_name, progress)
 	_pointer.clear_transients()
@@ -259,6 +253,15 @@ func _on_completed() -> void:
 	_completed_this_frame = true
 	var continuity := 1.0 if _release_count == 0 else maxf(0.55, 1.0 - float(_release_count) * 0.1)
 	_pending_score = ScoreModel.score(100.0, 1.0, continuity)
+
+func _handle_detached_label() -> void:
+	var progress_result: Dictionary = _session.record_clean_peel(_pending_score)
+	var reward_text := "CLEAN PEEL  +%d" % _pending_score
+	if bool(progress_result.get("unlocked_new", false)):
+		reward_text += "\nNEW FEEL UNLOCKED"
+	_reward.text = reward_text
+	_advance_after_reset = true
+	_reset_timer = 2.15
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
