@@ -52,6 +52,14 @@ func get_progress() -> float:
 func is_complete() -> bool:
 	return _progress >= 1.0
 
+func get_config() -> Dictionary:
+	return {
+		"base_adhesion": _base_adhesion,
+		"release_increment": _release_increment,
+		"speed_gain": _speed_gain,
+		"angle_gain": _angle_gain
+	}
+
 func _finite_or(value: float, fallback: float) -> float:
 	if is_nan(value) or is_inf(value):
 		return fallback
