@@ -1,4 +1,4 @@
-name: Local Model Challenger Probe
+name: Local Model Independent Review
 
 on:
   push:
@@ -10,8 +10,17 @@ permissions:
 
 jobs:
   challenge:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - agent: qwen-challenger
+            model: qwen2.5-coder:3b
+          - agent: codegemma-challenger
+            model: codegemma:2b
+    name: ${{ matrix.agent }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout exact complete-playable candidate
         uses: actions/checkout@v6
@@ -20,21 +29,38 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare exact diff
+      - name: Prepare exact review packet
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          git diff --no-ext-diff --unified=3 origin/main...HEAD > /tmp/candidate.diff
-          git diff --stat origin/main...HEAD
-          test -s /tmp/candidate.diff
+          git diff --no-ext-diff --unified=4 origin/main...HEAD -- \
+            scripts/peel_lab.gd \
+            scripts/session/session_model.gd \
+            scripts/peel/peel_controller.gd \
+            scripts/peel/peel_model.gd > /tmp/production.diff
+          git diff --no-ext-diff --unified=2 origin/main...HEAD -- \
+            tests/test_session_model.gd \
+            tests/smoke_scene.gd \
+            tests/smoke_reset_loop.gd > /tmp/tests.diff
+          test -s /tmp/production.diff
+          {
+            echo '=== CURRENT PRODUCTION peel_lab.gd ==='
+            cat scripts/peel_lab.gd
+            echo '=== CURRENT PRODUCTION session_model.gd ==='
+            cat scripts/session/session_model.gd
+            echo '=== PRODUCTION DIFF VS MAIN ==='
+            cat /tmp/production.diff
+            echo '=== TEST DIFF (evidence only; do not assume tests are correct) ==='
+            cat /tmp/tests.diff
+          } > /tmp/review-packet.txt
+          wc -c /tmp/review-packet.txt
 
       - name: Install local Ollama runtime
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL https://ollama.com/install.sh | sh
-          ollama --version
           nohup ollama serve >/tmp/ollama-server.log 2>&1 &
           for _ in {1..30}; do
             if ollama list >/dev/null 2>&1; then exit 0; fi
@@ -43,49 +69,82 @@ jobs:
           cat /tmp/ollama-server.log
           exit 1
 
-      - name: Pull small code-review model
+      - name: Pull independent model
         shell: bash
         run: |
           set -euo pipefail
-          ollama pull qwen2.5-coder:1.5b
+          ollama pull '${{ matrix.model }}'
 
-      - name: Run independent adversarial review
+      - name: Run adversarial exact-head review
         shell: bash
+        env:
+          REVIEW_MODEL: ${{ matrix.model }}
+          AGENT_NAME: ${{ matrix.agent }}
         run: |
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are an independent Challenger reviewing a Godot 4.7.1 game PR. You did not write this patch.
-          Review only concrete machine-observable correctness. Be adversarial and try to falsify the candidate.
+          You are a skeptical independent code-review agent. You did NOT write this patch.
+          Review a Godot 4.7.1 GDScript game candidate. Do not summarize the tests. Try to break the production logic.
 
-          Acceptance focus:
-          - direct-run fresh clone remains valid;
-          - no regression of true final detach, bounded label geometry, authored hands, label print, real local Foley;
-          - player HUD avoids internal state jargon and exposes reset/pause;
-          - tactile variants must change actual peel parameters, not only names;
-          - unlocks and score must record exactly once per true detached label;
-          - repeated complete -> next cycles must not corrupt the current controller, hand reset, label dimensions, or progression;
-          - R resets only the label; Shift+R restarts the run; Esc pause is reversible;
-          - flag any concrete GDScript lifecycle/order bug, stale state, double-count, impossible transition, or test blind spot.
+          Exact acceptance claims to attack:
+          1. A true detached label records progression exactly once.
+          2. Completing a label, waiting for next-item transition, and completing again cannot double-count or retain stale controller/lifecycle state.
+          3. Unlock thresholds are exactly after clean peels 2 and 5. Variant rotation uses only unlocked variants.
+          4. Each tactile variant changes real peel configuration and label dimensions, not only text.
+          5. R resets the current label without erasing accumulated run progression. Shift+R clears the whole run. Esc pause/resume is reversible and does not advance timers while paused.
+          6. Rebuilding the controller during a variant change does not leave stale signal callbacks or old model parameters in use.
+          7. The old V2 contracts remain reachable: true DETACHING->HELD lifecycle, bounded label visual, authored hands, printed paper texture, local Foley.
+          8. No direct-run runtime cloud/secret/plugin dependency was introduced.
 
-          Output one of:
-          VERIFIED: followed by the strongest counterexamples you attempted and why they fail; or
-          NEEDS_FIX: followed by specific file/function, reproducible counterexample, and minimum acceptance test.
+          Required review method:
+          - Read production code first. Treat tests only as evidence, not truth.
+          - Construct at least THREE concrete event sequences/counterexamples, including one involving reset during the 2.15s next-item delay and one involving pause during that delay.
+          - Check actual variable ordering and state mutations line by line.
+          - If you find a defect, identify the exact function/variables and propose one minimal falsifiable test.
+          - Do not judge subjective visuals/audio pleasantness.
 
-          Do not claim subjective aesthetics/audio feel are proven.
+          Your output MUST use exactly this structure:
+          VERDICT: VERIFIED
+          COUNTEREXAMPLE_1: ...
+          COUNTEREXAMPLE_2: ...
+          COUNTEREXAMPLE_3: ...
+          EVIDENCE: ...
+          MIN_TEST: none
 
-          Exact candidate diff follows:
+          OR:
+          VERDICT: NEEDS_FIX
+          COUNTEREXAMPLE_1: ...
+          COUNTEREXAMPLE_2: ...
+          COUNTEREXAMPLE_3: ...
+          EVIDENCE: exact file/function/variable defect
+          MIN_TEST: precise reproducible acceptance test
+
+          Review packet follows.
           PROMPT
-            cat /tmp/candidate.diff
-          } > /tmp/challenger-prompt.txt
-          ollama run qwen2.5-coder:1.5b < /tmp/challenger-prompt.txt | tee /tmp/local-challenger-report.txt
-          test -s /tmp/local-challenger-report.txt
+            cat /tmp/review-packet.txt
+          } > /tmp/review-prompt.txt
+
+          ollama run "$REVIEW_MODEL" < /tmp/review-prompt.txt | tee /tmp/review-report.txt
+          test -s /tmp/review-report.txt
+          if ! grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt; then
+            echo "$AGENT_NAME failed the review protocol: no valid verdict" >&2
+            exit 1
+          fi
+          for field in COUNTEREXAMPLE_1 COUNTEREXAMPLE_2 COUNTEREXAMPLE_3 EVIDENCE MIN_TEST; do
+            grep -Eq "^${field}:" /tmp/review-report.txt || {
+              echo "$AGENT_NAME failed the review protocol: missing $field" >&2
+              exit 1
+            }
+          done
 
       - name: Show independent report
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/local-challenger-report.txt ]; then
-            echo '===== LOCAL CHALLENGER REPORT ====='
-            cat /tmp/local-challenger-report.txt
+          echo '===== ${{ matrix.agent }} / ${{ matrix.model }} ====='
+          if [ -f /tmp/review-report.txt ]; then
+            cat /tmp/review-report.txt
+          else
+            echo 'No conforming report produced.'
           fi
