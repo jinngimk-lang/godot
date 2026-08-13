@@ -15,7 +15,8 @@ func _init() -> void:
 		"res://tests/test_score_model.gd",
 		"res://tests/test_peel_controller.gd",
 		"res://tests/test_label_visual_geometry.gd",
-		"res://tests/test_label_lifecycle.gd"
+		"res://tests/test_label_lifecycle.gd",
+		"res://tests/test_label_visual_v2.gd"
 	]:
 		if ResourceLoader.exists(suite_path):
 			var suite = load(suite_path).new()
