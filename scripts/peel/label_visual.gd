@@ -18,8 +18,7 @@ func _ready() -> void:
 	set_peel(0.0, get_front_position(0.0))
 
 func get_front_position(progress: float) -> Vector3:
-	var p := clampf(progress, 0.0, 1.0)
-	return Vector3(lerpf(-label_width * 0.5, label_width * 0.5, p), label_y, cup_radius + 0.018)
+	return _attached_point(clampf(progress, 0.0, 1.0))
 
 func set_peel(progress: float, grip_local: Vector3) -> void:
 	var p := clampf(progress, 0.0, 1.0)
@@ -38,7 +37,7 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 	_mesh.surface_end()
 
 func _point_for(u: float, progress: float, grip: Vector3) -> Vector3:
-	var attached := Vector3(lerpf(-label_width * 0.5, label_width * 0.5, u), label_y, cup_radius + 0.018)
+	var attached := _attached_point(u)
 	if progress <= 0.0001 or u > progress:
 		return attached
 	var front := get_front_position(progress)
@@ -46,3 +45,9 @@ func _point_for(u: float, progress: float, grip: Vector3) -> Vector3:
 	var arc := sin(t * PI)
 	var curl := sin(t * PI * 2.0) * (1.0 - t)
 	return grip.lerp(front, t) + Vector3(0.0, arc * 0.11 + curl * 0.035, arc * 0.16)
+
+func _attached_point(u: float) -> Vector3:
+	var safe_radius := maxf(cup_radius + 0.018, 0.001)
+	var half_angle := minf((label_width * 0.5) / safe_radius, PI * 0.49)
+	var theta := lerpf(-half_angle, half_angle, clampf(u, 0.0, 1.0))
+	return Vector3(sin(theta) * safe_radius, label_y, cos(theta) * safe_radius)
