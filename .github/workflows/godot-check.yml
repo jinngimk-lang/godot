@@ -57,7 +57,11 @@ jobs:
         run: |
           set -euo pipefail
           test -f tests/test_runner.gd
-          ./godot --headless --path . --script res://tests/test_runner.gd
+          ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee godot-unit.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-unit.log; then
+            echo "Godot emitted engine/script errors during an otherwise-successful unit run."
+            exit 1
+          fi
 
       - name: Scene smoke
         shell: bash
