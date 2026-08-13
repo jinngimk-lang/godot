@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile:
@@ -40,6 +40,22 @@ jobs:
           gh aw compile agent-challenger --strict
           test -s .github/workflows/agent-builder.lock.yml
           test -s .github/workflows/agent-challenger.lock.yml
+
+      - name: Commit exact compiler outputs to feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/agent-builder.lock.yml \
+                  .github/workflows/agent-challenger.lock.yml \
+                  .github/aw/actions-lock.json
+          if git diff --cached --quiet; then
+            echo "Compiled lock files already match sources."
+            exit 0
+          fi
+          git commit -m "build: compile dual-agent workflows with gh-aw v0.83.4"
+          git push origin HEAD:feat/dual-agent-runtime-v1
 
       - name: Upload compiled workflows
         uses: actions/upload-artifact@v4
