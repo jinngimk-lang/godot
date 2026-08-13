@@ -32,7 +32,8 @@ func run() -> Array[String]:
 		failures.append("attached label should remain on the visible front hemisphere")
 
 	# Production cup is a frustum: radius must interpolate with vertical height,
-	# and attached strip edges must use the radius at their own y coordinate.
+	# attached strip edges must use the radius at their own y coordinate, and
+	# their shading normals must include the taper slope instead of staying flat in y.
 	var bottom_radius := 0.45
 	var top_radius := 0.54
 	var cup_height := 1.48
@@ -49,6 +50,8 @@ func run() -> Array[String]:
 	if absf(script.frustum_radius_at_y(top_y, bottom_radius, top_radius, cup_height, cup_center_y) - top_radius) > 0.00001:
 		failures.append("frustum top y must use top radius")
 
+	var expected_slope := (top_radius - bottom_radius) / cup_height
+	var expected_normal_y := -expected_slope / sqrt(1.0 + expected_slope * expected_slope)
 	for sample_y in [label_y - 0.21, label_y, label_y + 0.21]:
 		var expected_frustum_radius: float = script.frustum_radius_at_y(
 			sample_y, bottom_radius, top_radius, cup_height, cup_center_y
@@ -67,6 +70,17 @@ func run() -> Array[String]:
 			var actual_frustum_radius := Vector2(point.x, point.z).length()
 			if absf(actual_frustum_radius - expected_frustum_radius) > 0.00001:
 				failures.append("frustum attached point at y=%.3f u=%.2f missed radius: %.5f vs %.5f" % [sample_y, u, actual_frustum_radius, expected_frustum_radius])
+				break
+			var normal: Vector3 = script.frustum_surface_normal(point, bottom_radius, top_radius, cup_height)
+			if absf(normal.length() - 1.0) > 0.00001:
+				failures.append("frustum surface normal must be unit length")
+				break
+			var radial := Vector3(point.x, 0.0, point.z).normalized()
+			if normal.dot(radial) <= 0.99:
+				failures.append("frustum surface normal must face outward at y=%.3f u=%.2f" % [sample_y, u])
+				break
+			if absf(normal.y - expected_normal_y) > 0.00001:
+				failures.append("frustum surface normal must include taper slope: %.6f vs %.6f" % [normal.y, expected_normal_y])
 				break
 
 	return failures
