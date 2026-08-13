@@ -31,6 +31,7 @@ func setup(dynamic_hand: bool) -> void:
 	_pinch_amount = _pinch_target
 	_apply_pose()
 
+# Target is the world-space point that thumb and index should pinch around.
 func set_grip_target(target: Vector3) -> void:
 	_target = target
 
@@ -43,18 +44,30 @@ func set_pinch_amount(amount: float) -> void:
 func get_finger_count() -> int:
 	return FINGER_NAMES.size()
 
+func get_pinch_world_position() -> Vector3:
+	if _pinch_point == null:
+		return global_position
+	return to_global(_pinch_point.position)
+
+# Snap keeps legacy root-position semantics for initial scene placement.
 func snap_to(target: Vector3) -> void:
-	_target = target
 	position = target
+	if _pinch_point != null:
+		_target = to_global(_pinch_point.position)
+	else:
+		_target = target
 
 func tick(delta: float) -> void:
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0, 0.0, 0.1)
-	if _dynamic:
-		var weight := 1.0 - exp(-follow_rate * safe_delta)
-		position = position.lerp(_target, weight)
 	var pinch_weight := 1.0 - exp(-pinch_follow_rate * safe_delta)
 	_pinch_amount = lerpf(_pinch_amount, _pinch_target, pinch_weight)
 	_apply_pose()
+	if _dynamic:
+		var desired_root := _target
+		if _pinch_point != null:
+			desired_root = _target - basis * _pinch_point.position
+		var weight := 1.0 - exp(-follow_rate * safe_delta)
+		position = position.lerp(desired_root, weight)
 
 func _build_hand() -> void:
 	_built = true
