@@ -11,5 +11,6 @@
 - Local files: `hand_left.glb`, `hand_right.glb`
 - Local modification: format conversion from the pinned animated `.blend` sources to self-contained glTF 2.0 binary (`.glb`); cameras/lights removed; mesh, armature/skin, materials and source animations retained where exportable
 - Runtime dependency: none on Blender or Godot XR Tools; these GLBs are repository-local presentation assets
+- Runtime integration: `scripts/hands/hand_visual.gd` is Peel Calm's project-owned wrapper. It owns hand damping, five-finger validation, pinch anchors and selection of authored poses such as `Cup` and `Pinch Tight`.
 
-The game does not vendor the Godot XR Tools addon. Its hand assets are consumed behind Peel Calm's own hand presentation contract.
+The game does not vendor the Godot XR Tools addon. Its hand assets are consumed behind Peel Calm's own hand presentation contract, so upstream XR gameplay/input code is not part of the runtime dependency graph.
