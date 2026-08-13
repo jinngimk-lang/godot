@@ -1,6 +1,10 @@
 extends Node3D
 class_name HandVisual
 
+const RIGHT_ASSET_PATH := "res://assets/models/hands/hand_right.glb"
+const LEFT_ASSET_PATH := "res://assets/models/hands/hand_left.glb"
+const FINGER_NAMES := ["Thumb", "Index", "Middle", "Ring", "Little"]
+
 var follow_rate := 11.0
 var pinch_follow_rate := 16.0
 
@@ -10,6 +14,12 @@ var _mirror_sign := 1.0
 var _pinch_target := 0.0
 var _pinch_amount := 0.0
 var _built := false
+var _using_authored_asset := false
+var _last_authored_pose := ""
+
+var _authored_root: Node3D
+var _animation_player: AnimationPlayer
+var _skeleton: Skeleton3D
 
 var _skin: StandardMaterial3D
 var _nail: StandardMaterial3D
@@ -20,16 +30,21 @@ var _thumb_tip: Node3D
 var _index_tip: Node3D
 var _pinch_point: Node3D
 
-const FINGER_NAMES := ["Thumb", "Index", "Middle", "Ring", "Little"]
-
 func setup(dynamic_hand: bool) -> void:
 	_dynamic = dynamic_hand
 	_mirror_sign = 1.0 if dynamic_hand else -1.0
+	_ensure_anchors()
 	if not _built:
-		_build_hand()
+		_using_authored_asset = _try_build_authored_hand()
+		if not _using_authored_asset:
+			_build_procedural_hand()
+		_built = true
 	_pinch_target = 0.18 if dynamic_hand else 0.42
 	_pinch_amount = _pinch_target
 	_apply_pose()
+
+func is_using_authored_asset() -> bool:
+	return _using_authored_asset
 
 # Target is the world-space point that thumb and index should pinch around.
 func set_grip_target(target: Vector3) -> void:
@@ -52,6 +67,7 @@ func get_pinch_world_position() -> Vector3:
 # Snap keeps legacy root-position semantics for initial scene placement.
 func snap_to(target: Vector3) -> void:
 	position = target
+	_refresh_pinch_anchors()
 	if _pinch_point != null:
 		_target = to_global(_pinch_point.position)
 	else:
@@ -62,6 +78,7 @@ func tick(delta: float) -> void:
 	var pinch_weight := 1.0 - exp(-pinch_follow_rate * safe_delta)
 	_pinch_amount = lerpf(_pinch_amount, _pinch_target, pinch_weight)
 	_apply_pose()
+	_refresh_pinch_anchors()
 	if _dynamic:
 		var desired_root := _target
 		if _pinch_point != null:
@@ -69,8 +86,143 @@ func tick(delta: float) -> void:
 		var weight := 1.0 - exp(-follow_rate * safe_delta)
 		position = position.lerp(desired_root, weight)
 
-func _build_hand() -> void:
-	_built = true
+func _ensure_anchors() -> void:
+	if _thumb_tip == null:
+		_thumb_tip = Node3D.new()
+		_thumb_tip.name = "ThumbTip"
+		add_child(_thumb_tip)
+	if _index_tip == null:
+		_index_tip = Node3D.new()
+		_index_tip.name = "IndexTip"
+		add_child(_index_tip)
+	if _pinch_point == null:
+		_pinch_point = Node3D.new()
+		_pinch_point.name = "PinchPoint"
+		add_child(_pinch_point)
+
+func _try_build_authored_hand() -> bool:
+	var asset_path := RIGHT_ASSET_PATH if _dynamic else LEFT_ASSET_PATH
+	if not ResourceLoader.exists(asset_path):
+		return false
+	var packed = load(asset_path)
+	if packed == null or not (packed is PackedScene):
+		return false
+	var instance = packed.instantiate()
+	if instance == null or not (instance is Node3D):
+		if instance != null:
+			instance.free()
+		return false
+
+	_authored_root = instance as Node3D
+	_authored_root.name = "AuthoredHand"
+	add_child(_authored_root)
+	_animation_player = _find_animation_player(_authored_root)
+	_skeleton = _find_skeleton(_authored_root)
+	if _animation_player == null or _skeleton == null:
+		remove_child(_authored_root)
+		_authored_root.free()
+		_authored_root = null
+		_animation_player = null
+		_skeleton = null
+		return false
+
+	var required_pose := "Pinch Tight" if _dynamic else "Cup"
+	if not _animation_player.has_animation(required_pose):
+		remove_child(_authored_root)
+		_authored_root.free()
+		_authored_root = null
+		_animation_player = null
+		_skeleton = null
+		return false
+
+	# GLBs are self-contained presentation assets; gameplay keeps ownership of movement.
+	_authored_root.position = Vector3.ZERO
+	_authored_root.rotation = Vector3.ZERO
+	_authored_root.scale = Vector3.ONE
+	_apply_authored_pose(required_pose)
+	_refresh_authored_anchors()
+	return true
+
+func _apply_pose() -> void:
+	if not _built and not _using_authored_asset:
+		return
+	if _using_authored_asset:
+		var pose_name := "Cup" if not _dynamic else ("Pinch Tight" if _pinch_amount >= 0.42 else "Default pose")
+		if _animation_player != null and not _animation_player.has_animation(pose_name):
+			pose_name = "Pinch Tight" if _dynamic else "Cup"
+		_apply_authored_pose(pose_name)
+		return
+	_apply_procedural_pose()
+
+func _apply_authored_pose(pose_name: String) -> void:
+	if _animation_player == null or not _animation_player.has_animation(pose_name):
+		return
+	if _last_authored_pose == pose_name:
+		return
+	_animation_player.play(pose_name)
+	_animation_player.seek(0.0, true)
+	_animation_player.pause()
+	_last_authored_pose = pose_name
+
+func _refresh_pinch_anchors() -> void:
+	if _using_authored_asset:
+		_refresh_authored_anchors()
+	else:
+		_refresh_procedural_anchors()
+
+func _refresh_authored_anchors() -> void:
+	if _skeleton == null:
+		return
+	var suffix := "R" if _dynamic else "L"
+	var thumb_local = _estimate_bone_tip("Thumb_Proximal_%s" % suffix, "Thumb_Distal_%s" % suffix, 0.020)
+	var index_local = _estimate_bone_tip("Index_Intermediate_%s" % suffix, "Index_Distal_%s" % suffix, 0.020)
+	if thumb_local != null:
+		_thumb_tip.position = thumb_local as Vector3
+	if index_local != null:
+		_index_tip.position = index_local as Vector3
+	if thumb_local != null and index_local != null:
+		_pinch_point.position = ((thumb_local as Vector3) + (index_local as Vector3)) * 0.5
+	elif _dynamic:
+		# Conservative fallback near the authored palm if an importer changes bone names.
+		_pinch_point.position = Vector3(-0.03, -0.08, -0.13)
+	else:
+		_pinch_point.position = Vector3(0.03, -0.08, -0.13)
+
+func _estimate_bone_tip(previous_name: String, distal_name: String, extension: float):
+	if _skeleton == null:
+		return null
+	var previous_id := _skeleton.find_bone(previous_name)
+	var distal_id := _skeleton.find_bone(distal_name)
+	if previous_id < 0 or distal_id < 0:
+		return null
+	var previous_pose := _skeleton.get_bone_global_pose(previous_id)
+	var distal_pose := _skeleton.get_bone_global_pose(distal_id)
+	var direction := distal_pose.origin - previous_pose.origin
+	if direction.length_squared() <= 0.000001:
+		return null
+	var skeleton_local_tip := distal_pose.origin + direction.normalized() * extension
+	var world_tip := _skeleton.to_global(skeleton_local_tip)
+	return to_local(world_tip)
+
+func _find_animation_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var found := _find_animation_player(child)
+		if found != null:
+			return found
+	return null
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node as Skeleton3D
+	for child in node.get_children():
+		var found := _find_skeleton(child)
+		if found != null:
+			return found
+	return null
+
+func _build_procedural_hand() -> void:
 	_skin = StandardMaterial3D.new()
 	_skin.albedo_color = Color(0.86, 0.67, 0.56, 1.0)
 	_skin.roughness = 0.72
@@ -145,19 +297,7 @@ func _build_hand() -> void:
 			add_child(nail)
 			_nails[finger_name] = nail
 
-	_thumb_tip = Node3D.new()
-	_thumb_tip.name = "ThumbTip"
-	add_child(_thumb_tip)
-	_index_tip = Node3D.new()
-	_index_tip.name = "IndexTip"
-	add_child(_index_tip)
-	_pinch_point = Node3D.new()
-	_pinch_point.name = "PinchPoint"
-	add_child(_pinch_point)
-
-func _apply_pose() -> void:
-	if not _built:
-		return
+func _apply_procedural_pose() -> void:
 	for finger_name in FINGER_NAMES:
 		var joints := _pose_points(finger_name)
 		var segments: Array = _finger_segments.get(finger_name, [])
@@ -174,7 +314,9 @@ func _apply_pose() -> void:
 			var end := joints[3]
 			var direction := (end - previous).normalized()
 			nail.position = end + Vector3(0.0, 0.0, 1.0) * _finger_radius(finger_name) * 0.72 - direction * _finger_radius(finger_name) * 0.30
+	_refresh_procedural_anchors()
 
+func _refresh_procedural_anchors() -> void:
 	_thumb_tip.position = _pose_points("Thumb")[3]
 	_index_tip.position = _pose_points("Index")[3]
 	_pinch_point.position = (_thumb_tip.position + _index_tip.position) * 0.5
@@ -184,54 +326,19 @@ func _pose_points(finger_name: String) -> Array[Vector3]:
 	var pinched: Array[Vector3]
 	match finger_name:
 		"Thumb":
-			relaxed = [
-				Vector3(-0.185, -0.02, 0.015),
-				Vector3(-0.255, -0.125, 0.025),
-				Vector3(-0.215, -0.245, 0.055),
-				Vector3(-0.135, -0.335, 0.080)
-			]
-			pinched = [
-				Vector3(-0.185, -0.02, 0.015),
-				Vector3(-0.190, -0.150, 0.055),
-				Vector3(-0.125, -0.265, 0.115),
-				Vector3(-0.052, -0.345, 0.145)
-			]
+			relaxed = [Vector3(-0.185, -0.02, 0.015), Vector3(-0.255, -0.125, 0.025), Vector3(-0.215, -0.245, 0.055), Vector3(-0.135, -0.335, 0.080)]
+			pinched = [Vector3(-0.185, -0.02, 0.015), Vector3(-0.190, -0.150, 0.055), Vector3(-0.125, -0.265, 0.115), Vector3(-0.052, -0.345, 0.145)]
 		"Index":
-			relaxed = [
-				Vector3(-0.090, -0.105, 0.005),
-				Vector3(-0.085, -0.265, 0.015),
-				Vector3(-0.085, -0.405, 0.045),
-				Vector3(-0.095, -0.525, 0.060)
-			]
-			pinched = [
-				Vector3(-0.090, -0.105, 0.005),
-				Vector3(-0.090, -0.235, 0.050),
-				Vector3(-0.080, -0.305, 0.115),
-				Vector3(-0.058, -0.350, 0.155)
-			]
+			relaxed = [Vector3(-0.090, -0.105, 0.005), Vector3(-0.085, -0.265, 0.015), Vector3(-0.085, -0.405, 0.045), Vector3(-0.095, -0.525, 0.060)]
+			pinched = [Vector3(-0.090, -0.105, 0.005), Vector3(-0.090, -0.235, 0.050), Vector3(-0.080, -0.305, 0.115), Vector3(-0.058, -0.350, 0.155)]
 		"Middle":
-			relaxed = [
-				Vector3(0.005, -0.100, 0.000),
-				Vector3(0.020, -0.270, -0.010),
-				Vector3(0.040, -0.395, 0.035),
-				Vector3(0.070, -0.480, 0.095)
-			]
+			relaxed = [Vector3(0.005, -0.100, 0.000), Vector3(0.020, -0.270, -0.010), Vector3(0.040, -0.395, 0.035), Vector3(0.070, -0.480, 0.095)]
 			pinched = relaxed
 		"Ring":
-			relaxed = [
-				Vector3(0.095, -0.090, -0.005),
-				Vector3(0.120, -0.245, -0.005),
-				Vector3(0.150, -0.350, 0.045),
-				Vector3(0.175, -0.420, 0.110)
-			]
+			relaxed = [Vector3(0.095, -0.090, -0.005), Vector3(0.120, -0.245, -0.005), Vector3(0.150, -0.350, 0.045), Vector3(0.175, -0.420, 0.110)]
 			pinched = relaxed
 		_:
-			relaxed = [
-				Vector3(0.175, -0.070, -0.010),
-				Vector3(0.205, -0.205, 0.000),
-				Vector3(0.235, -0.290, 0.050),
-				Vector3(0.250, -0.345, 0.110)
-			]
+			relaxed = [Vector3(0.175, -0.070, -0.010), Vector3(0.205, -0.205, 0.000), Vector3(0.235, -0.290, 0.050), Vector3(0.250, -0.345, 0.110)]
 			pinched = relaxed
 
 	var points: Array[Vector3] = []
