@@ -1,9 +1,10 @@
 {
-  "runtime": "github-agentic-workflows",
+  "runtime": "openai-codex-action",
   "builder": "peel-builder",
   "challenger": "peel-challenger",
-  "status": "BOOTSTRAPPING",
+  "status": "INSTALLING",
   "acceptance": "UNVERIFIED",
-  "activation_secret": "OPENAI_API_KEY_OR_CODEX_API_KEY",
+  "activation_secret": "OPENAI_API_KEY",
+  "max_handoff_round": 20,
   "game_target": "complete-playable-version-before-owner-handoff"
 }
