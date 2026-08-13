@@ -72,3 +72,17 @@ jobs:
           set -euo pipefail
           test -f tests/smoke_reset_loop.gd
           ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
+
+      - name: Pause input isolation smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_pause_input_isolation.gd
+          ./godot --headless --path . --script res://tests/smoke_pause_input_isolation.gd
+
+      - name: Reset input isolation smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_reset_input_isolation.gd
+          ./godot --headless --path . --script res://tests/smoke_reset_input_isolation.gd
