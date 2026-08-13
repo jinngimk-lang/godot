@@ -1,0 +1,9 @@
+{
+  "runtime": "github-agentic-workflows",
+  "builder": "peel-builder",
+  "challenger": "peel-challenger",
+  "status": "BOOTSTRAPPING",
+  "acceptance": "UNVERIFIED",
+  "activation_secret": "OPENAI_API_KEY_OR_CODEX_API_KEY",
+  "game_target": "complete-playable-version-before-owner-handoff"
+}
