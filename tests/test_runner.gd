@@ -1,6 +1,9 @@
 extends SceneTree
 
 func _init() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
 	var required := "res://scripts/peel/peel_model.gd"
 	if not ResourceLoader.exists(required):
 		push_error("RED: missing production peel contract: %s" % required)
