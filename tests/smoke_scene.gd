@@ -65,8 +65,42 @@ func _run() -> void:
 	elif lifecycle.get_phase_name() != "ATTACHED":
 		failures.append("fresh peel scene lifecycle should start ATTACHED")
 
+	# Complete-playable session contract: tactile variants must drive the actual
+	# scene/controller, not exist only as disconnected progression data.
+	var session = scene.get("_session")
+	if session == null:
+		failures.append("complete playable scene must initialize SessionModel")
+	else:
+		var variant: Dictionary = session.current_variant()
+		var label := scene.get_node_or_null("PeelLabel") as LabelVisual
+		if label == null:
+			failures.append("session integration missing PeelLabel")
+		else:
+			if absf(label.label_width - float(variant.get("label_width", -1.0))) > 0.001:
+				failures.append("current tactile variant must drive label width")
+			if absf(label.label_height - float(variant.get("label_height", -1.0))) > 0.001:
+				failures.append("current tactile variant must drive label height")
+
+		var controller = scene.get("_controller")
+		if controller == null or not controller.has_method("get_model_config"):
+			failures.append("playable controller must expose applied tactile config for verification")
+		else:
+			var config: Dictionary = controller.get_model_config()
+			if absf(float(config.get("base_adhesion", -1.0)) - float(variant.get("base_adhesion", -2.0))) > 0.001:
+				failures.append("current tactile variant must drive actual adhesion")
+
+	var hud := scene.get_node_or_null("HUD/Instructions") as Label
+	if hud == null:
+		failures.append("missing player-facing instruction HUD")
+	else:
+		for developer_word in ["ATTACHED", "PEELING", "DETACHING", "HELD", "IDLE", "PINCHED"]:
+			if hud.text.contains(developer_word):
+				failures.append("player HUD must not expose developer state jargon: %s" % developer_word)
+		if not hud.text.contains("Reset") or not hud.text.contains("Pause"):
+			failures.append("player HUD must expose reset and pause affordances")
+
 	if failures.is_empty():
-		print("PASS: tactile v2 peel lab scene smoke")
+		print("PASS: complete-playable tactile peel scene smoke")
 		scene.queue_free()
 		await process_frame
 		quit(0)
