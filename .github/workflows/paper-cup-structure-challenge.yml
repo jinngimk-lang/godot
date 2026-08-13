@@ -1,0 +1,51 @@
+name: Paper Cup Structure Challenge
+
+on:
+  push:
+    branches:
+      - verify/challenge-paper-cup-structure-v4
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Fresh import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee challenge-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" challenge-import.log; then
+            echo "Paper-cup verifier import failed."
+            exit 1
+          fi
+
+      - name: Run independent paper-cup challenge
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --script res://tests/verify_paper_cup_structure.gd 2>&1 | tee paper-cup-challenge.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" paper-cup-challenge.log; then
+            echo "Paper-cup challenge emitted a Godot/script error."
+            exit 1
+          fi
+          grep -Fq 'PASS: paper-cup structure follows all variant palettes/Cup transforms' paper-cup-challenge.log
