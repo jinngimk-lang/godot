@@ -35,15 +35,17 @@ V2 is specifically aimed at the first local playtest failures:
 
 - **No rubber ribbon at 100%:** peel geometry has a bounded physical length and switches to a cup-independent held-label representation after detachment.
 - **Print stays on the paper:** order/drink graphics are rendered into the label texture instead of floating as a separate world-space text node.
-- **Recognizable hands:** the repository-local procedural hand has a rounded palm/wrist, five articulated fingers, an opposable thumb, thumb/index pinch anchors and visible nail surfaces. The gameplay API is rig-ready so a later authored GLB/Skeleton3D hand can replace it without rewriting peel authority.
+- **Authored hands by default:** normal runtime uses repository-local rigged CC0 hand GLBs derived from the Godot XR Tools hand models. The left hand uses the authored `Cup` pose and the right hand switches into `Pinch Tight` for the peel grip. Peel Calm owns the damping/grip contract; no Godot XR Tools addon is required at runtime. A procedural five-finger hand remains only as a fallback if an authored asset fails to load.
 - **Real Foley:** the normal sound path uses repository-local CC0-derived tape/paper WAV assets for slow/fast adhesive texture, paper flex, micro releases and the final release. Source/license provenance is recorded in `assets/audio/ATTRIBUTION.md`.
+
+Hand model provenance and the upstream CC0 license are stored under `assets/models/hands/`.
 
 ## Verification
 
-GitHub Actions uses the official Godot 4.7.1 Linux x86_64 release, verifies its published checksum, imports the project headlessly, runs deterministic tests, and performs a scene smoke test that checks the V2 hand anchors, lifecycle, printed-label node and local Foley streams.
+GitHub Actions uses the official Godot 4.7.1 Linux x86_64 release, verifies its published checksum, imports the project headlessly, runs deterministic tests, and performs a scene smoke test that requires both authored hand GLBs, their runtime wrapper, the V2 lifecycle, printed-label node and local Foley streams.
 
-A green CI run proves project/script/resource contracts and scene loadability. It does **not** prove that resistance feels pleasant, the hand looks natural enough on the player's display, or the Foley is relaxing rather than annoying. Those remain experiential playtest items.
+A green CI run proves project/script/resource contracts and scene loadability. It does **not** prove that resistance feels pleasant, the authored hand placement looks natural enough on the player's display, or the Foley is relaxing rather than annoying. Those remain experiential playtest items.
 
 ## Asset boundary
 
-The current cup and hand are still repository-local procedural geometry so a fresh clone remains deterministic and dependency-free. Higher-quality authored/generated models can replace the presentation layer later through the existing hand/label interfaces. External assets committed to the repository must have auditable redistribution/license metadata.
+The cup and peel mesh remain repository-local procedural geometry, while the normal hand presentation is now repository-local authored GLB with a procedural fallback. A fresh clone remains deterministic and dependency-free. Future cup/hand upgrades can replace presentation assets through the existing interfaces. External assets committed to the repository must have auditable redistribution/license metadata.
