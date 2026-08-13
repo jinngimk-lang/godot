@@ -32,8 +32,22 @@ func _run() -> void:
 			failures.append("%s must expose five fingers" % hand_name)
 		if not hand.is_using_authored_asset():
 			failures.append("%s must use repository-local authored GLB in normal runtime" % hand_name)
-		if hand.get_node_or_null("AuthoredHand") == null:
+		var authored_root := hand.get_node_or_null("AuthoredHand") as Node3D
+		if authored_root == null:
 			failures.append("%s missing authored hand scene instance" % hand_name)
+		else:
+			var presentation := _hand_presentation(authored_root)
+			var vertices := int(presentation["vertices"])
+			var max_extent := float(presentation["max_extent"])
+			var materials: Array[String] = presentation["materials"] as Array[String]
+			if vertices <= 0:
+				failures.append("%s authored hand has no renderable vertices" % hand_name)
+			if max_extent < 0.35:
+				failures.append("%s authored hand presentation is too small to read beside the cup: extent=%.3f" % [hand_name, max_extent])
+			if max_extent > 1.40:
+				failures.append("%s authored hand presentation is implausibly oversized: extent=%.3f" % [hand_name, max_extent])
+			if not materials.has("HandSkin") or not materials.has("HandNail"):
+				failures.append("%s authored hand missing HandSkin/HandNail materials: %s" % [hand_name, str(materials)])
 		for anchor in ["ThumbTip", "IndexTip", "PinchPoint"]:
 			if hand.find_child(anchor, true, false) == null:
 				failures.append("%s missing pinch anchor: %s" % [hand_name, anchor])
@@ -100,7 +114,7 @@ func _run() -> void:
 			failures.append("player HUD must expose reset and pause affordances")
 
 	if failures.is_empty():
-		print("PASS: complete-playable tactile peel scene smoke")
+		print("PASS: complete-playable tactile peel scene smoke with renderable authored hands")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -108,3 +122,29 @@ func _run() -> void:
 	for failure in failures:
 		push_error(failure)
 	quit(1)
+
+func _hand_presentation(node: Node) -> Dictionary:
+	var vertices := 0
+	var max_extent := 0.0
+	var materials: Array[String] = []
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		var mesh := mesh_instance.mesh
+		if mesh != null:
+			var size := mesh.get_aabb().size * mesh_instance.global_transform.basis.get_scale().abs()
+			max_extent = maxf(size.x, maxf(size.y, size.z))
+			for surface_index in range(mesh.get_surface_count()):
+				var arrays := mesh.surface_get_arrays(surface_index)
+				if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+					vertices += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+				var material := mesh.surface_get_material(surface_index)
+				if material != null and not material.resource_name.is_empty() and not materials.has(material.resource_name):
+					materials.append(material.resource_name)
+	for child in node.get_children():
+		var child_data := _hand_presentation(child)
+		vertices += int(child_data["vertices"])
+		max_extent = maxf(max_extent, float(child_data["max_extent"]))
+		for material_name in child_data["materials"] as Array[String]:
+			if not materials.has(material_name):
+				materials.append(material_name)
+	return {"vertices": vertices, "max_extent": max_extent, "materials": materials}
