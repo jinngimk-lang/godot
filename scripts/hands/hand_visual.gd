@@ -24,6 +24,8 @@ var _skeleton: Skeleton3D
 
 var _skin: StandardMaterial3D
 var _nail: StandardMaterial3D
+var _sleeve_fabric: StandardMaterial3D
+var _sleeve_rib: StandardMaterial3D
 var _finger_segments: Dictionary = {}
 var _finger_tips: Dictionary = {}
 var _nails: Dictionary = {}
@@ -140,9 +142,53 @@ func _try_build_authored_hand() -> bool:
 	_authored_root.position = Vector3.ZERO
 	_authored_root.rotation = Vector3.ZERO
 	_authored_root.scale = Vector3.ONE * AUTHORED_PRESENTATION_SCALE
+	_build_authored_wrist_cover()
 	_apply_authored_pose(required_pose)
 	_refresh_authored_anchors()
 	return true
+
+func _build_authored_wrist_cover() -> void:
+	if _authored_root == null:
+		return
+
+	# Real-render diagnostics show both imported hand meshes ending at local
+	# +Z ~= 0.026, with Wrist_L/Wrist_R rooted at +Z ~= 0.027. A short sleeve
+	# intentionally overlaps that plane so the close camera sees fabric rather
+	# than an exposed/open wrist cut. Keeping it under AuthoredHand means the
+	# existing presentation scale and root animation transform apply uniformly.
+	_sleeve_fabric = StandardMaterial3D.new()
+	_sleeve_fabric.resource_name = "SleeveFabric"
+	_sleeve_fabric.albedo_color = Color(0.18, 0.135, 0.115, 1.0)
+	_sleeve_fabric.roughness = 0.96
+
+	_sleeve_rib = StandardMaterial3D.new()
+	_sleeve_rib.resource_name = "SleeveRib"
+	_sleeve_rib.albedo_color = Color(0.67, 0.57, 0.47, 1.0)
+	_sleeve_rib.roughness = 0.94
+
+	var sleeve := MeshInstance3D.new()
+	sleeve.name = "WristSleeve"
+	var sleeve_mesh := CylinderMesh.new()
+	sleeve_mesh.top_radius = 0.049
+	sleeve_mesh.bottom_radius = 0.057
+	sleeve_mesh.height = 0.095
+	sleeve.mesh = sleeve_mesh
+	sleeve.material_override = _sleeve_fabric
+	sleeve.position = Vector3(0.0, 0.0, 0.074)
+	sleeve.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	_authored_root.add_child(sleeve)
+
+	var cuff := MeshInstance3D.new()
+	cuff.name = "WristCuff"
+	var cuff_mesh := CylinderMesh.new()
+	cuff_mesh.top_radius = 0.053
+	cuff_mesh.bottom_radius = 0.053
+	cuff_mesh.height = 0.024
+	cuff.mesh = cuff_mesh
+	cuff.material_override = _sleeve_rib
+	cuff.position = Vector3(0.0, 0.0, 0.029)
+	cuff.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	_authored_root.add_child(cuff)
 
 func _apply_pose() -> void:
 	if not _built and not _using_authored_asset:
