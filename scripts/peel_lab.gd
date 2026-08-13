@@ -10,6 +10,7 @@ var _audio: PeelAudio
 var _hud: Label
 var _reward: Label
 var _edge_marker: MeshInstance3D
+var _print_text: Label3D
 var _release_count := 0
 var _reset_timer := -1.0
 
@@ -50,6 +51,7 @@ func _process(delta: float) -> void:
 	_label.set_peel(progress, grip_world)
 	_right_hand.set_target(grip_world + Vector3(0.0, -0.18, 0.18))
 	_right_hand.tick(delta)
+	_update_temporary_print(progress)
 
 	var tension: float = hand_screen.distance_to(edge_screen) * 0.65
 	var speed: float = state.velocity.length() / 100.0
@@ -123,14 +125,14 @@ func _build_world() -> void:
 	_label.cup_radius = 0.53
 	add_child(_label)
 
-	var print_text := Label3D.new()
-	print_text.name = "OrderPrint"
-	print_text.text = "ORDER  A17\nOAT LATTE"
-	print_text.font_size = 42
-	print_text.pixel_size = 0.0036
-	print_text.modulate = Color(0.12, 0.11, 0.10, 1)
-	print_text.position = Vector3(0.12, 0.22, 0.553)
-	add_child(print_text)
+	_print_text = Label3D.new()
+	_print_text.name = "OrderPrint"
+	_print_text.text = "ORDER  A17\nOAT LATTE"
+	_print_text.font_size = 42
+	_print_text.pixel_size = 0.0036
+	_print_text.modulate = Color(0.12, 0.11, 0.10, 1)
+	_print_text.position = Vector3(0.12, 0.22, 0.553)
+	add_child(_print_text)
 
 	_edge_marker = MeshInstance3D.new()
 	_edge_marker.name = "PeelEdge"
@@ -190,6 +192,13 @@ func _update_hud(state_name: String, progress: float) -> void:
 	var percent := int(round(progress * 100.0))
 	_hud.text = "Peel %d%%   •   %s\nGold dot = current peel edge   •   R = reset" % [percent, state_name]
 
+func _update_temporary_print(progress: float) -> void:
+	if _print_text == null:
+		return
+	var color := _print_text.modulate
+	color.a = clampf(1.0 - progress * 7.5, 0.0, 1.0)
+	_print_text.modulate = color
+
 func _on_completed() -> void:
 	var continuity := 1.0 if _release_count == 0 else maxf(0.55, 1.0 - float(_release_count) * 0.1)
 	var points := ScoreModel.score(100.0, 1.0, continuity)
@@ -211,6 +220,8 @@ func _reset_session() -> void:
 	if _label != null:
 		var front := _label.get_front_position(0.0)
 		_label.set_peel(0.0, front)
+	if _print_text != null:
+		_print_text.modulate = Color(0.12, 0.11, 0.10, 1)
 	if _audio != null:
 		_audio.quiet()
 
