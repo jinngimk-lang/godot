@@ -1,0 +1,91 @@
+name: Local Model Challenger Probe
+
+on:
+  push:
+    branches: [feat/free-dual-agent-runtime]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact complete-playable candidate
+        uses: actions/checkout@v6
+        with:
+          ref: b3d80f4c53aa7d27ebb6f56d81afefffc54a334a
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare exact diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          git diff --no-ext-diff --unified=3 origin/main...HEAD > /tmp/candidate.diff
+          git diff --stat origin/main...HEAD
+          test -s /tmp/candidate.diff
+
+      - name: Install local Ollama runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama --version
+          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
+          for _ in {1..30}; do
+            if ollama list >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ollama-server.log
+          exit 1
+
+      - name: Pull small code-review model
+        shell: bash
+        run: |
+          set -euo pipefail
+          ollama pull qwen2.5-coder:1.5b
+
+      - name: Run independent adversarial review
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are an independent Challenger reviewing a Godot 4.7.1 game PR. You did not write this patch.
+          Review only concrete machine-observable correctness. Be adversarial and try to falsify the candidate.
+
+          Acceptance focus:
+          - direct-run fresh clone remains valid;
+          - no regression of true final detach, bounded label geometry, authored hands, label print, real local Foley;
+          - player HUD avoids internal state jargon and exposes reset/pause;
+          - tactile variants must change actual peel parameters, not only names;
+          - unlocks and score must record exactly once per true detached label;
+          - repeated complete -> next cycles must not corrupt the current controller, hand reset, label dimensions, or progression;
+          - R resets only the label; Shift+R restarts the run; Esc pause is reversible;
+          - flag any concrete GDScript lifecycle/order bug, stale state, double-count, impossible transition, or test blind spot.
+
+          Output one of:
+          VERIFIED: followed by the strongest counterexamples you attempted and why they fail; or
+          NEEDS_FIX: followed by specific file/function, reproducible counterexample, and minimum acceptance test.
+
+          Do not claim subjective aesthetics/audio feel are proven.
+
+          Exact candidate diff follows:
+          PROMPT
+            cat /tmp/candidate.diff
+          } > /tmp/challenger-prompt.txt
+          ollama run qwen2.5-coder:1.5b < /tmp/challenger-prompt.txt | tee /tmp/local-challenger-report.txt
+          test -s /tmp/local-challenger-report.txt
+
+      - name: Show independent report
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/local-challenger-report.txt ]; then
+            echo '===== LOCAL CHALLENGER REPORT ====='
+            cat /tmp/local-challenger-report.txt
+          fi
