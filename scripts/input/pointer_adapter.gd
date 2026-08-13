@@ -7,6 +7,7 @@ var state := PointerState.new()
 var _gameplay_suspended := false
 var _awaiting_release := false
 var _physical_pressed := false
+var _active_touch_index := -1
 
 func suspend_gameplay_input() -> void:
 	_gameplay_suspended = true
@@ -45,14 +46,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventScreenTouch:
-		_physical_pressed = event.pressed
-		if _consume_boundary_event(_physical_pressed, event.position):
+		if event.pressed:
+			if _active_touch_index == -1:
+				_active_touch_index = event.index
+			elif event.index != _active_touch_index:
+				return
+			_physical_pressed = true
+			if _consume_boundary_event(true, event.position):
+				return
+			state.set_frame(true, event.position, Vector2.ZERO, Vector2.ZERO, false)
+			pointer_changed.emit(state)
 			return
-		state.set_frame(event.pressed, event.position, Vector2.ZERO, Vector2.ZERO, not event.pressed)
+
+		if event.index != _active_touch_index:
+			return
+		_physical_pressed = false
+		_active_touch_index = -1
+		if _consume_boundary_event(false, event.position):
+			return
+		state.set_frame(false, event.position, Vector2.ZERO, Vector2.ZERO, true)
 		pointer_changed.emit(state)
 		return
 
 	if event is InputEventScreenDrag:
+		if _active_touch_index == -1:
+			_active_touch_index = event.index
+		elif event.index != _active_touch_index:
+			return
 		_physical_pressed = true
 		if _consume_boundary_event(true, event.position):
 			return
