@@ -275,7 +275,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	if event.keycode == KEY_ESCAPE:
-		_paused = not _paused
+		if _paused:
+			_paused = false
+			_pointer.resume_gameplay_input()
+		else:
+			_pointer.suspend_gameplay_input()
+			_paused = true
 		_audio.reset_feedback()
 		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
 		return
@@ -310,6 +315,9 @@ func _apply_current_variant() -> void:
 	_cup.material_override = _material(cup_color, 0.94)
 
 func _reset_session() -> void:
+	if _pointer != null:
+		_pointer.resume_gameplay_input()
+		_pointer.quarantine_current_press()
 	if _controller != null:
 		_controller.reset()
 	if _lifecycle != null:
