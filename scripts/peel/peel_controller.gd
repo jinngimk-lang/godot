@@ -55,19 +55,13 @@ func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
 				_set_state(State.RELEASED)
 			else:
 				_set_state(State.PEELING)
+				_advance_peel(pointer, delta)
 		State.PEELING:
 			_update_hand(pointer.position, delta)
 			if pointer.released_this_frame or not pointer.pressed:
 				_set_state(State.RELEASED)
 			else:
-				var pull_vec := _hand_position - _edge_position
-				var tension := pull_vec.length() * _tension_per_pixel
-				var speed := pointer.velocity.length() / 100.0
-				var peel_angle := absf(atan2(pull_vec.y, pull_vec.x))
-				var result := _model.step(tension, speed, peel_angle, delta)
-				if result.completed_now:
-					_set_state(State.COMPLETE)
-					completed.emit()
+				_advance_peel(pointer, delta)
 		State.RELEASED:
 			_update_hand(_edge_position, delta)
 			if pointer.pressed and distance_to_edge <= _edge_radius * 1.5:
@@ -95,6 +89,16 @@ func get_hand_position() -> Vector2:
 
 func get_state_name() -> String:
 	return State.keys()[_state]
+
+func _advance_peel(pointer: PointerState, delta: float) -> void:
+	var pull_vec: Vector2 = _hand_position - _edge_position
+	var tension: float = pull_vec.length() * _tension_per_pixel
+	var speed: float = pointer.velocity.length() / 100.0
+	var peel_angle: float = absf(atan2(pull_vec.y, pull_vec.x))
+	var result: Dictionary = _model.step(tension, speed, peel_angle, delta)
+	if bool(result["completed_now"]):
+		_set_state(State.COMPLETE)
+		completed.emit()
 
 func _update_hand(target: Vector2, delta: float) -> void:
 	var safe_delta := clampf(delta, 0.0, 0.1)
