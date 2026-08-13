@@ -43,6 +43,7 @@ func setup(dynamic_hand: bool) -> void:
 		_sync_pose(true)
 		_update_pinch_anchors()
 
+# Target is the world-space point that thumb and index should pinch around.
 func set_grip_target(target: Vector3) -> void:
 	_target = target
 
@@ -63,22 +64,34 @@ func get_finger_count() -> int:
 		count += 1
 	return count
 
+func get_pinch_world_position() -> Vector3:
+	if _pinch_point == null:
+		return global_position
+	return to_global(_pinch_point.position)
+
+# Snap keeps legacy root-position semantics for initial scene placement.
 func snap_to(target: Vector3) -> void:
-	_target = target
 	position = target
 	_update_pinch_anchors()
+	if _pinch_point != null:
+		_target = to_global(_pinch_point.position)
+	else:
+		_target = target
 
 func tick(delta: float) -> void:
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0, 0.0, 0.1)
-	if _dynamic:
-		var position_weight := 1.0 - exp(-follow_rate * safe_delta)
-		position = position.lerp(_target, position_weight)
 	var pinch_weight := 1.0 - exp(-pinch_follow_rate * safe_delta)
 	_pinch_amount = lerpf(_pinch_amount, _pinch_target, pinch_weight)
 	if is_inside_tree():
 		_ensure_rigged_presentation()
 		_sync_pose(false)
 	_update_pinch_anchors()
+	if _dynamic:
+		var desired_root := _target
+		if _pinch_point != null:
+			desired_root = _target - basis * _pinch_point.position
+		var position_weight := 1.0 - exp(-follow_rate * safe_delta)
+		position = position.lerp(desired_root, position_weight)
 
 func has_rigged_asset() -> bool:
 	return _model_root != null and _skeleton != null and get_finger_count() == EXPECTED_FINGER_COUNT
