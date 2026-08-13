@@ -28,9 +28,6 @@ func _run() -> void:
 	var cup_mesh := cup.mesh as CylinderMesh
 	var slope: float = (cup_mesh.top_radius - cup_mesh.bottom_radius) / maxf(cup_mesh.height, 0.001)
 
-	# Non-sampled partial peel: verify attached columns use the tapered normal,
-	# the immediately free column remains a bend/curve normal, and the seam does
-	# not contain a gross normal flip.
 	var progress := 0.233
 	var front := label.get_front_position(progress)
 	label.set_phase("PEELING")
@@ -43,6 +40,14 @@ func _run() -> void:
 	var normals := partial[1] as PackedVector3Array
 	var first_attached: int = clampi(int(ceil(progress * float(label.segments))), 1, label.segments)
 	var last_free: int = first_attached - 1
+
+	print("PRIMARY_NORMAL_DIAG progress=%.6f segments=%d first_attached=%d last_free=%d vertices=%d normals=%d" % [progress, label.segments, first_attached, last_free, vertices.size(), normals.size()])
+	for column in range(maxi(last_free - 2, 0), mini(first_attached + 3, label.segments + 1)):
+		var u: float = float(column) / float(label.segments)
+		for row in [0, 1]:
+			var idx: int = column * 2 + int(row)
+			print("PRIMARY_NORMAL_DIAG column=%d u=%.6f row=%d vertex=%s normal=%s" % [column, u, int(row), str(vertices[idx]), str(normals[idx].normalized())])
+
 	var min_attached_dot := 1.0
 	var min_seam_dot := 1.0
 	for row_value in [0, 1]:
@@ -59,7 +64,7 @@ func _run() -> void:
 		min_attached_dot = minf(min_attached_dot, cup_normal.dot(expected))
 		min_seam_dot = minf(min_seam_dot, free_normal.dot(mesh_normal))
 		if absf(free_normal.y) > CURVE_Y_EPS:
-			push_error("RED: first free partial-peel column was incorrectly snapped to cup taper normal")
+			push_error("RED: first free partial-peel column was incorrectly snapped to cup taper normal; row=%d normal=%s" % [row, str(free_normal)])
 			quit(1)
 			return
 		if mesh_normal.y >= -0.03:
@@ -76,8 +81,6 @@ func _run() -> void:
 		return
 	print("PRIMARY_NORMAL_PARTIAL attached_dot=%.6f seam_dot=%.6f" % [min_attached_dot, min_seam_dot])
 
-	# DETACHING and HELD are no longer cup-attached. Their normals must return to
-	# the existing curve-normal path rather than retaining a hidden taper snap.
 	label.set_phase("DETACHING")
 	label.set_detach_alpha(0.55)
 	var detach_grip: Vector3 = label.get_front_position(1.0) + Vector3(-0.30, 0.16, 0.26)
@@ -91,8 +94,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Pure helper sign attack: if a frustum narrows upward instead, the outward
-	# surface normal must flip to a positive y component.
 	var narrowing_point := Vector3(0.5, 0.0, 0.2)
 	var narrowing_normal := CupSurface.frustum_surface_normal(narrowing_point, 0.54, 0.45, 1.48)
 	if narrowing_normal.y <= 0.0:
@@ -103,8 +104,6 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 
-	# Standalone fallback must remain cylindrical/curve-driven when no sibling Cup
-	# exists. The new frustum helper must not leak into this construction path.
 	var standalone_parent := Node3D.new()
 	root.add_child(standalone_parent)
 	var standalone := LabelVisual.new()
