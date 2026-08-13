@@ -230,9 +230,9 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 		return
 
 	var percent := int(round(progress * 100.0))
-	var hint := "Touch the gold edge • hold left mouse • pull gently"
+	var hint := "Grab the gold edge • press & hold (left mouse / touch) • pull gently"
 	if state_name == "EDGE_HOVER":
-		hint = "Hold left mouse, then pull away from the cup"
+		hint = "Press & hold (left mouse / touch), then pull away from the cup"
 	elif state_name in ["EDGE_LIFT", "PINCHED"]:
 		hint = "Keep holding • begin a slow steady pull"
 	elif state_name == "PEELING":
