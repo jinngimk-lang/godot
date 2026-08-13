@@ -12,12 +12,18 @@ on:
         required: false
         type: string
         default: ""
+  issues:
+    types: [opened]
+if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.actor == 'jinngimk-lang' && startsWith(github.event.issue.title, '[AGENT-TASK]'))
 permissions:
   contents: read
   issues: read
   pull-requests: read
   actions: read
 engine: codex
+checkout:
+  fetch: ["*"]
+  fetch-depth: 0
 tools:
   edit:
   bash:
@@ -54,9 +60,9 @@ You are **peel-builder**, the implementation agent for Peel Calm. You are one of
 
 # Canonical task
 
-The task identifier is GitHub Issue **#${{ github.event.inputs.task_id }}**.
+The task identifier is GitHub Issue **#${{ github.event.inputs.task_id || github.event.issue.number }}**.
 
-Optional Challenger repair feedback supplied by the handoff is:
+Optional Challenger repair/continuation feedback supplied by the handoff is:
 
 `${{ github.event.inputs.challenger_feedback }}`
 
@@ -72,13 +78,13 @@ Read these repository files first:
 6. `README.md`
 7. affected production code, tests, and `.github/workflows/godot-check.yml`
 
-Then inspect current open pull requests. If there is an existing open PR whose title begins `[builder]` and whose body identifies `TASK-ID: #${{ github.event.inputs.task_id }}`, treat that as the current Builder artifact and inspect its current exact head before deciding whether to update it.
+Then inspect current open pull requests. If there is an existing open PR whose title begins `[builder]` and whose body identifies `TASK-ID: #${{ github.event.inputs.task_id || github.event.issue.number }}`, treat that as the current Builder artifact. Fetch its current head ref/SHA. Because all repository branches are fetched, switch the workspace to that head branch before editing an existing proposal so your patch is based on the artifact Challenger actually reviewed.
 
 # Mission
 
-Advance the canonical task toward the complete playable Peel Calm target using the smallest coherent, testable change that materially improves the game. Use all verified project knowledge, prior owner playtest failures, existing tests, and current code. Do not regress previously fixed V1/V2 failures.
+Advance the canonical task toward the complete playable Peel Calm target using the smallest coherent, testable batch that materially improves the game. Use all verified project knowledge, prior owner playtest failures, existing tests, and current code. Do not regress previously fixed V1/V2 failures.
 
-When Challenger feedback is present, reproduce or inspect the stated counterexample before changing code. Treat a reproducible Challenger finding as a defect to fix, not as optional feedback.
+When Challenger feedback is present, reproduce or inspect the stated counterexample before changing code. Treat a reproducible Challenger finding as a defect to fix, not as optional feedback. When Challenger explicitly verifies the previous batch and asks you to continue, select the highest-priority incomplete acceptance item from the canonical task and shared knowledge rather than reworking an already verified area.
 
 # Engineering rules
 
@@ -102,18 +108,18 @@ Before handoff, ensure the proposed code is internally coherent and relevant tes
 
 If no Builder PR exists for this task, create one draft PR. Its body must contain:
 
-- `TASK-ID: #${{ github.event.inputs.task_id }}`
+- `TASK-ID: #${{ github.event.inputs.task_id || github.event.issue.number }}`
 - `FROM: peel-builder`
 - a falsifiable `CLAIM`
 - RED evidence when applicable
 - files/tests changed
 - explicit `UNVERIFIED` experiential items
 
-If an existing `[builder]` PR exists for this task and Challenger supplied a reproducible defect, update that PR using the push-to-PR-branch safe output rather than creating a duplicate PR.
+If an existing `[builder]` PR exists for this task, update that PR using the push-to-PR-branch safe output rather than creating a duplicate PR.
 
 After a reviewable artifact exists, post a protocol-formatted `CLAIM` comment tied to the artifact you produced or updated, then dispatch **agent-challenger** exactly once with:
 
-- `task_id`: `${{ github.event.inputs.task_id }}`
+- `task_id`: `${{ github.event.inputs.task_id || github.event.issue.number }}`
 - `builder_claim`: a concise statement of the claim Challenger should try to falsify.
 
 Never dispatch yourself. Never emit `VERIFIED` or `ACCEPTED` for your own work.
