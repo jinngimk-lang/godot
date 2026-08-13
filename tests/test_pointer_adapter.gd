@@ -52,5 +52,60 @@ func run() -> Array[String]:
 	if state.released_this_frame or state.relative != Vector2.ZERO or state.velocity != Vector2.ZERO:
 		failures.append("clear_transients should clear release, relative and velocity only")
 
+	var required_methods := ["suspend_gameplay_input", "resume_gameplay_input", "quarantine_current_press"]
+	var missing_contract := false
+	for method_name in required_methods:
+		if not adapter.has_method(method_name):
+			failures.append("RED: PointerAdapter missing boundary quarantine method %s" % method_name)
+			missing_contract = true
+	if missing_contract:
+		adapter.free()
+		return failures
+
+	# Reset-style quarantine: a touch that was already held must stay neutral
+	# through drags until release, then a fresh press must work normally.
+	touch.position = Vector2(400, 260)
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	adapter.quarantine_current_press()
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("quarantine_current_press should neutralize an already-held touch")
+	drag.position = Vector2(430, 250)
+	adapter._unhandled_input(drag)
+	state = adapter.consume_frame()
+	if state.pressed:
+		failures.append("held touch drag must stay quarantined until release")
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	state = adapter.consume_frame()
+	if state.pressed or state.released_this_frame:
+		failures.append("quarantine release should re-arm without leaking a gameplay release transient")
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	if not adapter.consume_frame().pressed:
+		failures.append("fresh touch after quarantine release should re-arm normally")
+
+	# Pause-style suspension: input received while suspended is tracked physically
+	# but never exposed to gameplay; resuming while held waits for a release.
+	adapter.suspend_gameplay_input()
+	drag.position = Vector2(455, 245)
+	adapter._unhandled_input(drag)
+	if adapter.consume_frame().pressed:
+		failures.append("suspended touch drag must not expose pressed gameplay state")
+	adapter.resume_gameplay_input()
+	if adapter.consume_frame().pressed:
+		failures.append("resume while touch is still held must remain quarantined")
+	touch.position = drag.position
+	touch.pressed = false
+	adapter._unhandled_input(touch)
+	if adapter.consume_frame().released_this_frame:
+		failures.append("resume quarantine release must not leak a gameplay release transient")
+	touch.pressed = true
+	adapter._unhandled_input(touch)
+	if not adapter.consume_frame().pressed:
+		failures.append("fresh post-resume touch should re-arm normally")
+
 	adapter.free()
 	return failures
