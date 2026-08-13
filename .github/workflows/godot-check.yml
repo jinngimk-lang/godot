@@ -50,3 +50,10 @@ jobs:
           set -euo pipefail
           test -f tests/smoke_scene.gd
           ./godot --headless --path . --script res://tests/smoke_scene.gd
+
+      - name: Rigged hand smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_rigged_hand.gd
+          ./godot --headless --path . --script res://tests/smoke_rigged_hand.gd
