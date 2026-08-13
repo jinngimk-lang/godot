@@ -25,6 +25,9 @@ func run() -> Array[String]:
 				failures.append("authored hand missing Pinch Tight animation: %s" % path)
 			if not names.has("Cup"):
 				failures.append("authored hand missing Cup animation: %s" % path)
+		var vertex_count := _renderable_vertex_count(instance)
+		if vertex_count <= 0:
+			failures.append("authored hand must contain a non-empty renderable mesh: %s" % path)
 		instance.free()
 
 	var hand_script = load("res://scripts/hands/hand_visual.gd")
@@ -44,6 +47,23 @@ func run() -> Array[String]:
 		failures.append("HandVisual should prefer repository-local authored GLB")
 	hand.free()
 	return failures
+
+func _renderable_vertex_count(node: Node) -> int:
+	var count := 0
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		var mesh: Mesh = mesh_instance.mesh
+		if mesh != null:
+			for surface_index in range(mesh.get_surface_count()):
+				var arrays: Array = mesh.surface_get_arrays(surface_index)
+				if arrays.size() <= Mesh.ARRAY_VERTEX:
+					continue
+				var vertices: Variant = arrays[Mesh.ARRAY_VERTEX]
+				if vertices is PackedVector3Array:
+					count += (vertices as PackedVector3Array).size()
+	for child in node.get_children():
+		count += _renderable_vertex_count(child)
+	return count
 
 func _find_first(node: Node, class_name_text: String) -> Node:
 	if node.get_class() == class_name_text:
