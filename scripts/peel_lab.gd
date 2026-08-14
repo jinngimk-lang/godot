@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 	if ritual_phase in ["CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
 		var crumple_state: PointerState = _pointer.consume_frame()
 		_process_crumple_pointer(crumple_state)
-		_audio.reset_feedback()
+		_audio.quiet()
 		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
 		_pointer.clear_transients()
 		return
@@ -121,6 +121,8 @@ func _process_crumple_pointer(state: PointerState) -> void:
 	var pulse := float(change.get("event_strength", 0.0))
 	if _crumple_presentation != null:
 		_crumple_presentation.set_crumple(_crumple.get_progress(), _crumple.get_gesture_side(), pulse)
+	if pulse > 0.0:
+		_audio.trigger_crumple(pulse)
 	if _crumple.is_complete() and _ritual.mark_crumple_complete():
 		if _ritual.consume_reward_event():
 			_reward.text = "%s\nStay a moment • R Next Cup" % _crumple_feedback_text()
