@@ -1,0 +1,73 @@
+name: Verify Owner Hand Deformation
+
+on:
+  push:
+    branches:
+      - verify/owner-hand-deformation-v5
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Import project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit
+
+      - name: Render candidate poses
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/hand-pose-candidates
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 60s \
+            ./godot --path . --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility \
+            --script res://tests/capture_hand_pose_candidates.gd 2>&1 | tee hand-pose-candidates.log
+          test -s artifacts/hand-pose-candidates/01_current_cup_default.png
+          test -s artifacts/hand-pose-candidates/02_cup_pinch_up.png
+          test -s artifacts/hand-pose-candidates/03_cup_pinch_tight.png
+          test -s artifacts/hand-pose-candidates/04_hold_pinch_up.png
+          test -s artifacts/hand-pose-candidates/05_default_pinch_up.png
+          if grep -E '(^|[[:space:]])(SCRIPT )?ERROR:' hand-pose-candidates.log; then
+            echo "Hand pose capture emitted a Godot error."
+            exit 1
+          fi
+          grep -Fq 'HAND_POSE_CAPTURE_OK' hand-pose-candidates.log
+
+      - name: Upload pose audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-hand-pose-candidates
+          path: |
+            artifacts/hand-pose-candidates/*.png
+            hand-pose-candidates.log
+          if-no-files-found: error
+          retention-days: 7
