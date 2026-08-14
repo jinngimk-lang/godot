@@ -26,9 +26,6 @@ func _ready() -> void:
 	_material.albedo_color = Color(0.97,0.955,0.90,1.0)
 	_material.roughness = 0.90
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	# The printed paper itself is opaque. Keeping it in the opaque/depth-writing
-	# pass means translucent glass behind it cannot blend over and erase it.
-	# The small surface offset prevents z-fighting while remaining visually glued.
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
@@ -57,6 +54,10 @@ func get_front_position(progress: float) -> Vector3:
 
 func set_phase(phase_name: String) -> void:
 	if phase_name == _phase_name:
+		# ATTACHED is also the lifecycle reset command. A prior presentation stage
+		# may have hidden the label, so idempotent resets must restore visibility.
+		if phase_name == "ATTACHED":
+			visible = true
 		return
 	if phase_name in ["DETACHING","HELD"] and not (_phase_name in ["DETACHING","HELD"]):
 		var front := get_front_position(1.0)
@@ -64,6 +65,7 @@ func set_phase(phase_name: String) -> void:
 		_held_direction = direction.normalized() if direction.length_squared()>0.000001 else Vector3.LEFT
 	_phase_name = phase_name
 	if _phase_name == "ATTACHED":
+		visible = true
 		_detach_alpha = 0.0
 	elif _phase_name == "HELD":
 		_detach_alpha = 1.0
