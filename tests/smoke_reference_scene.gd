@@ -13,13 +13,14 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 
-	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual"]:
+	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual","CupContentsPresentation"]:
 		if scene.get_node_or_null(path) == null:
 			_fail("missing integrated node: %s" % path,scene)
 			return
 
 	var venue: Node = scene.get_node("VenuePresentation")
 	var product: Node = scene.get_node("ProductPresentation")
+	var contents: Node = scene.get_node("CupContentsPresentation")
 	var hud: Label = scene.get_node("HUD/Instructions") as Label
 	var edge: MeshInstance3D = scene.get_node("PeelEdge") as MeshInstance3D
 	if venue.call("get_active_profile_id") != "cafe_window":
@@ -27,6 +28,9 @@ func _run() -> void:
 		return
 	if product.call("get_active_kind") != "paper_cup":
 		_fail("initial product should be paper_cup",scene)
+		return
+	if int(contents.call("get_content_count")) != 0:
+		_fail("initial cafe cup should not contain ice",scene)
 		return
 	if venue.get_node_or_null("CafeWindows") == null:
 		_fail("cafe landmark root missing",scene)
@@ -38,8 +42,9 @@ func _run() -> void:
 	if edge == null or edge.visible:
 		_fail("legacy gold hotspot must remain hidden",scene)
 		return
-	if hud == null or not hud.text.contains("LMB Peel anywhere") or not hud.text.contains("RMB Inspect") or not hud.text.contains("Q/E Scene"):
-		_fail("reference HUD is missing peel/inspect/navigation affordances",scene)
+	var hud_text := hud.text.to_lower() if hud != null else ""
+	if hud == null or not hud_text.contains("mouse") or not hud_text.contains("touch") or not hud_text.contains("rmb inspect") or not hud_text.contains("q/e scene"):
+		_fail("reference HUD is missing touch-safe peel/inspect/navigation affordances",scene)
 		return
 
 	scene.call("debug_select_variant",1)
@@ -54,6 +59,9 @@ func _run() -> void:
 	if lid == null or lid.visible:
 		_fail("glass bottle should not keep paper-cup lid visible",scene)
 		return
+	if int(contents.call("get_content_count")) != 0:
+		_fail("amber bar bottle should not inherit market ice",scene)
+		return
 
 	scene.call("debug_select_variant",2)
 	await process_frame
@@ -66,14 +74,20 @@ func _run() -> void:
 	if product.get_node_or_null("BottleLiquid") == null:
 		_fail("clear market bottle should expose visible liquid core",scene)
 		return
+	if int(contents.call("get_content_count")) != 3:
+		_fail("market bottle must preserve the V6 three-ice contents contract",scene)
+		return
 
 	scene.call("debug_select_variant",0)
 	await process_frame
 	if venue.call("get_active_profile_id") != "cafe_window" or product.call("get_active_kind") != "paper_cup":
 		_fail("navigation back to cafe should restore paper cup",scene)
 		return
+	if int(contents.call("get_content_count")) != 0:
+		_fail("navigation back to cafe must clear market ice",scene)
+		return
 
-	print("PASS: reference café/bar/market vertical slice smoke")
+	print("PASS: reference café/bar/market vertical slice with V6 contents smoke")
 	scene.queue_free()
 	await process_frame
 	quit(0)
