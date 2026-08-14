@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +22,7 @@ jobs:
           set -euo pipefail
           test -f .github/workflows/agent-builder.yml
           test -f .github/workflows/agent-challenger.yml
+          test -f .github/workflows/agent-challenger-local.yml
           test -f .agents/PROJECT_KNOWLEDGE.md
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-builder.yml
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-challenger.yml
@@ -85,6 +86,13 @@ jobs:
           test -f tests/smoke_scene.gd
           ./godot --headless --path . --script res://tests/smoke_scene.gd
 
+      - name: Reference scene smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_reference_scene.gd
+          ./godot --headless --path . --script res://tests/smoke_reference_scene.gd
+
       - name: Label cup-surface smoke
         shell: bash
         run: |
@@ -147,3 +155,28 @@ jobs:
           set -euo pipefail
           test -f tests/smoke_reset_input_isolation.gd
           ./godot --headless --path . --script res://tests/smoke_reset_input_isolation.gd
+
+      - name: Capture cafe bar and market frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq xvfb
+          fi
+          mkdir -p artifacts/reference_frames
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
+          for name in cafe bar market; do
+            test -s "artifacts/reference_frames/${name}.png"
+          done
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-capture.log; then
+            echo "Godot emitted errors while capturing reference frames."
+            exit 1
+          fi
+
+      - name: Upload reference frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: peel-calm-reference-frames
+          path: artifacts/reference_frames/*.png
+          if-no-files-found: error

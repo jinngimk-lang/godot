@@ -1,22 +1,54 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 16
-const RING_SIDES := 12
+const CURVE_RINGS := 36
+const RING_SIDES := 32
+const AUTHORED_HAND_SCALE := 4.15
 
 var _applied := false
+var _forearms: Dictionary = {}
+var _cloth_materials: Dictionary = {}
+var _skin_materials: Dictionary = {}
+var _last_venue := ""
+var _cup: MeshInstance3D
 
 func _ready() -> void:
-	# PeelLab constructs authored hands in its own _ready(). Defer once so the
-	# imported hand mesh, wrist cover and shared SleeveFabric material exist.
 	call_deferred("_apply")
+
+func _process(_delta: float) -> void:
+	if not _applied:
+		return
+	var venue_id := _active_venue_id()
+	if venue_id != _last_venue:
+		_last_venue = venue_id
+		_apply_venue_materials(venue_id)
 
 func _apply() -> void:
 	if _applied:
 		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
+	_scale_hand_preserve_pinch(parent.get_node_or_null("RightHand") as HandVisual)
+	_scale_hand_preserve_pinch(parent.get_node_or_null("LeftHand") as HandVisual)
+	_build_for_hand("RightHand",true)
+	_build_for_hand("LeftHand",false)
 	_applied = true
-	_build_for_hand("RightHand", true)
-	_build_for_hand("LeftHand", false)
+	_last_venue = ""
+
+func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
+	if hand == null:
+		return
+	var authored := hand.get_node_or_null("AuthoredHand") as Node3D
+	if authored == null:
+		return
+	var old_pinch := hand.get_pinch_world_position()
+	authored.scale = Vector3.ONE*AUTHORED_HAND_SCALE
+	hand.snap_to(hand.position)
+	var new_pinch := hand.get_pinch_world_position()
+	hand.position += old_pinch-new_pinch
+	hand.set_grip_target(old_pinch)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
@@ -28,120 +60,174 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var authored := hand.get_node_or_null("AuthoredHand") as Node3D
 	if authored == null:
 		return
-
-	var legacy_sleeve := authored.find_child("WristSleeve", true, false) as MeshInstance3D
-	if legacy_sleeve == null or legacy_sleeve.material_override == null:
+	var legacy_sleeve := authored.find_child("WristSleeve",true,false) as MeshInstance3D
+	var legacy_cuff := authored.find_child("WristCuff",true,false) as MeshInstance3D
+	if legacy_sleeve == null:
 		return
-	var fabric := legacy_sleeve.material_override
 	legacy_sleeve.visible = false
+	if legacy_cuff != null:
+		legacy_cuff.visible = false
 
-	var side := -1.0 if dynamic_hand else 1.0
-	# Real-render axis diagnostics established that authored +Z heads down/out
-	# from each wrist and authored +/-X heads toward the correct side of frame.
-	# Keep the visible curve deliberately compact: the hand and cup are the
-	# subject, while the forearm should leave the frame quickly instead of
-	# becoming a long hose-like graphic element.
-	var start_authored := Vector3(0.0, 0.0, 0.020)
-	var control_authored := Vector3(0.045 * side, 0.0, 0.205 if dynamic_hand else 0.220)
-	var end_authored := Vector3(0.165 * side, 0.0, 0.515 if dynamic_hand else 0.545)
+	var cloth := _make_cafe_cloth()
+	var skin: Material = _find_material(authored,"HandSkin") as Material
+	if skin == null:
+		var fallback_skin := StandardMaterial3D.new()
+		fallback_skin.resource_name = "HandSkin"
+		fallback_skin.albedo_color = Color(0.64,0.41,0.30,1.0)
+		fallback_skin.roughness = 0.80
+		skin = fallback_skin
+	elif skin is StandardMaterial3D:
+		# Re-use the actual imported hand material so the forearm/hand join stays
+		# continuous, but calibrate the XR asset away from the prototype pink read.
+		var skin_mat := skin as StandardMaterial3D
+		skin_mat.albedo_color = Color(0.66,0.43,0.31,1.0)
+		skin_mat.roughness = 0.78
+		skin_mat.metallic = 0.0
+		skin_mat.metallic_specular = 0.46
 
-	var start: Vector3 = _descendant_point_to_ancestor(authored, hand, start_authored)
-	var control: Vector3 = _descendant_point_to_ancestor(authored, hand, control_authored)
-	var end: Vector3 = _descendant_point_to_ancestor(authored, hand, end_authored)
-	if not _finite_vector(start) or not _finite_vector(control) or not _finite_vector(end):
-		legacy_sleeve.visible = true
+	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
+	if not _finite_vector(start):
 		return
+	var start_world := hand.to_global(start)
+	var cup_world := _cup.global_position if _cup != null else Vector3.ZERO
+	var outward_sign := -1.0 if start_world.x<cup_world.x else 1.0
+	if absf(start_world.x-cup_world.x)<0.05:
+		outward_sign = -1.0 if dynamic_hand else 1.0
+	# Reference hands enter from the lower corners with a visible elbow arc and
+	# broaden toward the viewer, rather than forming straight tubes across table.
+	var control_world := start_world+Vector3(outward_sign*0.78,-0.36,0.14)
+	var end_world := start_world+Vector3(outward_sign*4.90,-1.28,0.66)
+	var control := hand.to_local(control_world)
+	var end := hand.to_local(end_world)
 
 	var forearm := MeshInstance3D.new()
-	forearm.name = "ForearmSleeve"
-	forearm.mesh = _build_curve_mesh(start, control, end)
-	forearm.material_override = fabric
+	forearm.name = "ForearmNatural"
+	forearm.mesh = _build_curve_mesh(start,control,end)
+	forearm.material_override = cloth
+	forearm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	hand.add_child(forearm)
+	_forearms[hand_name] = forearm
+	_cloth_materials[hand_name] = cloth
+	_skin_materials[hand_name] = skin
 
-	var exit_marker := Node3D.new()
-	exit_marker.name = "ForearmExit"
-	exit_marker.position = end
-	hand.add_child(exit_marker)
+func _make_cafe_cloth() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.resource_name = "SleeveFabric"
+	material.albedo_color = Color(0.16,0.155,0.15,1.0)
+	material.roughness = 0.97
+	return material
 
 func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
-
 	for ring_index in range(CURVE_RINGS):
-		var t := float(ring_index) / float(CURVE_RINGS - 1)
-		var point := _quadratic_point(start, control, end, t)
-		var tangent := _quadratic_tangent(start, control, end, t).normalized()
-		if tangent.length_squared() <= 0.000001:
+		var t := float(ring_index)/float(CURVE_RINGS-1)
+		var point := _quadratic_point(start,control,end,t)
+		var tangent := _quadratic_tangent(start,control,end,t).normalized()
+		if tangent.length_squared()<=0.000001:
 			tangent = Vector3.FORWARD
-
 		var helper := Vector3.UP
-		if absf(tangent.dot(helper)) > 0.94:
+		if absf(tangent.dot(helper))>0.94:
 			helper = Vector3.RIGHT
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
-
-		# Anatomical-cloth silhouette rather than a uniform pipe: narrow wrist,
-		# gradual forearm fullness around the middle, then a slight taper as the
-		# geometry exits the frame. The oval section keeps it soft and non-tubular.
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.72, 0.80, smoothstep(0.0, 1.0, t))
+		var oval_height := lerpf(0.66,0.76,t)
 		for side_index in range(RING_SIDES):
-			var angle := TAU * float(side_index) / float(RING_SIDES)
+			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
 			var sin_a := sin(angle)
-			var radial := ring_x * cos_a * radius + ring_y * sin_a * radius * oval_height
-			vertices.append(point + radial)
-			normals.append((ring_x * cos_a + ring_y * sin_a / oval_height).normalized())
-
-	for ring_index in range(CURVE_RINGS - 1):
-		var current := ring_index * RING_SIDES
-		var next := (ring_index + 1) * RING_SIDES
+			var radial := ring_x*cos_a*radius+ring_y*sin_a*radius*oval_height
+			vertices.append(point+radial)
+			normals.append((ring_x*cos_a+ring_y*sin_a/oval_height).normalized())
+	for ring_index in range(CURVE_RINGS-1):
+		var current := ring_index*RING_SIDES
+		var next := (ring_index+1)*RING_SIDES
 		for side_index in range(RING_SIDES):
-			var side_next := (side_index + 1) % RING_SIDES
-			var a := current + side_index
-			var b := next + side_index
-			var c := next + side_next
-			var d := current + side_next
-			indices.append(a)
-			indices.append(b)
-			indices.append(c)
-			indices.append(a)
-			indices.append(c)
-			indices.append(d)
-
+			var side_next := (side_index+1)%RING_SIDES
+			var a := current+side_index
+			var b := next+side_index
+			var c := next+side_next
+			var d := current+side_next
+			indices.append(a); indices.append(b); indices.append(c)
+			indices.append(a); indices.append(c); indices.append(d)
+	var start_center := vertices.size()
+	vertices.append(start)
+	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
+	var end_center := vertices.size()
+	vertices.append(end)
+	normals.append(_quadratic_tangent(start,control,end,1.0).normalized())
+	for side_index in range(RING_SIDES):
+		var side_next := (side_index+1)%RING_SIDES
+		indices.append(start_center); indices.append(side_next); indices.append(side_index)
+		var end_ring := (CURVE_RINGS-1)*RING_SIDES
+		indices.append(end_center); indices.append(end_ring+side_index); indices.append(end_ring+side_next)
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	return mesh
 
 func _radius_profile(t: float) -> float:
-	var clamped := clampf(t, 0.0, 1.0)
-	if clamped <= 0.60:
-		return lerpf(0.057, 0.094, smoothstep(0.0, 0.60, clamped))
-	return lerpf(0.094, 0.084, smoothstep(0.60, 1.0, clamped))
+	var p := clampf(t,0.0,1.0)
+	var base := lerpf(0.155,0.285,smoothstep(0.0,1.0,p))
+	return base*(1.0+0.065*sin(p*PI))
+
+func _active_venue_id() -> String:
+	var parent := get_parent()
+	if parent == null:
+		return "cafe_window"
+	var venue := parent.get_node_or_null("VenuePresentation")
+	if venue != null and venue.has_method("get_active_profile_id"):
+		return String(venue.call("get_active_profile_id"))
+	return "cafe_window"
+
+func _apply_venue_materials(venue_id: String) -> void:
+	var use_cloth := venue_id=="cafe_window"
+	for hand_name in _forearms.keys():
+		var forearm := _forearms[hand_name] as MeshInstance3D
+		if forearm == null:
+			continue
+		forearm.material_override = (_cloth_materials.get(hand_name) as Material) if use_cloth else (_skin_materials.get(hand_name) as Material)
+
+func _find_material(node: Node, wanted_name: String):
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.material_override != null and mesh_instance.material_override.resource_name==wanted_name:
+			return mesh_instance.material_override
+		var mesh := mesh_instance.mesh
+		if mesh != null:
+			for surface_index in range(mesh.get_surface_count()):
+				var material := mesh.surface_get_material(surface_index)
+				if material != null and material.resource_name==wanted_name:
+					return material
+	for child in node.get_children():
+		var found = _find_material(child,wanted_name)
+		if found != null:
+			return found
+	return null
 
 func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
-	var one_minus := 1.0 - t
-	return start * one_minus * one_minus + control * 2.0 * one_minus * t + end * t * t
+	var one_minus := 1.0-t
+	return start*one_minus*one_minus+control*2.0*one_minus*t+end*t*t
 
 func _quadratic_tangent(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
-	return (control - start) * (2.0 * (1.0 - t)) + (end - control) * (2.0 * t)
+	return (control-start)*(2.0*(1.0-t))+(end-control)*(2.0*t)
 
 func _descendant_point_to_ancestor(descendant: Node3D, ancestor: Node3D, point: Vector3) -> Vector3:
 	var current := descendant
 	var converted := point
-	while current != ancestor:
+	while current!=ancestor:
 		if current.is_set_as_top_level():
-			return Vector3(INF, INF, INF)
-		converted = current.transform * converted
+			return Vector3(INF,INF,INF)
+		converted = current.transform*converted
 		var parent := current.get_parent()
 		if not (parent is Node3D):
-			return Vector3(INF, INF, INF)
+			return Vector3(INF,INF,INF)
 		current = parent as Node3D
 	return converted
 

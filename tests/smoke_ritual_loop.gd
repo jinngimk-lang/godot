@@ -69,8 +69,6 @@ func _run() -> void:
 	if ritual.get_phase_name() != "CRUMPLE_READY":
 		failures.append("RITUAL_RED: CRUMPLE_READY must never auto-advance on elapsed time")
 
-	# First create a deliberately partial squeeze. This isolates re-grab before
-	# the ritual can legally transition to RITUAL_COMPLETE.
 	var press := PointerState.new()
 	press.set_frame(true, Vector2(420, 360), Vector2.ZERO, Vector2.ZERO, false)
 	scene.call("_process_crumple_pointer", press)
@@ -93,7 +91,6 @@ func _run() -> void:
 	if float(crumple.get_progress()) <= before_regrab + 0.01:
 		failures.append("RITUAL_RED: fresh press after release must reacquire crumple ownership and add another squeeze")
 
-	# Continue with larger squeezes for the existing presentation/Foley contract.
 	var drag := PointerState.new()
 	drag.set_frame(true, Vector2(470, 360), Vector2(50, 0), Vector2(120, 0), false)
 	for _i in range(4):
@@ -131,8 +128,8 @@ func _run() -> void:
 	var hud_lower := hud.text.to_lower()
 	if hud_lower.contains("score") or hud_lower.contains("feels"):
 		failures.append("RITUAL_RED: primary HUD must de-emphasize Score/Feels counters")
-	if not hud_lower.contains("ritual") or not hud_lower.contains("tactile"):
-		failures.append("RITUAL_RED: post-peel HUD should communicate soft ritual/tactile progression")
+	if not hud_lower.contains("squeeze") or not hud_lower.contains("r next"):
+		failures.append("RITUAL_RED: post-peel HUD should communicate the optional tactile action without debug jargon")
 
 	var before_id := String(session.current_variant().get("id", ""))
 	var next_key := InputEventKey.new()
@@ -161,4 +158,6 @@ func _finish(scene: Node, failures: Array[String]) -> void:
 		return
 	for failure in failures:
 		push_error(failure)
+	scene.queue_free()
+	await process_frame
 	quit(1)

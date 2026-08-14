@@ -108,29 +108,33 @@ func _clear_contents() -> void:
 func _sync_open_top_for_contents(has_ice: bool) -> void:
 	if _cup == null:
 		_bind_cup()
+	var paper_shell := String(_profile.get("cup_shell", "paper")) == "paper"
 	if _cup != null and _cup.mesh is CylinderMesh:
-		(_cup.mesh as CylinderMesh).cap_top = not has_ice
+		# Paper cups own a real top cap only while closed. Bottle profiles continue
+		# into a procedural shoulder/neck, so a cylinder cap would create a false
+		# internal disk visible through glass.
+		(_cup.mesh as CylinderMesh).cap_top = paper_shell and not has_ice
 	var parent := get_parent()
 	if parent == null:
 		return
+	var show_paper_lid := paper_shell and not has_ice
 	var lid := parent.get_node_or_null("Lid") as MeshInstance3D
 	if lid != null:
-		lid.visible = not has_ice
+		lid.visible = show_paper_lid
 	var cafe := parent.get_node_or_null("CafePresentation") as Node3D
 	if cafe != null:
 		for node_name in ["LidInset", "LidCenter"]:
 			var detail := cafe.get_node_or_null(node_name) as MeshInstance3D
 			if detail != null:
-				detail.visible = not has_ice
+				detail.visible = show_paper_lid
 
 func _base_transform_for(index: int, count: int) -> Transform3D:
 	var dims := _dimensions()
 	var inner_radius := _inner_radius(dims)
 	var denominator := maxf(float(count - 1) * 0.5, 1.0)
 	var spread := (float(index) - float(count - 1) * 0.5) / denominator
-	# Bias the small payload into the back half of the open cup. From the fixed
-	# low camera this keeps the ice readable instead of hiding it behind the
-	# front paper wall, while all centers stay laterally contained.
+	# Bias the small payload into the back half of the open vessel so the ice
+	# remains readable from the fixed product camera without escaping bounds.
 	var x := spread * inner_radius * 0.48
 	var z := -inner_radius * (0.20 + 0.08 * float(index % 2))
 	var top_limit := dims.z * 0.5 - _cube_size * 0.10
@@ -196,8 +200,6 @@ func _clamp_position(position: Vector3, dims: Vector3) -> Vector3:
 	if radial.length() > inner_radius:
 		radial = radial.normalized() * inner_radius
 	var bottom_limit := -dims.z * 0.5 + _cube_size * 0.75
-	# Filled-cup staging may let the cube top peek above the paper rim, but the
-	# center remains below the rim and bounded even under the strongest pulse.
 	var top_limit := dims.z * 0.5 - _cube_size * 0.10
 	return Vector3(radial.x, clampf(position.y, bottom_limit, top_limit), radial.y)
 
