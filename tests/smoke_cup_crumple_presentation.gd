@@ -69,8 +69,13 @@ func _run() -> void:
 				presentation.set_crumple(1.0, 1, 1.0)
 				await process_frame
 				var full := shell.mesh.get_aabb()
-				if full.size.x <= 0.20 or full.size.y <= 0.70:
+				var full_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
+				if full.size.x <= 0.20 or full.size.y <= baseline.size.y * 0.70:
 					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must remain a bounded cup-like shell")
+				if full_mid_span >= baseline_mid_span * 0.82:
+					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must produce a clearly compressed waist, not a nearly unchanged cup")
+				if full.size.y >= baseline.size.y * 0.88:
+					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must visibly shorten the paper cup")
 				presentation.reset_visual()
 				await process_frame
 				if shell.visible or (cup != null and not cup.visible):
@@ -79,7 +84,7 @@ func _run() -> void:
 					failures.append("CRUMPLE_PRESENTATION_RED: reset must restore exact baseline Lid transform")
 
 	if failures.is_empty():
-		print("PASS: cup crumple presentation has visible clockwise faces, bounded deformation, lid follow and clean reset")
+		print("PASS: cup crumple presentation has visible clockwise faces, strong bounded deformation, lid follow and clean reset")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -104,8 +109,6 @@ func _clockwise_faces_align_with_normals(mesh: ArrayMesh) -> bool:
 		var i2 := indices[triangle * 3 + 2]
 		var edge_a := vertices[i1] - vertices[i0]
 		var edge_b := vertices[i2] - vertices[i0]
-		# Godot's visible front face uses clockwise winding, so the outward face
-		# normal is the reverse of the conventional CCW cross product.
 		var front_normal := edge_b.cross(edge_a).normalized()
 		var authored_normal := (normals[i0] + normals[i1] + normals[i2]).normalized()
 		if front_normal.dot(authored_normal) <= 0.25:
