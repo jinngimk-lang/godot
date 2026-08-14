@@ -38,13 +38,13 @@ func update(delta: float) -> void:
 		_phase = Phase.CRUMPLE_READY
 
 func begin_crumple() -> bool:
-	if _phase != Phase.CRUMPLE_READY:
+	if _phase != Phase.CRUMPLE_READY or _next_pending:
 		return false
 	_phase = Phase.CRUMPLING
 	return true
 
 func mark_crumple_complete() -> bool:
-	if _phase != Phase.CRUMPLING:
+	if _phase != Phase.CRUMPLING or _next_pending:
 		return false
 	_phase = Phase.RITUAL_COMPLETE
 	_reward_pending = true
