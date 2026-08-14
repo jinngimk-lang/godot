@@ -3,7 +3,7 @@ name: Sensory V6 Visual Capture
 on:
   push:
     branches:
-      - verify/sensory-cup-ice-v6-visual-green
+      - verify/sensory-v6-after-v5-repairs-visual
   workflow_dispatch:
 
 permissions:
