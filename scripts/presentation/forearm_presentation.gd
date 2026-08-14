@@ -32,7 +32,15 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var legacy_sleeve := authored.find_child("WristSleeve", true, false) as MeshInstance3D
 	if legacy_sleeve == null or legacy_sleeve.material_override == null:
 		return
-	var fabric := legacy_sleeve.material_override
+	# Do not recolor HandVisual's shared wrist material in place. The long visible
+	# forearm gets its own low-contrast cloth copy so hand/wrist fallback semantics
+	# remain untouched while the frame no longer contains two near-black hoses.
+	var fabric := legacy_sleeve.material_override.duplicate()
+	if fabric is StandardMaterial3D:
+		var cloth := fabric as StandardMaterial3D
+		cloth.resource_name = "SleeveFabric"
+		cloth.albedo_color = Color(0.68, 0.57, 0.49, 1.0)
+		cloth.roughness = 0.96
 	legacy_sleeve.visible = false
 
 	var side := -1.0 if dynamic_hand else 1.0
