@@ -49,8 +49,6 @@ func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 		return
 	var old_pinch := hand.get_pinch_world_position()
 	authored.scale = Vector3.ONE*AUTHORED_HAND_SCALE
-	# snap_to refreshes authored bone anchors; offset the root so scaling changes
-	# visual presence without breaking the physical fingertip contact point.
 	hand.snap_to(hand.position)
 	var new_pinch := hand.get_pinch_world_position()
 	hand.position += old_pinch-new_pinch
@@ -59,9 +57,12 @@ func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 func _update_support_hand(delta: float) -> void:
 	if _support_hand == null or _cup == null:
 		return
+	# Café paper squeezing has its own exact, deterministic CrumpleHandStaging.
+	# Inspect support motion is reserved for glass profiles so the two owners
+	# never fight over the same transform or leave a stale post-ritual offset.
+	if _active_venue_id() == "cafe_window":
+		return
 	var yaw := _cup.rotation.y
-	# The support hand cups the vessel rather than hovering at a fixed world
-	# coordinate. It follows inspection yaw with a damped, comfort-first motion.
 	var target := Vector3(0.76+sin(yaw)*0.10,0.18,0.48+cos(yaw)*0.045)
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
 	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
