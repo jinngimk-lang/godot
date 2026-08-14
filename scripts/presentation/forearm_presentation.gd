@@ -43,14 +43,15 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var legacy_sleeve := authored.find_child("WristSleeve",true,false) as MeshInstance3D
 	if legacy_sleeve == null or legacy_sleeve.material_override == null:
 		return
-	var cloth := legacy_sleeve.material_override
+	var cloth: Material = legacy_sleeve.material_override
 	cloth.resource_name = "SleeveFabric"
-	var skin := _find_material(authored,"HandSkin")
+	var skin: Material = _find_material(authored,"HandSkin") as Material
 	if skin == null:
-		skin = StandardMaterial3D.new()
-		skin.resource_name = "HandSkin"
-		(skin as StandardMaterial3D).albedo_color = Color(0.72,0.46,0.32,1.0)
-		(skin as StandardMaterial3D).roughness = 0.70
+		var fallback_skin := StandardMaterial3D.new()
+		fallback_skin.resource_name = "HandSkin"
+		fallback_skin.albedo_color = Color(0.72,0.46,0.32,1.0)
+		fallback_skin.roughness = 0.70
+		skin = fallback_skin
 	legacy_sleeve.visible = false
 
 	var side := -1.0 if dynamic_hand else 1.0
@@ -92,7 +93,6 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		# Human forearms are subtly flattened rather than circular pipes.
 		var oval_height := lerpf(0.72,0.82,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
@@ -122,9 +122,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 	return mesh
 
 func _radius_profile(t: float) -> float:
-	var clamped := clampf(t,0.0,1.0)
-	# Slightly narrower at the wrist, gently fuller toward the frame edge.
-	return lerpf(0.050,0.074,smoothstep(0.0,1.0,clamped))
+	return lerpf(0.050,0.074,smoothstep(0.0,1.0,clampf(t,0.0,1.0)))
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
@@ -141,7 +139,7 @@ func _apply_venue_materials(venue_id: String) -> void:
 		var forearm := _forearms[hand_name] as MeshInstance3D
 		if forearm == null:
 			continue
-		forearm.material_override = _cloth_materials.get(hand_name) if use_cloth else _skin_materials.get(hand_name)
+		forearm.material_override = (_cloth_materials.get(hand_name) as Material) if use_cloth else (_skin_materials.get(hand_name) as Material)
 
 func _find_material(node: Node, wanted_name: String):
 	if node is MeshInstance3D:
