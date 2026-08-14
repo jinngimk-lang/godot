@@ -90,6 +90,23 @@ func run() -> Array[String]:
 	if mid_skip.mark_crumple_complete() and mid_skip.consume_reward_event():
 		failures.append("RED: next requested during CRUMPLING must cancel optional crumple reward eligibility")
 
+	# Consuming the one-shot next event is transport bookkeeping, not permission
+	# to resurrect the outgoing cup's optional reward. The cancellation must
+	# remain latched until reset/new-item state begins.
+	var consumed_skip = load(required).new()
+	consumed_skip.on_label_detached()
+	consumed_skip.update(1.0)
+	if not consumed_skip.begin_crumple():
+		failures.append("consumed-skip fixture must enter CRUMPLING")
+	if not consumed_skip.request_next():
+		failures.append("consumed-skip fixture must accept next request")
+	if not consumed_skip.consume_next_request():
+		failures.append("consumed-skip fixture must consume next request once")
+	if consumed_skip.mark_crumple_complete():
+		failures.append("RED: consumed next request must keep outgoing ritual crumple completion ineligible")
+	if consumed_skip.consume_reward_event():
+		failures.append("RED: consumed next request must keep outgoing ritual reward-ineligible until reset")
+
 	var safe_flow = load(required).new()
 	safe_flow.on_label_detached()
 	safe_flow.update(NAN)

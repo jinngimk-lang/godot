@@ -109,6 +109,12 @@ func _process_crumple_pointer(state: PointerState) -> void:
 		if _ritual.begin_crumple():
 			_crumple.begin_gesture(state.position.x, cup_screen.x)
 			phase = _ritual.get_phase_name()
+	elif phase == "CRUMPLING" and state.pressed and _crumple.get_gesture_side() == 0:
+		# A completed release ends only the current squeeze gesture. The ritual
+		# intentionally remains in CRUMPLING so a later fresh press can make
+		# another dent without resetting the cup or farming progression.
+		var cup_screen := _camera.unproject_position(_cup.global_position)
+		_crumple.begin_gesture(state.position.x, cup_screen.x)
 
 	if phase != "CRUMPLING":
 		return
