@@ -40,6 +40,12 @@ func _bind() -> void:
 func _stage_support_hand(venue_id: String, delta: float) -> void:
 	if _left_hand == null or _cup == null:
 		return
+	# Café paper-cup support staging is already owned by CrumpleHandStaging.
+	# Do not let a second presentation layer move the same root or reset/next-item
+	# can no longer return to an exact tactile baseline. This layer is reserved
+	# for the non-crumpling glass scenes where a wrap pose must follow inspection.
+	if venue_id == "cafe_window":
+		return
 	# The authored Cup pose supplies multi-finger flexion; this presentation layer
 	# places and turns the palm so that flexion actually wraps the hero vessel
 	# instead of reading as a detached claw beside it.
