@@ -2,6 +2,10 @@ extends SceneTree
 
 const MIN_EXIT_LENGTH := 0.85
 const MAX_EXIT_LENGTH := 1.55
+const MIN_SLEEVE_VALUE := 0.38
+const MAX_WRIST_RADIUS := 0.050
+const MAX_MID_RADIUS := 0.078
+const MAX_EXIT_RADIUS := 0.070
 
 func _init() -> void:
 	call_deferred("_run")
@@ -22,6 +26,16 @@ func _run() -> void:
 	var presentation := scene.get_node_or_null("ForearmPresentation") as Node3D
 	if presentation == null:
 		failures.append("FOREARM_RED: missing ForearmPresentation runtime layer")
+	else:
+		var wrist_radius := float(presentation.call("_radius_profile", 0.0))
+		var mid_radius := float(presentation.call("_radius_profile", 0.60))
+		var exit_radius := float(presentation.call("_radius_profile", 1.0))
+		if wrist_radius > MAX_WRIST_RADIUS:
+			failures.append("REFERENCE_RED: forearm wrist remains too thick/tubular %.3f > %.3f" % [wrist_radius, MAX_WRIST_RADIUS])
+		if mid_radius > MAX_MID_RADIUS:
+			failures.append("REFERENCE_RED: forearm midpoint remains too thick/tubular %.3f > %.3f" % [mid_radius, MAX_MID_RADIUS])
+		if exit_radius > MAX_EXIT_RADIUS:
+			failures.append("REFERENCE_RED: forearm exit remains too thick/tubular %.3f > %.3f" % [exit_radius, MAX_EXIT_RADIUS])
 
 	for hand_name in ["RightHand", "LeftHand"]:
 		var hand := scene.get_node_or_null(hand_name) as Node3D
@@ -39,7 +53,12 @@ func _run() -> void:
 			failures.append("FOREARM_RED: %s must use one continuous ArrayMesh ForearmSleeve" % hand_name)
 		else:
 			if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
-				failures.append("%s ForearmSleeve must reuse SleeveFabric" % hand_name)
+				failures.append("%s ForearmSleeve must reuse semantic SleeveFabric" % hand_name)
+			elif forearm.material_override is StandardMaterial3D:
+				var sleeve_color := (forearm.material_override as StandardMaterial3D).albedo_color
+				var sleeve_value := _perceived_value(sleeve_color)
+				if sleeve_value < MIN_SLEEVE_VALUE:
+					failures.append("REFERENCE_RED: %s sleeve is still a dominant near-black hose; value=%.3f target>=%.2f" % [hand_name, sleeve_value, MIN_SLEEVE_VALUE])
 			var mesh := forearm.mesh as ArrayMesh
 			if mesh.get_surface_count() != 1:
 				failures.append("%s continuous forearm should have one connected render surface" % hand_name)
@@ -64,7 +83,7 @@ func _run() -> void:
 				failures.append("FOREARM_RED: %s ForearmExit length %.4f outside compact offscreen range %.2f..%.2f" % [hand_name, exit_length, MIN_EXIT_LENGTH, MAX_EXIT_LENGTH])
 
 	if failures.is_empty():
-		print("PASS: compact continuous forearms exit outward without rigid elbows or long-hose silhouette")
+		print("PASS: slender continuous forearms use low-contrast warm cloth and exit outward")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -72,3 +91,6 @@ func _run() -> void:
 	for failure in failures:
 		push_error(failure)
 	quit(1)
+
+func _perceived_value(color: Color) -> float:
+	return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722

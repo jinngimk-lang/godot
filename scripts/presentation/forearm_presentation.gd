@@ -32,7 +32,15 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var legacy_sleeve := authored.find_child("WristSleeve", true, false) as MeshInstance3D
 	if legacy_sleeve == null or legacy_sleeve.material_override == null:
 		return
-	var fabric := legacy_sleeve.material_override
+	# Do not recolor HandVisual's shared wrist material in place. The long visible
+	# forearm gets its own low-contrast cloth copy so hand/wrist fallback semantics
+	# remain untouched while the frame no longer contains two near-black hoses.
+	var fabric := legacy_sleeve.material_override.duplicate()
+	if fabric is StandardMaterial3D:
+		var cloth := fabric as StandardMaterial3D
+		cloth.resource_name = "SleeveFabric"
+		cloth.albedo_color = Color(0.68, 0.57, 0.49, 1.0)
+		cloth.roughness = 0.96
 	legacy_sleeve.visible = false
 
 	var side := -1.0 if dynamic_hand else 1.0
@@ -81,11 +89,11 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 
-		# Anatomical-cloth silhouette rather than a uniform pipe: narrow wrist,
-		# gradual forearm fullness around the middle, then a slight taper as the
-		# geometry exits the frame. The oval section keeps it soft and non-tubular.
+		# A slender oval cloth section preserves wrist continuity without reading
+		# as a uniform pipe. The forearm is fuller through its middle but remains
+		# secondary to the cup and hands in the fixed close-up camera.
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.72, 0.80, smoothstep(0.0, 1.0, t))
+		var oval_height := lerpf(0.60, 0.70, smoothstep(0.0, 1.0, t))
 		for side_index in range(RING_SIDES):
 			var angle := TAU * float(side_index) / float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -122,8 +130,8 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 func _radius_profile(t: float) -> float:
 	var clamped := clampf(t, 0.0, 1.0)
 	if clamped <= 0.60:
-		return lerpf(0.057, 0.094, smoothstep(0.0, 0.60, clamped))
-	return lerpf(0.094, 0.084, smoothstep(0.60, 1.0, clamped))
+		return lerpf(0.046, 0.074, smoothstep(0.0, 0.60, clamped))
+	return lerpf(0.074, 0.062, smoothstep(0.60, 1.0, clamped))
 
 func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
 	var one_minus := 1.0 - t
