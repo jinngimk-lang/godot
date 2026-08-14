@@ -25,9 +25,14 @@ func run() -> Array[String]:
 		if hand.find_child(required_node, true, false) == null:
 			failures.append("HandVisual missing pinch anchor %s" % required_node)
 
-	# Real-render diagnostics proved the authored GLBs end directly at their
-	# root Wrist_L/Wrist_R plane. Normal close-up presentation must therefore
-	# cover that open wrist end instead of exposing a cropped skin cylinder.
+	# Owner playtest showed the fully open dynamic rest pose reading as a
+	# deformed two-finger claw in the actual game camera. HandVisual stores the
+	# authored pose it deliberately applied, so verify that policy directly
+	# instead of AnimationPlayer.current_animation (which is blank after pause).
+	var relaxed_pose := String(hand.get("_last_authored_pose"))
+	if relaxed_pose != "Pinch Up":
+		failures.append("RED: relaxed dynamic authored hand must use Pinch Up, got %s" % relaxed_pose)
+
 	var sleeve := hand.find_child("WristSleeve", true, false) as MeshInstance3D
 	var cuff := hand.find_child("WristCuff", true, false) as MeshInstance3D
 	if sleeve == null:
@@ -45,6 +50,19 @@ func run() -> Array[String]:
 
 	hand.set_pinch_amount(1.0)
 	hand.set_grip_target(Vector3(1.0, 0.5, 0.8))
-	hand.tick(0.016)
+	hand.tick(0.1)
+	var active_pose := String(hand.get("_last_authored_pose"))
+	if active_pose != "Pinch Tight":
+		failures.append("active authored hand must close to Pinch Tight, got %s" % active_pose)
 	hand.free()
+
+	# The upstream Cup pose has strong multi-finger flexion and the owner frame
+	# shows it reading as twisted anatomy from this support-hand angle. A neutral
+	# open authored pose pressed against the cup is the safer baseline.
+	var support = hand_script.new()
+	support.setup(false)
+	var support_pose := String(support.get("_last_authored_pose"))
+	if support_pose != "Default pose":
+		failures.append("RED: authored support hand must use neutral Default pose, got %s" % support_pose)
+	support.free()
 	return failures
