@@ -34,6 +34,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          grep -n -E -C 6 '(reset|restart|next_item|variant|scene|pause|inspect|peel)' scripts/peel_lab.gd > /tmp/root-context.txt || true
+          grep -n -E -C 5 '(reset|next|variant|label|glass|paper|owner|pause)' tests/smoke_reset_loop.gd > /tmp/reset-context.txt || true
+          grep -n -E -C 6 '(setup|_apply_pose|_apply_authored_pose|set_grip_target|snap_to|tick|Wrist|Pinch|Cup)' scripts/hands/hand_visual.gd > /tmp/hand-context.txt || true
+          grep -n -E -C 5 '(owner|support|forearm|hand|venue|inspect|update)' tests/smoke_forearm_presentation.gd > /tmp/forearm-test-context.txt || true
+
           {
             echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
             echo "BASE=$BASE_SHA"
@@ -46,9 +51,9 @@ jobs:
             echo '=== CURRENT SESSION ==='
             cat scripts/session/session_model.gd
             echo '=== ROOT TRANSITION CONTEXT ==='
-            grep -n -E -C 6 '(reset|restart|next_item|variant|scene|pause|inspect|peel)' scripts/peel_lab.gd | head -n 240
+            sed -n '1,240p' /tmp/root-context.txt
             echo '=== RESET ASSERTIONS ==='
-            grep -n -E -C 5 '(reset|next|variant|label|glass|paper|owner|pause)' tests/smoke_reset_loop.gd | head -n 180
+            sed -n '1,180p' /tmp/reset-context.txt
           } > /tmp/state-packet.txt
 
           {
@@ -59,9 +64,9 @@ jobs:
             echo '=== CURRENT FOREARM OWNER ==='
             cat scripts/presentation/forearm_presentation.gd
             echo '=== HAND POSE CONTEXT ==='
-            grep -n -E -C 6 '(setup|_apply_pose|_apply_authored_pose|set_grip_target|snap_to|tick|Wrist|Pinch|Cup)' scripts/hands/hand_visual.gd | head -n 220
+            sed -n '1,220p' /tmp/hand-context.txt
             echo '=== FOREARM CONTRACT ASSERTIONS ==='
-            grep -n -E -C 5 '(owner|support|forearm|hand|venue|inspect|update)' tests/smoke_forearm_presentation.gd | head -n 180
+            sed -n '1,180p' /tmp/forearm-test-context.txt
             echo '=== LOCKED ACCEPTANCE RULES ==='
             sed -n '1,170p' art/acceptance_refs/v1/MANIFEST.md
           } > /tmp/presentation-packet.txt
