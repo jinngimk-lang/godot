@@ -1,9 +1,10 @@
-"""Render deterministic MPFB support-wrap and label-pinch pose diagnostics.
+"""Render deterministic MPFB hand-pose diagnostics.
 
-This version deliberately does not use Blender IK. Two real-frame experiments
-proved that target-driven IK produced unacceptable stretched/claw silhouettes.
-Instead every phalanx keeps its authored length and receives a bounded local
-rotation toward a contact region.
+This stage intentionally isolates the GameEngine rig's natural finger flexion
+axis before attempting vessel-wrap or label-pinch choreography. Earlier target-
+driven IK and cross-product rotations both produced stretched/twisted claws.
+The sweep below keeps every phalanx length unchanged and rotates only the right
+index chain around one local cardinal axis at a time.
 """
 from __future__ import annotations
 import math, sys, traceback
@@ -35,12 +36,6 @@ def _skin_material(mesh):
         p.inputs['Roughness'].default_value=0.64
     mesh.data.materials.clear(); mesh.data.materials.append(mat)
 
-def _mat(name,color,rough=.45):
-    m=bpy.data.materials.new(name); m.use_nodes=True
-    p=next((n for n in m.node_tree.nodes if n.type=='BSDF_PRINCIPLED'),None)
-    if p: p.inputs['Base Color'].default_value=(*color,1); p.inputs['Roughness'].default_value=rough
-    return m
-
 def _setup():
     _reset(); bpy.ops.import_scene.gltf(filepath=str(INPUT))
     meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']; arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']
@@ -56,59 +51,20 @@ def _clear_pose(arm):
     for pb in arm.pose.bones:
         pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=Quaternion((1,0,0,0)); pb.location=(0,0,0); pb.scale=(1,1,1)
         for c in list(pb.constraints): pb.constraints.remove(c)
-    for o in list(bpy.context.scene.objects):
-        if o.get('pose_proxy'): bpy.data.objects.remove(o,do_unlink=True)
     bpy.context.view_layer.update()
 
-def _proxy_cylinder(center):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=.030, depth=.105, location=center)
-    o=bpy.context.object; o.name='VesselProxy'; o['pose_proxy']=True; o.data.materials.append(_mat('VesselProxyMat',(0.12,0.28,0.40),.32)); return o
+def _rotate_local(arm,bone_name,axis,degrees):
+    pb=arm.pose.bones.get(bone_name)
+    if pb is None: raise RuntimeError(f'missing pose bone {bone_name}')
+    axes={'x':Vector((1,0,0)),'y':Vector((0,1,0)),'z':Vector((0,0,1))}
+    pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=Quaternion(axes[axis],math.radians(degrees))
 
-def _proxy_flap(center):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=center)
-    o=bpy.context.object; o.name='FlapProxy'; o['pose_proxy']=True; o.scale=(.020,.003,.014); o.data.materials.append(_mat('FlapProxyMat',(0.70,0.52,0.20),.7)); return o
-
-def _bend_toward(arm,bone_name,target_world,degrees):
-    """Rotate one pose bone locally toward target while preserving its length."""
-    b=arm.data.bones.get(bone_name); pb=arm.pose.bones.get(bone_name)
-    if b is None or pb is None: raise RuntimeError(f'missing bend bone {bone_name}')
-    head=arm.matrix_world@b.head_local; tail=arm.matrix_world@b.tail_local
-    direction=(tail-head).normalized(); desired=(target_world-head).normalized()
-    axis_world=direction.cross(desired)
-    if axis_world.length_squared<1e-8: return
-    axis_world.normalize()
-    axis_arm=arm.matrix_world.to_3x3().inverted()@axis_world
-    axis_local=b.matrix_local.to_3x3().inverted()@axis_arm
-    if axis_local.length_squared<1e-8: return
-    axis_local.normalize()
-    pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=Quaternion(axis_local,math.radians(degrees))
-
-def _curl_finger(arm,prefix,target,angles):
-    for idx,deg in zip((1,2,3),angles): _bend_toward(arm,f'{prefix}_{idx:02d}_r',target,deg)
-
-def _support_wrap(arm):
-    index_tip=_world_rest(arm,'index_03_r',True); thumb_tip=_world_rest(arm,'thumb_03_r',True)
-    center=(index_tip+thumb_tip)*0.5+Vector((0.0,0.022,-0.006)); _proxy_cylinder(center)
-    far=center+Vector((-0.027,0.002,-0.002))
-    _curl_finger(arm,'index',far,(24,38,28))
-    _curl_finger(arm,'middle',far+Vector((-0.002,0.0,-0.010)),(28,42,30))
-    _curl_finger(arm,'ring',far+Vector((-0.001,0.0,-0.020)),(30,44,32))
-    _curl_finger(arm,'pinky',far+Vector((0.002,0.0,-0.030)),(28,42,32))
-    _curl_finger(arm,'thumb',center+Vector((0.028,-0.003,0.008)),(18,30,24))
-    _bend_toward(arm,'hand_r',center,14)
-    bpy.context.view_layer.update(); return center
-
-def _pinch(arm):
-    index_tip=_world_rest(arm,'index_03_r',True); thumb_tip=_world_rest(arm,'thumb_03_r',True)
-    center=(index_tip+thumb_tip)*0.5+Vector((0.0,0.012,0.002)); _proxy_flap(center)
-    _curl_finger(arm,'index',center+Vector((-0.003,0.0,0.002)),(18,34,24))
-    _curl_finger(arm,'thumb',center+Vector((0.003,0.0,-0.002)),(20,34,22))
-    palm=_world_rest(arm,'hand_r')
-    _curl_finger(arm,'middle',palm+Vector((-0.020,-0.085,-0.030)),(18,28,22))
-    _curl_finger(arm,'ring',palm+Vector((-0.015,-0.072,-0.045)),(22,32,24))
-    _curl_finger(arm,'pinky',palm+Vector((-0.010,-0.060,-0.052)),(24,34,26))
-    _bend_toward(arm,'hand_r',center,9)
-    bpy.context.view_layer.update(); return center
+def _curl_index(arm,axis,sign):
+    # Proximal / intermediate / distal flexion magnitudes approximate a relaxed
+    # grasp. Only the axis/sign changes between diagnostic renders.
+    for bone,deg in [('index_01_r',26),('index_02_r',42),('index_03_r',30)]:
+        _rotate_local(arm,bone,axis,sign*deg)
+    bpy.context.view_layer.update()
 
 def _render(cam,name,target,offset):
     cam.location=target+offset; _look(cam,target); bpy.context.scene.render.filepath=str(OUT/f'{name}.png'); bpy.ops.render.render(write_still=True)
@@ -118,9 +74,12 @@ def _render(cam,name,target,offset):
 
 def _run():
     global INPUT,OUT; INPUT,OUT=_args(); OUT.mkdir(parents=True,exist_ok=True); mesh,arm,cam=_setup()
-    _clear_pose(arm); neutral=(_world_rest(arm,'hand_r')+_world_rest(arm,'middle_03_r',True))*0.5; _render(cam,'neutral_limb',neutral,Vector((-0.18,-0.28,0.10)))
-    _clear_pose(arm); c=_support_wrap(arm); _render(cam,'support_wrap_front',c,Vector((0.02,-0.28,0.07))); _render(cam,'support_wrap_oblique',c,Vector((-0.21,-0.20,0.13)))
-    _clear_pose(arm); c=_pinch(arm); _render(cam,'peel_pinch_front',c,Vector((0.02,-0.28,0.07))); _render(cam,'peel_pinch_oblique',c,Vector((-0.21,-0.20,0.13)))
+    target=(_world_rest(arm,'hand_r')+_world_rest(arm,'middle_03_r',True))*0.5
+    camera_offset=Vector((-0.18,-0.28,0.10))
+    _clear_pose(arm); _render(cam,'axis_neutral',target,camera_offset)
+    for axis in ('x','z'):
+        for sign,label in ((1,'pos'),(-1,'neg')):
+            _clear_pose(arm); _curl_index(arm,axis,sign); _render(cam,f'axis_{axis}_{label}',target,camera_offset)
     print(SUCCESS)
 if __name__=='__main__':
     try:_run()
