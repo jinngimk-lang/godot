@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/table_surface_presentation.gd" id="8_table"]
 [ext_resource type="Script" path="res://scripts/presentation/hud_chrome_presentation.gd" id="9_hud"]
 [ext_resource type="Script" path="res://scripts/presentation/cup_contents_presentation.gd" id="10_contents"]
+[ext_resource type="Script" path="res://scripts/presentation/reference_composition.gd" id="11_composition"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -22,6 +23,9 @@ script = ExtResource("7_backdrop")
 
 [node name="VenuePresentation" type="Node3D" parent="."]
 script = ExtResource("6_venue")
+
+[node name="ReferenceComposition" type="Node" parent="."]
+script = ExtResource("11_composition")
 
 [node name="TableSurfacePresentation" type="Node" parent="."]
 script = ExtResource("8_table")
