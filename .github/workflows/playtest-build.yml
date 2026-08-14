@@ -1,0 +1,137 @@
+name: Playtest Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - chore/playtest-build-v1
+  pull_request:
+    paths:
+      - export_presets.cfg
+      - PLAYTEST.md
+      - .github/workflows/playtest-build.yml
+      - project.godot
+      - scenes/**
+      - scripts/**
+      - assets/**
+
+permissions:
+  contents: read
+
+jobs:
+  export-playtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1 editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Install official export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o export_templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          echo "86409db6200b6f8fd3230989c2d2002851f3dd18acf11d7bdbafddf5a0dd0f72  export_templates.tpz" | sha256sum -c -
+          rm -rf export-template-unpack
+          mkdir -p export-template-unpack "$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          unzip -q export_templates.tpz -d export-template-unpack
+          test -d export-template-unpack/templates
+          cp -a export-template-unpack/templates/. "$HOME/.local/share/godot/export_templates/4.7.1.stable/"
+          test -s "$HOME/.local/share/godot/export_templates/4.7.1.stable/linux_release.x86_64"
+          test -s "$HOME/.local/share/godot/export_templates/4.7.1.stable/windows_release_x86_64.exe"
+
+      - name: Fresh project import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee playtest-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" playtest-import.log; then
+            echo "Godot reported a script parse/load failure during playtest import."
+            exit 1
+          fi
+
+      - name: Export Windows release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds/windows
+          timeout 240s ./godot --headless --path . --export-release "Windows Desktop" builds/windows/PeelCalm.exe 2>&1 | tee export-windows.log
+          test -s builds/windows/PeelCalm.exe
+          cp PLAYTEST.md builds/windows/PLAYTEST.md
+          printf '%s\n' "$GITHUB_SHA" > builds/windows/BUILD_SHA.txt
+          file builds/windows/PeelCalm.exe | tee windows-file.txt
+          grep -Eq 'PE32\+ executable|PE32 executable' windows-file.txt
+
+      - name: Export Linux release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds/linux
+          timeout 240s ./godot --headless --path . --export-release "Linux" builds/linux/PeelCalm.x86_64 2>&1 | tee export-linux.log
+          test -s builds/linux/PeelCalm.x86_64
+          chmod +x builds/linux/PeelCalm.x86_64
+          cp PLAYTEST.md builds/linux/PLAYTEST.md
+          printf '%s\n' "$GITHUB_SHA" > builds/linux/BUILD_SHA.txt
+          file builds/linux/PeelCalm.x86_64 | tee linux-file.txt
+          grep -Fq 'ELF 64-bit' linux-file.txt
+
+      - name: Smoke exported Linux build
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 30s ./builds/linux/PeelCalm.x86_64 --headless --quit-after 20 --verbose 2>&1 | tee exported-linux-smoke.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" exported-linux-smoke.log; then
+            echo "Exported Linux build emitted a Godot/script error."
+            exit 1
+          fi
+          grep -Eq 'Peel Calm|peel_lab|Loading resource' exported-linux-smoke.log || {
+            echo "Exported Linux smoke produced no recognizable project-startup evidence."
+            exit 1
+          }
+
+      - name: Package Godot source fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds/source
+          git archive --format=zip --output builds/source/PeelCalm-Godot-4.7.1-source.zip HEAD
+          cp PLAYTEST.md builds/source/PLAYTEST.md
+          printf '%s\n' "$GITHUB_SHA" > builds/source/BUILD_SHA.txt
+          test -s builds/source/PeelCalm-Godot-4.7.1-source.zip
+
+      - name: Upload Windows playtest
+        uses: actions/upload-artifact@v4
+        with:
+          name: PeelCalm-Windows-${{ github.sha }}
+          path: builds/windows
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux playtest
+        uses: actions/upload-artifact@v4
+        with:
+          name: PeelCalm-Linux-${{ github.sha }}
+          path: builds/linux
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Godot source fallback
+        uses: actions/upload-artifact@v4
+        with:
+          name: PeelCalm-Source-${{ github.sha }}
+          path: builds/source
+          if-no-files-found: error
+          retention-days: 7
