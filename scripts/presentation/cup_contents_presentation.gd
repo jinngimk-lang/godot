@@ -126,20 +126,21 @@ func _sync_open_top_for_contents(has_ice: bool) -> void:
 func _base_transform_for(index: int, count: int) -> Transform3D:
 	var dims := _dimensions()
 	var inner_radius := _inner_radius(dims)
-	var angle := 0.35 + (TAU * float(index) / maxf(float(count), 1.0))
-	var radius_scale := 0.24 + 0.12 * float(index % 2)
-	var radius := inner_radius * radius_scale
-	# The open iced cup is viewed from a shallow downward camera angle. Keep two
-	# cubes at the highest center height already allowed by the conservative cup
-	# clamp, with one slightly lower cube for depth. Their top faces remain below
-	# the physical rim, but now enter the visible line of sight instead of being
-	# fully occluded by the front wall.
-	var half_height := maxf(dims.z * 0.5 - _cube_size * 0.75, 0.01)
-	var vertical_stagger := _cube_size * 0.16 * float(index % 2)
-	var upper_y := half_height - vertical_stagger
-	var position := Vector3(cos(angle) * radius, upper_y, sin(angle) * radius)
-	position = _clamp_position(position, dims)
-	var rotation := Vector3(0.12 * float(index + 1), angle * 0.22, -0.08 * float(index))
+	var denominator := maxf(float(count - 1) * 0.5, 1.0)
+	var spread := (float(index) - float(count - 1) * 0.5) / denominator
+	# Bias the small payload into the back half of the open cup. From the fixed
+	# low camera this keeps the ice readable instead of hiding it behind the
+	# front paper wall, while all centers stay laterally contained.
+	var x := spread * inner_radius * 0.48
+	var z := -inner_radius * (0.20 + 0.08 * float(index % 2))
+	var top_limit := dims.z * 0.5 - _cube_size * 0.10
+	var y := top_limit - _cube_size * 0.04 * float(index % 2)
+	var position := _clamp_position(Vector3(x, y, z), dims)
+	var rotation := Vector3(
+		0.10 + 0.08 * float(index),
+		-0.18 * spread,
+		0.08 * spread
+	)
 	return Transform3D(Basis.from_euler(rotation), position)
 
 func _apply_motion() -> void:
@@ -187,15 +188,18 @@ func _dimensions() -> Vector3:
 	return Vector3(bottom, top, height)
 
 func _inner_radius(dims: Vector3) -> float:
-	return maxf(minf(dims.x, dims.y) - _cube_size * 0.65, 0.01)
+	return maxf(minf(dims.x, dims.y) - _cube_size * 0.60, 0.01)
 
 func _clamp_position(position: Vector3, dims: Vector3) -> Vector3:
 	var inner_radius := _inner_radius(dims)
 	var radial := Vector2(position.x, position.z)
 	if radial.length() > inner_radius:
 		radial = radial.normalized() * inner_radius
-	var half_height := maxf(dims.z * 0.5 - _cube_size * 0.75, 0.01)
-	return Vector3(radial.x, clampf(position.y, -half_height, half_height), radial.y)
+	var bottom_limit := -dims.z * 0.5 + _cube_size * 0.75
+	# Filled-cup staging may let the cube top peek above the paper rim, but the
+	# center remains below the rim and bounded even under the strongest pulse.
+	var top_limit := dims.z * 0.5 - _cube_size * 0.10
+	return Vector3(radial.x, clampf(position.y, bottom_limit, top_limit), radial.y)
 
 func _ice_material(index: int) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()

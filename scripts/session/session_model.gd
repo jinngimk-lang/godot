@@ -52,7 +52,7 @@ const VARIANTS := [
 		"cup_shell": "paper",
 		"cup_dimensions": {"top_radius": 0.58, "bottom_radius": 0.47, "height": 1.38},
 		"crumple_profile": {"rigidity": 0.055, "dent_gain": 0.0035, "max_compression": 0.18},
-		"contents_profile": {"type": "ice", "count": 3, "cube_size": 0.115, "motion_gain": 0.55},
+		"contents_profile": {"type": "ice", "count": 3, "cube_size": 0.145, "motion_gain": 0.55},
 		"reward_theme": "crisp",
 		"hint": "firmer catch • crisp releases"
 	}
