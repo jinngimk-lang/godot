@@ -9,6 +9,7 @@ enum State { IDLE, EDGE_HOVER, EDGE_LIFT, PINCHED, PEELING, RELEASED, COMPLETE }
 var _state: State = State.IDLE
 var _model: PeelModel
 var _edge_position := Vector2.ZERO
+var _grab_region := Rect2()
 var _grab_origin := Vector2.ZERO
 var _hand_position := Vector2.ZERO
 var _edge_radius := 34.0
@@ -30,23 +31,26 @@ func set_edge_position(screen_position: Vector2) -> void:
 	if _state in [State.IDLE, State.EDGE_HOVER, State.RELEASED]:
 		_hand_position = screen_position
 
+func set_grab_region(screen_region: Rect2) -> void:
+	_grab_region = screen_region.abs()
+
 func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
-	var distance_to_edge := pointer.position.distance_to(_edge_position)
+	var can_grab := _can_grab(pointer.position)
 	match _state:
 		State.IDLE:
-			if distance_to_edge <= _edge_radius:
+			if pointer.pressed and can_grab:
+				_begin_lift(pointer.position)
+			elif can_grab:
 				_set_state(State.EDGE_HOVER)
 		State.EDGE_HOVER:
-			if distance_to_edge > _edge_radius * 1.35:
+			if pointer.pressed and can_grab:
+				_begin_lift(pointer.position)
+			elif not can_grab:
 				_set_state(State.IDLE)
-			elif pointer.pressed:
-				_grab_origin = pointer.position
-				_hand_position = pointer.position
-				_set_state(State.EDGE_LIFT)
 		State.EDGE_LIFT:
 			_update_hand(pointer.position, delta)
 			if not pointer.pressed:
-				_set_state(State.EDGE_HOVER)
+				_set_state(State.RELEASED)
 			elif pointer.position.distance_to(_grab_origin) >= _lift_distance:
 				_set_state(State.PINCHED)
 		State.PINCHED:
@@ -64,10 +68,9 @@ func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
 				_advance_peel(pointer, delta)
 		State.RELEASED:
 			_update_hand(_edge_position, delta)
-			if pointer.pressed and distance_to_edge <= _edge_radius * 1.5:
-				_grab_origin = pointer.position
-				_set_state(State.PINCHED)
-			elif distance_to_edge <= _edge_radius:
+			if pointer.pressed and can_grab:
+				_begin_lift(pointer.position)
+			elif can_grab:
 				_set_state(State.EDGE_HOVER)
 		State.COMPLETE:
 			_update_hand(pointer.position, delta)
@@ -75,11 +78,23 @@ func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
 	return {
 		"state": get_state_name(),
 		"progress": _model.get_progress(),
-		"hand_position": _hand_position
+		"hand_position": _hand_position,
+		"bond_load": _model.get_bond_load(),
+		"integrity": _model.get_integrity(),
+		"residue": _model.get_residue()
 	}
 
 func get_progress() -> float:
 	return _model.get_progress()
+
+func get_bond_load() -> float:
+	return _model.get_bond_load()
+
+func get_integrity() -> float:
+	return _model.get_integrity()
+
+func get_residue() -> float:
+	return _model.get_residue()
 
 func is_complete() -> bool:
 	return _model.is_complete()
@@ -93,11 +108,21 @@ func get_state_name() -> String:
 func get_model_config() -> Dictionary:
 	return _model.get_config()
 
+func _can_grab(position: Vector2) -> bool:
+	if _grab_region.size.x > 0.0 and _grab_region.size.y > 0.0 and _grab_region.grow(7.0).has_point(position):
+		return true
+	return position.distance_to(_edge_position) <= _edge_radius
+
+func _begin_lift(position: Vector2) -> void:
+	_grab_origin = position
+	_hand_position = position
+	_set_state(State.EDGE_LIFT)
+
 func _advance_peel(pointer: PointerState, delta: float) -> void:
-	var pull_vec: Vector2 = _hand_position - _edge_position
-	var tension: float = pull_vec.length() * _tension_per_pixel
-	var speed: float = pointer.velocity.length() / 100.0
-	var peel_angle: float = absf(atan2(pull_vec.y, pull_vec.x))
+	var pull_vec: Vector2 = _hand_position - _grab_origin
+	var tension := pull_vec.length() * _tension_per_pixel
+	var speed := pointer.velocity.length() / 100.0
+	var peel_angle := absf(atan2(pull_vec.y, pull_vec.x))
 	var result: Dictionary = _model.step(tension, speed, peel_angle, delta)
 	if bool(result["completed_now"]):
 		_set_state(State.COMPLETE)
