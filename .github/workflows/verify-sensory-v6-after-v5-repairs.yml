@@ -1,0 +1,37 @@
+name: Verify Sensory V6 After V5 Repairs
+
+on:
+  push:
+    branches:
+      - verify/challenge-sensory-v6-after-v5-repairs
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+      - name: Import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" import.log; then exit 1; fi
+      - name: Repaired-main V6 ice verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 30s ./godot --headless --path . --script res://tests/verify_sensory_ice_v6_source.gd
