@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v16
+      - spike/mpfb-hero-limb-retarget-v17
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  render-measured-axis-pinch:
+  diagnose-retarget:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses,previews}
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses}
           curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
           echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
           tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
@@ -48,25 +48,18 @@ jobs:
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
           .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- artifacts/mpfb_limb/assets/mpfb-human-source.glb right artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json 2>&1 | tee artifacts/mpfb_limb/logs/extract-right.log
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
-      - name: Reconfirm measured axes
+      - name: Inspect XR to MPFB retarget contract
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/diagnose_mpfb_hand_axes.py -- artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/hand-axis-diagnostic.json 2>&1 | tee artifacts/mpfb_limb/logs/hand-axis-diagnostic.log
-          grep -Fq "MPFB_AXIS_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/hand-axis-diagnostic.log
-      - name: Solve and render measured-axis pinch
-        shell: bash
-        run: |
-          set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v16.py -- artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_PRIOR measured_axes_v16" artifacts/mpfb_limb/logs/pose-preview.log
-          for frame in pinch_measured_1 pinch_measured_2 pinch_measured_3; do test -s "artifacts/mpfb_limb/previews/${frame}.png"; done
-      - name: Upload visual evidence
+          .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
+          grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
+          test -s artifacts/mpfb_limb/reports/xr-mpfb-retarget.json
+      - name: Upload retarget evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v16
+          name: mpfb-hero-limb-retarget-v17
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
