@@ -46,7 +46,7 @@ func _run() -> void:
 	if int(presentation.get_content_count()) != 3:
 		failures.append("ice profile should create exactly 3 deterministic cubes")
 
-	var container := presentation.get_node_or_null("IceContents")
+	var container: Node = presentation.get_node_or_null("IceContents")
 	if container == null:
 		failures.append("ice profile should expose IceContents container")
 	else:
