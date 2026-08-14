@@ -58,6 +58,15 @@ func run() -> Array[String]:
 	if flow.consume_reward_event() or flow.consume_next_request():
 		failures.append("reset should clear pending ritual events")
 
+	var settle_skip = load(required).new()
+	settle_skip.on_label_detached()
+	if not settle_skip.request_next():
+		failures.append("RED: PEEL_SETTLE must allow an immediate pressure-free next request")
+	if not settle_skip.consume_next_request():
+		failures.append("settle skip request should emit one-shot next intent")
+	if settle_skip.consume_reward_event():
+		failures.append("settle skip must not fabricate a crumple reward event")
+
 	var skip_flow = load(required).new()
 	skip_flow.on_label_detached()
 	skip_flow.update(1.0)
