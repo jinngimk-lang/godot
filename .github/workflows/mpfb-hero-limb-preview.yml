@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - spike/mpfb-hero-limb-v2
+      - spike/mpfb-hero-limb-pose-v3
   workflow_dispatch:
 
 permissions:
@@ -58,25 +59,46 @@ jobs:
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
           test -s artifacts/mpfb_limb/assets/mpfb-human-source.glb
 
-      - name: Render fixed-camera anatomy previews
+      - name: RED gate — extract right hero limb
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_limb_preview.py -- \
-            artifacts/mpfb_limb/assets/mpfb-human-source.glb \
+          .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- \
+            artifacts/mpfb_limb/assets/mpfb-human-source.glb right \
+            artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb \
+            artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json \
+            2>&1 | tee artifacts/mpfb_limb/logs/extract-right.log
+          grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
+          test -s artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb
+          python - <<'PY'
+          import json
+          p='artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json'
+          d=json.load(open(p))
+          assert 2500 <= d['mesh']['vertices'] < 12000, d['mesh']['vertices']
+          assert d['mesh']['polygons'] < 15000, d['mesh']['polygons']
+          assert d['retained_groups']['hand'] > 0
+          assert d['retained_groups']['upperarm'] > 0
+          PY
+
+      - name: RED gate — render support-wrap and flap-pinch previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview.py -- \
+            artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb \
             artifacts/mpfb_limb/previews \
-            2>&1 | tee artifacts/mpfb_limb/logs/preview.log
-          grep -Fq "MPFB_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/preview.log
-          for frame in right_hand_front right_hand_oblique right_forearm_oblique; do
+            2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
+          grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
+          for frame in support_wrap_front support_wrap_oblique peel_pinch_front peel_pinch_oblique; do
             test -s "artifacts/mpfb_limb/previews/${frame}.png"
           done
-          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/preview.log
+          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/pose-preview.log
 
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-preview-v2
+          name: mpfb-hero-limb-pose-v3
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
