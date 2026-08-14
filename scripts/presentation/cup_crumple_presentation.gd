@@ -3,6 +3,8 @@ class_name CupCrumplePresentation
 
 const RINGS := 7
 const SEGMENTS := 16
+const VISUAL_COMPRESSION_GAIN := 1.35
+const HEIGHT_SHORTENING_GAIN := 0.16
 
 var _cup: MeshInstance3D
 var _lid: MeshInstance3D
@@ -90,7 +92,7 @@ func _apply_lid_follow() -> void:
 	if _lid == null or not _has_lid_baseline:
 		return
 	var dims := _dimensions()
-	var total_shortening := dims.z * _progress * 0.09
+	var total_shortening := dims.z * _progress * HEIGHT_SHORTENING_GAIN
 	var target := _baseline_lid_transform
 	# The generated cup shell shortens symmetrically around its center. The lid
 	# follows the top rim, which therefore moves downward by half the total loss.
@@ -166,8 +168,8 @@ func _build_mesh(bottom_radius: float, top_radius: float, height: float, progres
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
-	var compression := clampf(progress * max_compression, 0.0, 0.45)
-	var shown_height := height * (1.0 - progress * 0.09)
+	var compression := clampf(progress * max_compression * VISUAL_COMPRESSION_GAIN, 0.0, 0.45)
+	var shown_height := height * (1.0 - progress * HEIGHT_SHORTENING_GAIN)
 	var slope := (top_radius - bottom_radius) / maxf(shown_height, 0.001)
 
 	for ring in range(RINGS):
@@ -184,7 +186,7 @@ func _build_mesh(bottom_radius: float, top_radius: float, height: float, progres
 			var dent := compression * vertical_envelope * (0.32 + 0.68 * side_weight)
 			var x_scale := 1.0 - dent
 			var z_scale := 1.0 - compression * vertical_envelope * 0.10
-			var crease := float(side) * pulse * progress * vertical_envelope * sin(angle * 3.0) * 0.008
+			var crease := float(side) * pulse * progress * vertical_envelope * sin(angle * 3.0) * 0.012
 			vertices.append(Vector3(radial_x * radius * x_scale + crease, y, radial_z * radius * z_scale))
 			var normal := Vector3(radial_x / maxf(x_scale, 0.2), -slope, radial_z / maxf(z_scale, 0.2)).normalized()
 			normals.append(normal)
@@ -197,9 +199,6 @@ func _build_mesh(bottom_radius: float, top_radius: float, height: float, progres
 			var b := ring * SEGMENTS + next_segment
 			var c := (ring + 1) * SEGMENTS + segment
 			var d := (ring + 1) * SEGMENTS + next_segment
-			# Godot treats clockwise winding as visible/front-facing. Reverse the
-			# conventional CCW quad triangles so outward authored normals and the
-			# rendered front face describe the same side of the paper cup.
 			indices.append_array(PackedInt32Array([a, c, b, b, c, d]))
 
 	var arrays: Array = []
