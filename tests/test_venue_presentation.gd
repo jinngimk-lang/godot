@@ -22,4 +22,5 @@ func run() -> Array[String]:
 		if venue.get_child_count() != count_before: failures.append("venue profile application must be idempotent")
 	venue.apply_profile({"id":"unknown"})
 	if venue.get_active_profile_id() != "cafe_window": failures.append("unknown venue ids should fall back to cafe_window")
+	venue.free()
 	return failures
