@@ -3,7 +3,10 @@ class_name ReferenceBackdrop
 
 const TEXTURES := {
 	"cafe_window":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"night_bar":"res://art/reference_backdrops/bar_backdrop.jpg",
+	# Reuse the proven warm shelf/interior plate for the bar and recolor it at
+	# runtime. This keeps the repository-local plate deterministic while the bar
+	# product/lighting/label establish the distinct amber identity.
+	"night_bar":"res://art/reference_backdrops/cafe_backdrop.jpg",
 	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg"
 }
 
@@ -12,8 +15,6 @@ var _active_id := ""
 func _ready() -> void:
 	name = "ReferenceBackdrop"
 	centered = true
-	# The plate sits just behind the tabletop/product so it masks prototype block
-	# scenery while real-time hands, vessel, label and shadows remain in front.
 	pixel_size = 0.0098
 	position = Vector3(0.0,0.72,-1.43)
 	shaded = false
@@ -39,11 +40,9 @@ func _apply(profile_id: String) -> void:
 	var loaded := load(String(TEXTURES[profile_id])) as Texture2D
 	if loaded != null:
 		texture = loaded
-	# Preserve enough contrast for the hero object while keeping the approved
-	# café/bar/market color script obvious without reading the HUD.
 	if profile_id == "market_coldcase":
 		modulate = Color(0.96,0.96,0.96,1.0)
 	elif profile_id == "night_bar":
-		modulate = Color(0.82,0.77,0.72,1.0)
+		modulate = Color(0.60,0.40,0.26,1.0)
 	else:
 		modulate = Color(0.91,0.88,0.84,1.0)
