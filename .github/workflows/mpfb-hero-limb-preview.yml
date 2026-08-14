@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Precision v30
+name: MPFB Hero Limb Godot Import v31
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-precision-v30
+      - spike/mpfb-hero-limb-godot-import-v31
   workflow_dispatch:
 
 permissions:
@@ -13,9 +13,9 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  precision:
+  staging-import:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Install headless runtime
@@ -48,25 +48,48 @@ jobs:
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
           .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- artifacts/mpfb_limb/assets/mpfb-human-source.glb right artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json 2>&1 | tee artifacts/mpfb_limb/logs/extract-right.log
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
-      - name: Inspect XR to MPFB source contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-          grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render precision root-aligned surface pinch
+      - name: Re-prove v30 precision pose gate
         shell: bash
         run: |
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/render_mpfb_precision_v30.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/precision-v30.log
           grep -Fq "MPFB_PRECISION_V30_SUCCESS" artifacts/mpfb_limb/logs/precision-v30.log
-          test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
-          test -s artifacts/mpfb_limb/previews/surface_v29_root_align.png
-      - name: Upload precision evidence
+      - name: Export rigged support and pinch staging GLBs
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/export_mpfb_pose_candidates_v31.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/assets artifacts/mpfb_limb/reports/pose-candidates-v31.json 2>&1 | tee artifacts/mpfb_limb/logs/export-v31.log
+          grep -Fq "MPFB_POSE_CANDIDATE_EXPORT_V31_SUCCESS" artifacts/mpfb_limb/logs/export-v31.log
+          test -s artifacts/mpfb_limb/assets/mpfb-right-support-wrap-v31.glb
+          test -s artifacts/mpfb_limb/assets/mpfb-right-label-pinch-v31.glb
+      - name: Install pinned Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+      - name: Import and inspect generated pose candidates in Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/generated_staging
+          cp artifacts/mpfb_limb/assets/mpfb-right-support-wrap-v31.glb assets/generated_staging/
+          cp artifacts/mpfb_limb/assets/mpfb-right-label-pinch-v31.glb assets/generated_staging/
+          ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_limb/logs/godot-import-v31.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" artifacts/mpfb_limb/logs/godot-import-v31.log; then
+            exit 1
+          fi
+          ./godot --headless --path . --script res://tests/inspect_mpfb_staging_candidate.gd 2>&1 | tee artifacts/mpfb_limb/logs/godot-inspect-v31.log
+          grep -Fq "MPFB_GODOT_STAGING_IMPORT_V31_SUCCESS" artifacts/mpfb_limb/logs/godot-inspect-v31.log
+      - name: Upload staging evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-precision-v30
+          name: mpfb-hero-limb-godot-import-v31
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
