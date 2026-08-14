@@ -17,12 +17,22 @@ func _run() -> void:
 
 	var required := [
 		"Camera", "Cup", "PeelLabel", "LabelPrint", "LeftHand", "RightHand",
-		"PointerAdapter", "PeelAudio", "HUD", "CafePresentation"
+		"PointerAdapter", "PeelAudio", "HUD", "CafePresentation", "CupContentsPresentation"
 	]
 	var failures: Array[String] = []
 	for child_name in required:
 		if not scene.has_node(child_name):
 			failures.append("RED: missing runtime node: %s" % child_name)
+
+	var contents_presentation: Node = scene.get_node_or_null("CupContentsPresentation")
+	if contents_presentation == null:
+		failures.append("RED: production scene must own bounded CupContentsPresentation")
+	elif not contents_presentation.has_method("get_content_count"):
+		failures.append("CupContentsPresentation missing content-count verification contract")
+	elif int(contents_presentation.call("get_content_count")) != 0:
+		failures.append("fresh warm_paper scene must start with zero cup contents")
+	if scene.get("_contents_presentation") != contents_presentation:
+		failures.append("RED: PeelLab must own the production CupContentsPresentation reference")
 
 	var cafe_presentation := scene.get_node_or_null("CafePresentation") as Node3D
 	if cafe_presentation == null:
@@ -57,9 +67,6 @@ func _run() -> void:
 		if authored_root == null:
 			failures.append("%s missing authored hand scene instance" % hand_name)
 		else:
-			# Keep the original authored-hand size/material gate focused on the GLB
-			# itself. Presentation accessories such as sleeves have their own bounded
-			# contract below and must not inflate this hand-mesh metric.
 			var presentation := _hand_presentation(authored_root)
 			var vertices := int(presentation["vertices"])
 			var max_extent := float(presentation["max_extent"])
@@ -124,8 +131,6 @@ func _run() -> void:
 	elif lifecycle.get_phase_name() != "ATTACHED":
 		failures.append("fresh peel scene lifecycle should start ATTACHED")
 
-	# Complete-playable session contract: tactile variants must drive the actual
-	# scene/controller, not exist only as disconnected progression data.
 	var session = scene.get("_session")
 	if session == null:
 		failures.append("complete playable scene must initialize SessionModel")
@@ -159,7 +164,7 @@ func _run() -> void:
 			failures.append("player HUD must expose reset and pause affordances")
 
 	if failures.is_empty():
-		print("PASS: complete-playable tactile peel scene smoke with cafe presentation and renderable authored hands")
+		print("PASS: complete-playable tactile peel scene smoke with cafe presentation, contents layer and renderable authored hands")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -172,8 +177,6 @@ func _hand_presentation(node: Node) -> Dictionary:
 	var vertices := 0
 	var max_extent := 0.0
 	var materials: Array[String] = []
-	# Wrist presentation accessories are validated separately. This helper is
-	# deliberately limited to the authored GLB hand mesh/material contract.
 	if node.name in ["WristSleeve", "WristCuff"]:
 		return {"vertices": 0, "max_extent": 0.0, "materials": materials}
 	if node is MeshInstance3D:
