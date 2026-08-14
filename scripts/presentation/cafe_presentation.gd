@@ -58,9 +58,6 @@ func _build_world_environment() -> void:
 	add_child(world)
 
 func _build_backdrop() -> void:
-	# Keep the compatibility renderer, but replace the old flat dark wall with a
-	# warm low-frequency café wall. Distant props add depth without competing
-	# with the tactile cup/hand foreground.
 	var backdrop := MeshInstance3D.new()
 	backdrop.name = "Backdrop"
 	var wall_mesh := BoxMesh.new()
@@ -80,79 +77,71 @@ func _build_backdrop() -> void:
 	add_child(backsplash)
 
 func _build_cafe_depth_layer() -> void:
-	var window := MeshInstance3D.new()
+	# Compatibility rendering has no native DOF. The distant café therefore uses
+	# low-frequency alpha sprites whose edges fall away softly. These cues remain
+	# behind gameplay space and avoid hard lines bisecting the cup/hand action.
+	var haze := Sprite3D.new()
+	haze.name = "CafeHaze"
+	haze.texture = _radial_bokeh_texture(Color(0.98, 0.73, 0.47, 0.15))
+	haze.position = Vector3(0.15, 0.78, -1.62)
+	haze.pixel_size = 0.025
+	haze.scale = Vector3(2.15, 1.35, 1.0)
+	add_child(haze)
+
+	var window := Sprite3D.new()
 	window.name = "WindowGlow"
-	var window_mesh := BoxMesh.new()
-	window_mesh.size = Vector3(2.05, 1.42, 0.035)
-	window.mesh = window_mesh
-	window.position = Vector3(-2.25, 0.92, -1.69)
-	window.material_override = _unshaded_material(Color(0.78, 0.61, 0.42, 1.0))
+	window.texture = _soft_rect_texture(Vector2i(128, 92), Color(0.92, 0.74, 0.50, 0.84), 0.22)
+	window.position = Vector3(-2.18, 0.95, -1.63)
+	window.pixel_size = 0.016
+	window.scale = Vector3(1.05, 1.0, 1.0)
 	add_child(window)
 
-	for x_offset in [-0.53, 0.53]:
-		var mullion := MeshInstance3D.new()
-		mullion.name = "WindowMullion"
-		var mullion_mesh := BoxMesh.new()
-		mullion_mesh.size = Vector3(0.035, 1.40, 0.028)
-		mullion.mesh = mullion_mesh
-		mullion.position = window.position + Vector3(x_offset, 0.0, 0.025)
-		mullion.material_override = _material(Color(0.37, 0.24, 0.18, 1.0), 0.92)
-		add_child(mullion)
-
-	var counter := MeshInstance3D.new()
+	var counter := Sprite3D.new()
 	counter.name = "CafeCounter"
-	var counter_mesh := BoxMesh.new()
-	counter_mesh.size = Vector3(7.7, 0.48, 0.30)
-	counter.mesh = counter_mesh
-	counter.position = Vector3(0.0, -0.24, -1.47)
-	counter.material_override = _material(Color(0.36, 0.235, 0.17, 1.0), 0.86)
+	counter.texture = _soft_rect_texture(Vector2i(256, 42), Color(0.32, 0.205, 0.145, 0.55), 0.26)
+	counter.position = Vector3(0.15, -0.22, -1.48)
+	counter.pixel_size = 0.012
+	counter.scale = Vector3(1.55, 1.0, 1.0)
 	add_child(counter)
 
-	var shelf := MeshInstance3D.new()
+	var shelf := Sprite3D.new()
 	shelf.name = "BackShelf"
-	var shelf_mesh := BoxMesh.new()
-	shelf_mesh.size = Vector3(4.7, 0.075, 0.18)
-	shelf.mesh = shelf_mesh
-	shelf.position = Vector3(0.70, 0.88, -1.51)
-	shelf.material_override = _material(Color(0.23, 0.145, 0.105, 1.0), 0.90)
+	shelf.texture = _soft_rect_texture(Vector2i(116, 22), Color(0.25, 0.15, 0.10, 0.45), 0.35)
+	shelf.position = Vector3(1.62, 0.94, -1.54)
+	shelf.pixel_size = 0.012
+	shelf.scale = Vector3(1.15, 1.0, 1.0)
 	add_child(shelf)
 
-	var mug := MeshInstance3D.new()
+	var mug := Sprite3D.new()
 	mug.name = "PropMug"
-	var mug_mesh := CylinderMesh.new()
-	mug_mesh.top_radius = 0.22
-	mug_mesh.bottom_radius = 0.21
-	mug_mesh.height = 0.42
-	mug.mesh = mug_mesh
-	mug.position = Vector3(-1.70, 0.18, -1.29)
-	mug.material_override = _material(Color(0.73, 0.61, 0.50, 1.0), 0.88)
+	mug.texture = _soft_ellipse_texture(Vector2i(54, 68), Color(0.74, 0.60, 0.46, 0.68))
+	mug.position = Vector3(-1.58, 0.17, -1.33)
+	mug.pixel_size = 0.009
+	mug.scale = Vector3(0.92, 1.0, 1.0)
 	add_child(mug)
 
-	var jar := MeshInstance3D.new()
+	var jar := Sprite3D.new()
 	jar.name = "PropJar"
-	var jar_mesh := CylinderMesh.new()
-	jar_mesh.top_radius = 0.19
-	jar_mesh.bottom_radius = 0.21
-	jar_mesh.height = 0.54
-	jar.mesh = jar_mesh
-	jar.position = Vector3(1.66, 0.24, -1.31)
-	jar.material_override = _material(Color(0.49, 0.35, 0.24, 1.0), 0.78)
+	jar.texture = _soft_ellipse_texture(Vector2i(52, 74), Color(0.53, 0.36, 0.23, 0.58))
+	jar.position = Vector3(1.78, 0.26, -1.35)
+	jar.pixel_size = 0.009
+	jar.scale = Vector3(0.90, 1.0, 1.0)
 	add_child(jar)
 
 	var bokeh_left := Sprite3D.new()
 	bokeh_left.name = "BokehWarmLeft"
-	bokeh_left.texture = _radial_bokeh_texture(Color(1.0, 0.78, 0.48, 0.30))
-	bokeh_left.position = Vector3(-1.15, 1.31, -1.42)
-	bokeh_left.pixel_size = 0.012
-	bokeh_left.scale = Vector3(1.35, 1.35, 1.0)
+	bokeh_left.texture = _radial_bokeh_texture(Color(1.0, 0.82, 0.55, 0.24))
+	bokeh_left.position = Vector3(-0.92, 1.32, -1.43)
+	bokeh_left.pixel_size = 0.013
+	bokeh_left.scale = Vector3(1.55, 1.55, 1.0)
 	add_child(bokeh_left)
 
 	var bokeh_right := Sprite3D.new()
 	bokeh_right.name = "BokehWarmRight"
-	bokeh_right.texture = _radial_bokeh_texture(Color(0.86, 0.68, 0.48, 0.22))
-	bokeh_right.position = Vector3(2.05, 0.92, -1.43)
-	bokeh_right.pixel_size = 0.010
-	bokeh_right.scale = Vector3(1.05, 1.05, 1.0)
+	bokeh_right.texture = _radial_bokeh_texture(Color(0.94, 0.70, 0.45, 0.18))
+	bokeh_right.position = Vector3(2.10, 1.10, -1.44)
+	bokeh_right.pixel_size = 0.012
+	bokeh_right.scale = Vector3(1.25, 1.25, 1.0)
 	add_child(bokeh_right)
 
 func _build_lid_detail() -> void:
@@ -351,6 +340,30 @@ func _radial_bokeh_texture(color: Color) -> Texture2D:
 			image.set_pixel(x, y, Color(color.r, color.g, color.b, color.a * falloff))
 	return ImageTexture.create_from_image(image)
 
+func _soft_rect_texture(size: Vector2i, color: Color, edge_softness: float) -> Texture2D:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	var softness := clampf(edge_softness, 0.05, 0.48)
+	for y in range(size.y):
+		for x in range(size.x):
+			var uv := Vector2((float(x) + 0.5) / float(size.x), (float(y) + 0.5) / float(size.y))
+			var edge := minf(minf(uv.x, 1.0 - uv.x), minf(uv.y, 1.0 - uv.y))
+			var alpha := smoothstep(0.0, softness, edge) * color.a
+			image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+	return ImageTexture.create_from_image(image)
+
+func _soft_ellipse_texture(size: Vector2i, color: Color) -> Texture2D:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	for y in range(size.y):
+		for x in range(size.x):
+			var centered := Vector2(
+				((float(x) + 0.5) / float(size.x) - 0.5) * 2.0,
+				((float(y) + 0.5) / float(size.y) - 0.5) * 2.0
+			)
+			var distance := centered.length()
+			var alpha := smoothstep(1.0, 0.62, distance) * color.a
+			image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+	return ImageTexture.create_from_image(image)
+
 func _semantic_material(resource_name: String, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.resource_name = resource_name
@@ -361,11 +374,4 @@ func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = roughness
-	return material
-
-func _unshaded_material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 1.0
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
