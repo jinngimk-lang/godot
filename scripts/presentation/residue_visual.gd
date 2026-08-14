@@ -1,18 +1,18 @@
 extends MeshInstance3D
 class_name ResidueVisual
 
-var _immediate := ImmediateMesh.new()
-var _material := StandardMaterial3D.new()
-var _bottom_radius := 0.45
-var _top_radius := 0.54
-var _body_height := 1.45
-var _body_center_y := 0.05
-var _label_width := 1.15
-var _label_height := 0.40
-var _label_y := 0.68
-var _residue_amount := 0.0
-var _integrity := 1.0
-var _progress := 0.0
+var _immediate: ImmediateMesh = ImmediateMesh.new()
+var _material: StandardMaterial3D = StandardMaterial3D.new()
+var _bottom_radius: float = 0.45
+var _top_radius: float = 0.54
+var _body_height: float = 1.45
+var _body_center_y: float = 0.05
+var _label_width: float = 1.15
+var _label_height: float = 0.40
+var _label_y: float = 0.68
+var _residue_amount: float = 0.0
+var _integrity: float = 1.0
+var _progress: float = 0.0
 
 func _ready() -> void:
 	mesh = _immediate
@@ -51,32 +51,32 @@ func _rebuild() -> void:
 		return
 	_material.albedo_color = Color(0.80,0.77,0.69,clampf(0.58 + _residue_amount*0.38,0.58,0.96))
 	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_material)
-	var segments := 34
-	var peeled_u := clampf(_progress,0.0,1.0)
-	var density := clampf(_residue_amount*1.55 + (1.0-_integrity)*0.72,0.08,1.0)
-	for i in range(segments):
-		var u0 := float(i)/float(segments)
-		var u1 := float(i+1)/float(segments)
+	var segments: int = 34
+	var peeled_u: float = clampf(_progress,0.0,1.0)
+	var density: float = clampf(_residue_amount*1.55 + (1.0-_integrity)*0.72,0.08,1.0)
+	for i: int in range(segments):
+		var u0: float = float(i)/float(segments)
+		var u1: float = float(i+1)/float(segments)
 		if u0 >= peeled_u:
 			break
-		var signal := 0.5 + 0.5*sin(float(i)*2.71 + 0.43)
-		if signal > density:
+		var signal_value: float = 0.5 + 0.5*sin(float(i)*2.71 + 0.43)
+		if signal_value > density:
 			continue
 		u1 = minf(u1,peeled_u)
-		var rag_a := sin(float(i)*1.91)*0.11*_label_height*(0.4+_residue_amount)
-		var rag_b := sin(float(i+1)*2.17+0.8)*0.11*_label_height*(0.4+_residue_amount)
-		var y_top_a := _label_y + _label_height*0.5 - absf(rag_a)*0.35
-		var y_bot_a := _label_y - _label_height*0.5 + absf(rag_a)
-		var y_top_b := _label_y + _label_height*0.5 - absf(rag_b)*0.70
-		var y_bot_b := _label_y - _label_height*0.5 + absf(rag_b)*0.45
-		var a := _point(u0,y_top_a)
-		var b := _point(u0,y_bot_a)
-		var c := _point(u1,y_top_b)
-		var d := _point(u1,y_bot_b)
-		var na := _normal(a)
-		var nb := _normal(b)
-		var nc := _normal(c)
-		var nd := _normal(d)
+		var rag_a: float = sin(float(i)*1.91)*0.11*_label_height*(0.4+_residue_amount)
+		var rag_b: float = sin(float(i+1)*2.17+0.8)*0.11*_label_height*(0.4+_residue_amount)
+		var y_top_a: float = _label_y + _label_height*0.5 - absf(rag_a)*0.35
+		var y_bot_a: float = _label_y - _label_height*0.5 + absf(rag_a)
+		var y_top_b: float = _label_y + _label_height*0.5 - absf(rag_b)*0.70
+		var y_bot_b: float = _label_y - _label_height*0.5 + absf(rag_b)*0.45
+		var a: Vector3 = _point(u0,y_top_a)
+		var b: Vector3 = _point(u0,y_bot_a)
+		var c: Vector3 = _point(u1,y_top_b)
+		var d: Vector3 = _point(u1,y_bot_b)
+		var na: Vector3 = _normal(a)
+		var nb: Vector3 = _normal(b)
+		var nc: Vector3 = _normal(c)
+		var nd: Vector3 = _normal(d)
 		_vertex(a,na,Vector2(u0,0))
 		_vertex(b,nb,Vector2(u0,1))
 		_vertex(c,nc,Vector2(u1,0))
