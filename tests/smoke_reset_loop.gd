@@ -17,8 +17,10 @@ func _run() -> void:
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
 	var session = scene.get("_session")
-	if right_hand == null or label == null or hud == null or session == null:
-		push_error("RESET_SMOKE: runtime hand/label/HUD/session contract missing")
+	var ritual = scene.get("_ritual")
+	var crumple = scene.get("_crumple")
+	if right_hand == null or label == null or hud == null or session == null or ritual == null or crumple == null:
+		push_error("RESET_SMOKE: runtime hand/label/HUD/session/ritual/crumple contract missing")
 		quit(1)
 		return
 	if not right_hand.has_method("get_pinch_world_position") or not right_hand.has_method("snap_to"):
@@ -26,9 +28,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# PC remains primary, but the same production PointerAdapter accepts direct
-	# touch. The first player-facing instruction must therefore not tell a touch
-	# player that a left mouse button is mandatory.
 	var onboarding := hud.text.to_lower()
 	if onboarding.contains("hold left mouse"):
 		push_error("RED: touch-ready onboarding must not make left mouse sound mandatory: %s" % hud.text)
@@ -48,18 +47,16 @@ func _run() -> void:
 		push_error("RESET_SMOKE: fixture failed to displace RightHand")
 		quit(1)
 		return
-
 	scene.call("_reset_session")
 	var pinch_world := right_hand.call("get_pinch_world_position") as Vector3
 	if pinch_world.distance_to(expected_grip_world) > 0.035:
 		push_error("RESET_SMOKE: reset must return visible pinch to fresh label edge; expected=%s actual=%s" % [str(expected_grip_world), str(pinch_world)])
 		quit(1)
 		return
-
 	await process_frame
 	var pinch_after_idle := right_hand.call("get_pinch_world_position") as Vector3
 	if pinch_after_idle.distance_to(expected_grip_world) > 0.065:
-		push_error("RESET_SMOKE: fresh-session pinch drifts away from label edge on the first idle frame; expected=%s actual=%s" % [str(expected_grip_world), str(pinch_after_idle)])
+		push_error("RESET_SMOKE: fresh-session pinch drifts away from label edge on first idle frame")
 		quit(1)
 		return
 
@@ -68,36 +65,40 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# First detach: even a duplicated detach callback must never double-count.
-	scene.set("_pending_score", 100)
-	scene.call("_handle_detached_label")
-	scene.call("_handle_detached_label")
-	if session.get_clean_peels() != 1 or session.get_total_score() != 100:
-		push_error("RED: duplicate detach callback must record progression exactly once")
-		quit(1)
-		return
-	scene.set("_reset_timer", 0.0)
-	await process_frame
-
-	# Second detach unlocks Silky Long. Pause must freeze the pending next-item timer.
-	scene.set("_pending_score", 90)
-	scene.call("_handle_detached_label")
-	if session.get_clean_peels() != 2 or session.get_unlocked_count() != 2:
-		push_error("RESET_SMOKE: second clean peel must unlock the second tactile feel")
-		quit(1)
-		return
-	var timer_before_pause := float(scene.get("_reset_timer"))
+	var reset_key := InputEventKey.new()
+	reset_key.pressed = true
+	reset_key.keycode = KEY_R
 	var escape := InputEventKey.new()
 	escape.pressed = true
 	escape.keycode = KEY_ESCAPE
-	scene.call("_unhandled_key_input", escape)
-	if not bool(scene.get("_paused")) or not hud.text.contains("PAUSED"):
-		push_error("RESET_SMOKE: Esc must enter a visible pause state")
+
+	# First detach: duplicate callback is exact-once, score is no longer progression,
+	# and no automatic next timer is scheduled.
+	scene.set("_pending_score", 100)
+	scene.call("_handle_detached_label")
+	scene.call("_handle_detached_label")
+	if session.get_clean_peels() != 1 or session.get_total_score() != 0:
+		push_error("RED: duplicate detach callback must record one score-independent ritual exactly once")
 		quit(1)
 		return
-	scene.call("_process", 0.75)
-	if absf(float(scene.get("_reset_timer")) - timer_before_pause) > 0.001:
-		push_error("RED: pause during the next-item delay must freeze the timer")
+	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
+		push_error("RED: V5 detach must not schedule the old automatic next-item timer")
+		quit(1)
+		return
+	if ritual.get_phase_name() != "PEEL_SETTLE":
+		push_error("RESET_SMOKE: first detach should enter PEEL_SETTLE")
+		quit(1)
+		return
+
+	# Pause freezes ritual settle itself rather than a hidden next timer.
+	scene.call("_unhandled_key_input", escape)
+	if not bool(scene.get("_paused")) or not hud.text.contains("PAUSED"):
+		push_error("RESET_SMOKE: Esc must enter visible pause state")
+		quit(1)
+		return
+	scene.call("_process", 1.0)
+	if ritual.get_phase_name() != "PEEL_SETTLE":
+		push_error("RED: pause must freeze the post-peel settle phase")
 		quit(1)
 		return
 	scene.call("_unhandled_key_input", escape)
@@ -106,55 +107,71 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# R after a completed peel means 'next now', not replaying the already-counted item.
-	var before_skip_id := String(session.current_variant().get("id", ""))
-	var reset_key := InputEventKey.new()
-	reset_key.pressed = true
-	reset_key.keycode = KEY_R
+	# R may skip the calm settle immediately. With one profile unlocked it cycles
+	# to the same tactile object, but it must return authority to a fresh PEEL.
 	scene.call("_unhandled_key_input", reset_key)
-	if session.get_clean_peels() != 2 or session.get_total_score() != 190:
-		push_error("RESET_SMOKE: skipping the completion delay must not change earned progression")
+	if session.get_clean_peels() != 1 or session.get_total_score() != 0:
+		push_error("RESET_SMOKE: immediate post-peel R must preserve earned progression")
 		quit(1)
 		return
-	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
-		push_error("RED: R during completion delay must consume the pending next-item transition")
-		quit(1)
-		return
-	var after_skip_id := String(session.current_variant().get("id", ""))
-	if before_skip_id == after_skip_id or after_skip_id != "silky_long":
-		push_error("RED: R during completion delay must advance immediately to the next unlocked tactile feel")
+	if ritual.get_phase_name() != "PEEL" or crumple.get_progress() != 0.0:
+		push_error("RED: post-peel R must reset ritual/crumple state for the next item")
 		quit(1)
 		return
 
-	# Ordinary R on an active fresh label resets only that label and preserves the run.
+	# Ordinary R during an active fresh peel only resets that label and preserves run.
+	var before_active_reset := String(session.current_variant().get("id", ""))
 	scene.call("_unhandled_key_input", reset_key)
-	if session.get_clean_peels() != 2 or session.get_total_score() != 190 or String(session.current_variant().get("id", "")) != "silky_long":
-		push_error("RESET_SMOKE: ordinary R must preserve progression and the current tactile feel")
+	if session.get_clean_peels() != 1 or String(session.current_variant().get("id", "")) != before_active_reset:
+		push_error("RESET_SMOKE: ordinary active-label R must preserve progression/current tactile profile")
 		quit(1)
 		return
 
-	# Three more completions exercise repeated next-item rotation and unlock the third feel.
-	for score in [80, 70, 60]:
-		scene.set("_pending_score", score)
+	# Four more rituals: each explicitly waits through settle then uses R. This
+	# proves there is no elapsed-time auto-next while keeping unlock cadence.
+	for ritual_number in range(2, 6):
+		scene.set("_pending_score", 100 - ritual_number)
 		scene.call("_handle_detached_label")
-		scene.set("_reset_timer", 0.0)
-		await process_frame
+		scene.call("_handle_detached_label")
+		if session.get_clean_peels() != ritual_number:
+			push_error("RESET_SMOKE: ritual %d must record exactly once" % ritual_number)
+			quit(1)
+			return
+		if session.get_total_score() != 0:
+			push_error("RESET_SMOKE: ritual progression must stay score-independent")
+			quit(1)
+			return
+		ritual.update(0.46)
+		if ritual.get_phase_name() != "CRUMPLE_READY":
+			push_error("RESET_SMOKE: ritual %d should reach pressure-free CRUMPLE_READY" % ritual_number)
+			quit(1)
+			return
+		for _i in range(30):
+			ritual.update(0.1)
+		if ritual.get_phase_name() != "CRUMPLE_READY":
+			push_error("RED: elapsed time must not auto-advance ritual %d" % ritual_number)
+			quit(1)
+			return
+		scene.call("_unhandled_key_input", reset_key)
+		if ritual.get_phase_name() != "PEEL":
+			push_error("RESET_SMOKE: deliberate next should return ritual %d to PEEL" % ritual_number)
+			quit(1)
+			return
 
 	if session.get_clean_peels() != 5 or session.get_unlocked_count() != 3:
-		push_error("RESET_SMOKE: five completed labels must unlock all three tactile feels")
+		push_error("RESET_SMOKE: five completed rituals must unlock all three tactile profiles")
 		quit(1)
 		return
-	if session.get_total_score() != 400:
-		push_error("RESET_SMOKE: repeated completion score should accumulate exactly once per label")
+	if String(session.current_variant().get("id", "")) != "crisp_seal":
+		push_error("RESET_SMOKE: fifth deliberate next should rotate to newly unlocked crisp_seal")
 		quit(1)
 		return
 
-	# A completed sixth label creates another pending transition; Shift+R must cancel it
-	# while clearing the whole run, so no stale auto-advance can fire afterwards.
-	scene.set("_pending_score", 50)
+	# A sixth detached cup is left in post-peel state; Shift+R must clear it and
+	# no stale transition may fire later because V5 has no auto-next timer.
 	scene.call("_handle_detached_label")
-	if session.get_clean_peels() != 6 or float(scene.get("_reset_timer")) <= 0.0:
-		push_error("RESET_SMOKE: fixture must enter a pending next-item transition")
+	if session.get_clean_peels() != 6 or ritual.get_phase_name() != "PEEL_SETTLE":
+		push_error("RESET_SMOKE: sixth ritual fixture must enter post-peel settle")
 		quit(1)
 		return
 	var restart := InputEventKey.new()
@@ -170,17 +187,21 @@ func _run() -> void:
 		push_error("RESET_SMOKE: full restart must restore warm_paper")
 		quit(1)
 		return
+	if ritual.get_phase_name() != "PEEL" or crumple.get_progress() != 0.0:
+		push_error("RED: Shift+R must clear ritual/crumple transient state")
+		quit(1)
+		return
 	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
-		push_error("RED: Shift+R during completion delay must cancel stale pending auto-advance")
+		push_error("RED: V5 restart must leave no stale automatic next transition")
 		quit(1)
 		return
 	scene.call("_process", 3.0)
-	if String(session.current_variant().get("id", "")) != "warm_paper" or session.get_clean_peels() != 0:
-		push_error("RED: stale next-item transition must not fire after full-run restart")
+	if String(session.current_variant().get("id", "")) != "warm_paper" or session.get_clean_peels() != 0 or ritual.get_phase_name() != "PEEL":
+		push_error("RED: idle time after full restart must not cause stale next-item behavior")
 		quit(1)
 		return
 
-	print("PASS: exact-once detach -> frozen pause -> next-now R -> repeated unlock -> full restart")
+	print("PASS: exact-once ritual -> pause freeze -> deliberate R next -> repeated unlock -> full restart")
 	scene.queue_free()
 	await process_frame
 	quit(0)
