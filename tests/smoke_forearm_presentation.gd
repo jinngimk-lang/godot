@@ -1,7 +1,8 @@
 extends SceneTree
 
-const MAX_FOREARM_LENGTH := 0.82
-const MAX_FOREARM_VERTICAL_THICKNESS := 0.18
+const MIN_FOREARM_LENGTH := 1.35
+const MAX_FOREARM_LENGTH := 3.20
+const MAX_FOREARM_VERTICAL_THICKNESS := 0.36
 const MIN_AUTHORED_HAND_SCALE := 3.45
 
 func _init() -> void:
@@ -37,22 +38,25 @@ func _run() -> void:
 			_fail("%s must use one smooth ForearmNatural mesh" % hand_name,scene)
 			return
 		var aabb := (forearm.mesh as ArrayMesh).get_aabb()
-		if aabb.size.length() > MAX_FOREARM_LENGTH:
-			_fail("%s forearm remains too long/hose-like: %.3f" % [hand_name,aabb.size.length()],scene)
+		var reach := aabb.size.length()
+		if reach < MIN_FOREARM_LENGTH or reach > MAX_FOREARM_LENGTH:
+			_fail("%s forearm must reach toward the frame edge without runaway geometry: %.3f" % [hand_name,reach],scene)
 			return
 		if aabb.size.y > MAX_FOREARM_VERTICAL_THICKNESS:
-			_fail("%s forearm remains too thick/geometric: %s" % [hand_name,str(aabb.size)],scene)
+			_fail("%s forearm cross-section is still too tube-like: %s" % [hand_name,str(aabb.size)],scene)
 			return
 		if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
 			_fail("café forearm should start with soft SleeveFabric",scene)
 			return
 		var legacy := hand.get_node_or_null("AuthoredHand/WristSleeve") as MeshInstance3D
+		var legacy_cuff := hand.get_node_or_null("AuthoredHand/WristCuff") as MeshInstance3D
 		if legacy == null or legacy.visible:
 			_fail("%s must hide the duplicate long authored sleeve" % hand_name,scene)
 			return
+		if legacy_cuff != null and legacy_cuff.visible:
+			_fail("%s must hide the old dark wrist ring" % hand_name,scene)
+			return
 
-	# Café support staging stays owned by the deterministic paper-crumple layer.
-	# Inspect follow starts only after switching to a glass scene.
 	scene.call("debug_select_variant",1)
 	await process_frame
 	await process_frame
@@ -79,7 +83,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, paper-staging isolation, and glass support follow stay coherent")
+	print("PASS: reference-scale hands and sealed frame-edge forearms stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
