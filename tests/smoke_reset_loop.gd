@@ -16,12 +16,15 @@ func _run() -> void:
 	var right_hand := scene.get_node_or_null("RightHand") as Node3D
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
+	var cup := scene.get_node_or_null("Cup") as MeshInstance3D
+	var lid := scene.get_node_or_null("Lid") as MeshInstance3D
+	var cafe := scene.get_node_or_null("CafePresentation") as Node3D
 	var contents: Node = scene.get_node_or_null("CupContentsPresentation")
 	var session = scene.get("_session")
 	var ritual = scene.get("_ritual")
 	var crumple = scene.get("_crumple")
-	if right_hand == null or label == null or hud == null or contents == null or session == null or ritual == null or crumple == null:
-		push_error("RESET_SMOKE: runtime hand/label/HUD/contents/session/ritual/crumple contract missing")
+	if right_hand == null or label == null or hud == null or cup == null or lid == null or cafe == null or contents == null or session == null or ritual == null or crumple == null:
+		push_error("RESET_SMOKE: runtime hand/label/HUD/cup/lid/cafe/contents/session/ritual/crumple contract missing")
 		quit(1)
 		return
 	if scene.get("_contents_presentation") != contents:
@@ -32,6 +35,16 @@ func _run() -> void:
 		push_error("RED: fresh warm_paper reset must start with zero cup contents")
 		quit(1)
 		return
+	if not lid.visible:
+		push_error("RESET_SMOKE: warm_paper should keep its opaque lid presentation")
+		quit(1)
+		return
+	for lid_detail_name in ["LidInset", "LidCenter"]:
+		var lid_detail := cafe.get_node_or_null(lid_detail_name) as MeshInstance3D
+		if lid_detail == null or not lid_detail.visible:
+			push_error("RESET_SMOKE: warm_paper should keep cafe lid detail visible: %s" % lid_detail_name)
+			quit(1)
+			return
 	if not right_hand.has_method("get_pinch_world_position") or not right_hand.has_method("snap_to"):
 		push_error("RESET_SMOKE: RightHand missing pinch/reset contract")
 		quit(1)
@@ -171,6 +184,22 @@ func _run() -> void:
 		quit(1)
 		return
 
+	var cup_mesh := cup.mesh as CylinderMesh
+	if cup_mesh == null or cup_mesh.cap_top:
+		push_error("RED: iced crisp_seal paper cup must expose an open top instead of sealing ice behind a cap")
+		quit(1)
+		return
+	if lid.visible:
+		push_error("RED: iced crisp_seal must hide the opaque runtime lid so contents are visually exposed")
+		quit(1)
+		return
+	for lid_detail_name in ["LidInset", "LidCenter"]:
+		var lid_detail := cafe.get_node_or_null(lid_detail_name) as MeshInstance3D
+		if lid_detail == null or lid_detail.visible:
+			push_error("RED: iced crisp_seal must hide opaque cafe lid detail: %s" % lid_detail_name)
+			quit(1)
+			return
+
 	var ice_container: Node = contents.get_node_or_null("IceContents")
 	if ice_container == null or ice_container.get_child_count() != 3:
 		push_error("RED: crisp_seal contents must expose deterministic IceContents children")
@@ -183,8 +212,6 @@ func _run() -> void:
 		return
 	var ice_before_crumple := first_ice.transform
 
-	# Sixth ritual uses the newly unlocked iced cup. A real inward squeeze must
-	# forward the same crumple pulse/progress into the contents presentation.
 	scene.call("_handle_detached_label")
 	if session.get_clean_peels() != 6 or ritual.get_phase_name() != "PEEL_SETTLE":
 		push_error("RESET_SMOKE: sixth ritual fixture must enter post-peel settle")
@@ -231,6 +258,17 @@ func _run() -> void:
 		push_error("RED: full restart must remove unlocked ice and restore quiet warm_paper contents")
 		quit(1)
 		return
+	cup_mesh = cup.mesh as CylinderMesh
+	if cup_mesh == null or not cup_mesh.cap_top or not lid.visible:
+		push_error("RED: full restart must restore the closed warm_paper cup/lid presentation")
+		quit(1)
+		return
+	for lid_detail_name in ["LidInset", "LidCenter"]:
+		var lid_detail := cafe.get_node_or_null(lid_detail_name) as MeshInstance3D
+		if lid_detail == null or not lid_detail.visible:
+			push_error("RED: full restart must restore cafe lid detail: %s" % lid_detail_name)
+			quit(1)
+			return
 	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
 		push_error("RED: V5 restart must leave no stale automatic next transition")
 		quit(1)
@@ -241,7 +279,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	print("PASS: exact-once ritual -> deliberate unlock -> iced crumple motion -> full quiet restart")
+	print("PASS: exact-once ritual -> deliberate unlock -> visible iced cup -> crumple motion -> full quiet restart")
 	scene.queue_free()
 	await process_frame
 	quit(0)
