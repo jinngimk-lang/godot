@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_CUBE_SIZE := 0.145
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -40,7 +42,7 @@ func _run() -> void:
 
 	var ice_profile := {
 		"cup_dimensions": {"top_radius": 0.58, "bottom_radius": 0.47, "height": 1.38},
-		"contents_profile": {"type": "ice", "count": 3, "cube_size": 0.115, "motion_gain": 0.55}
+		"contents_profile": {"type": "ice", "count": 3, "cube_size": TEST_CUBE_SIZE, "motion_gain": 0.55}
 	}
 	presentation.set_profile(ice_profile)
 	if int(presentation.get_content_count()) != 3:
@@ -54,17 +56,22 @@ func _run() -> void:
 			failures.append("contained ice must stay presentation-only without RigidBody3D/SoftBody3D")
 		var base_transforms: Array[Transform3D] = []
 		var dims: Dictionary = ice_profile.get("cup_dimensions", {})
-		var visible_floor := float(dims.get("height", 0.0)) * 0.24
+		var surface_floor := float(dims.get("height", 0.0)) * 0.5 - TEST_CUBE_SIZE * 0.25
+		var back_half_count := 0
 		for child in container.get_children():
 			if not (child is MeshInstance3D):
 				failures.append("ice contents should contain only mesh presentation children")
 				continue
 			var cube := child as MeshInstance3D
 			base_transforms.append(cube.transform)
-			if not _inside_cup(cube.position, 0.115, dims):
-				failures.append("ice base position escaped configured cup bounds: %s" % cube.position)
-			if cube.position.y < visible_floor:
-				failures.append("RED: contained ice must sit in the upper visible cup layer; y=%.3f floor=%.3f" % [cube.position.y, visible_floor])
+			if not _inside_bounded_surface_band(cube.position, TEST_CUBE_SIZE, dims):
+				failures.append("ice base position escaped bounded cup surface band: %s" % cube.position)
+			if cube.position.y < surface_floor:
+				failures.append("RED: ice reward must stage at the rim surface for fixed-camera readability; y=%.3f floor=%.3f" % [cube.position.y, surface_floor])
+			if cube.position.z < -TEST_CUBE_SIZE * 0.05:
+				back_half_count += 1
+		if back_half_count < 2:
+			failures.append("RED: at least two ice cubes must stage in the camera-readable back half of the open cup; got %d" % back_half_count)
 
 		presentation.set_crumple(1.0, -1, 1.0)
 		for child in container.get_children():
@@ -72,8 +79,8 @@ func _run() -> void:
 				var cube := child as MeshInstance3D
 				if not _is_finite_vec3(cube.position):
 					failures.append("max crumple pulse produced non-finite ice position")
-				if not _inside_cup(cube.position, 0.115, dims):
-					failures.append("max crumple pulse pushed ice outside configured cup bounds: %s" % cube.position)
+				if not _inside_bounded_surface_band(cube.position, TEST_CUBE_SIZE, dims):
+					failures.append("max crumple pulse pushed ice outside bounded cup surface band: %s" % cube.position)
 
 		presentation.set_crumple(0.72, 1, 0.9)
 		presentation.reset_visual()
@@ -86,18 +93,21 @@ func _run() -> void:
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: contained ice presentation is deterministic, upper-layer visible, finite, bounded and physics-free")
+		print("PASS: contained ice is deterministic, rim-readable, bounded, finite and physics-free")
 		quit(0)
 		return
 	for failure in failures:
 		push_error(failure)
 	quit(1)
 
-func _inside_cup(position: Vector3, cube_size: float, dims: Dictionary) -> bool:
-	var inner_radius := maxf(minf(float(dims.get("top_radius", 0.0)), float(dims.get("bottom_radius", 0.0))) - cube_size * 0.65, 0.01)
-	var half_height := maxf(float(dims.get("height", 0.0)) * 0.5 - cube_size * 0.75, 0.01)
+func _inside_bounded_surface_band(position: Vector3, cube_size: float, dims: Dictionary) -> bool:
+	var inner_radius := maxf(minf(float(dims.get("top_radius", 0.0)), float(dims.get("bottom_radius", 0.0))) - cube_size * 0.60, 0.01)
+	var bottom_limit := -float(dims.get("height", 0.0)) * 0.5 + cube_size * 0.75
+	# A filled cup may let the ice top peek slightly above the paper rim, but the
+	# cube center remains near/below the rim and cannot fly free vertically.
+	var top_limit := float(dims.get("height", 0.0)) * 0.5 - cube_size * 0.10
 	var radial := Vector2(position.x, position.z).length()
-	return radial <= inner_radius + 0.0001 and absf(position.y) <= half_height + 0.0001
+	return radial <= inner_radius + 0.0001 and position.y >= bottom_limit - 0.0001 and position.y <= top_limit + 0.0001
 
 func _has_physics_descendant(node: Node) -> bool:
 	for child in node.get_children():
