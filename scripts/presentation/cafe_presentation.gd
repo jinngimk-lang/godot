@@ -44,7 +44,7 @@ func _build_world_environment() -> void:
 	world.name = "WorldEnvironment"
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.20, 0.13, 0.095, 1.0)
+	environment.background_color = Color(0.25, 0.175, 0.13, 1.0)
 	environment.background_energy_multiplier = 0.82
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color(0.58, 0.43, 0.33, 1.0)
@@ -89,7 +89,6 @@ func _build_cafe_depth_layer() -> void:
 	window.material_override = _unshaded_material(Color(0.78, 0.61, 0.42, 1.0))
 	add_child(window)
 
-	# Window dividers keep the bright block from reading as one featureless quad.
 	for x_offset in [-0.53, 0.53]:
 		var mullion := MeshInstance3D.new()
 		mullion.name = "WindowMullion"
@@ -140,8 +139,6 @@ func _build_cafe_depth_layer() -> void:
 	jar.material_override = _material(Color(0.49, 0.35, 0.24, 1.0), 0.78)
 	add_child(jar)
 
-	# Compatibility rendering has no native DOF. Two soft radial sprites create
-	# a restrained bokeh cue so the background feels optically de-emphasized.
 	var bokeh_left := Sprite3D.new()
 	bokeh_left.name = "BokehWarmLeft"
 	bokeh_left.texture = _radial_bokeh_texture(Color(1.0, 0.78, 0.48, 0.30))
