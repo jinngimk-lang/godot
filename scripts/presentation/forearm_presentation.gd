@@ -1,9 +1,9 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 30
-const RING_SIDES := 28
-const AUTHORED_HAND_SCALE := 3.60
+const CURVE_RINGS := 32
+const RING_SIDES := 30
+const AUTHORED_HAND_SCALE := 3.75
 const SUPPORT_FOLLOW_RATE := 8.5
 
 var _applied := false
@@ -60,11 +60,11 @@ func _update_support_hand(delta: float) -> void:
 	if _active_venue_id() == "cafe_window":
 		return
 	var yaw := _cup.rotation.y
-	var target := Vector3(0.76+sin(yaw)*0.10,0.18,0.48+cos(yaw)*0.045)
+	var target := Vector3(0.73+sin(yaw)*0.105,0.16,0.46+cos(yaw)*0.05)
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
 	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
 	_support_hand.position = _support_hand.position.lerp(target,weight)
-	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(40.0)+yaw*0.32,weight)
+	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(38.0)+yaw*0.34,weight)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
@@ -89,8 +89,8 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	if skin == null:
 		var fallback_skin := StandardMaterial3D.new()
 		fallback_skin.resource_name = "HandSkin"
-		fallback_skin.albedo_color = Color(0.72,0.46,0.32,1.0)
-		fallback_skin.roughness = 0.72
+		fallback_skin.albedo_color = Color(0.66,0.43,0.31,1.0)
+		fallback_skin.roughness = 0.76
 		skin = fallback_skin
 
 	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
@@ -101,10 +101,10 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x) < 0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
-	# Explicit world-space routing makes the arms leave through the side edges
-	# like the reference photography instead of ending as visible tubes near the cup.
-	var control_world := start_world+Vector3(outward_sign*0.82,-0.12,0.22)
-	var end_world := start_world+Vector3(outward_sign*2.30,-0.30,0.58)
+	# Bend through a lower elbow arc before leaving the frame. This avoids the
+	# ruler-straight rod silhouette while keeping the actual hand contact stable.
+	var control_world := start_world+Vector3(outward_sign*0.70,-0.34,0.10)
+	var end_world := start_world+Vector3(outward_sign*2.50,-0.72,0.48)
 	var control := hand.to_local(control_world)
 	var end := hand.to_local(end_world)
 
@@ -121,8 +121,8 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 func _make_cafe_cloth() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.resource_name = "SleeveFabric"
-	material.albedo_color = Color(0.68,0.62,0.54,1.0)
-	material.roughness = 0.94
+	material.albedo_color = Color(0.34,0.33,0.32,1.0)
+	material.roughness = 0.96
 	return material
 
 func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayMesh:
@@ -141,7 +141,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.72,0.80,t)
+		var oval_height := lerpf(0.70,0.78,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -160,7 +160,6 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
-	# Seal both ends so even a transitional camera angle never exposes a hollow tube.
 	var start_center := vertices.size()
 	vertices.append(start)
 	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
@@ -183,7 +182,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 
 func _radius_profile(t: float) -> float:
 	var p := smoothstep(0.0,1.0,clampf(t,0.0,1.0))
-	return lerpf(0.115,0.165,p)
+	return lerpf(0.135,0.215,p)
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
