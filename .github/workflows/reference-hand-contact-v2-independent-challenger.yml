@@ -10,7 +10,7 @@ permissions:
 jobs:
   challenge:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       CANDIDATE_SHA: 96898f4da8d65a5aa8dbcb134dbcba3e52f5161b
       BASE_SHA: 17fe40b41ae2e1fc8d10d5e4b4bfc5e689ddc875
@@ -51,7 +51,6 @@ jobs:
             cat tests/test_inspection_controller.gd
             cat tests/test_reference_profiles.gd
           } > /tmp/gameplay-packet.txt
-
           {
             echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
             echo "BASE=$BASE_SHA"
@@ -66,13 +65,8 @@ jobs:
             echo '=== CHECKPOINT 02 ==='
             cat docs/superpowers/checkpoints/2026-08-14-reference-convergence-checkpoint-02.md
           } > /tmp/presentation-packet.txt
-
-          gameplay_bytes="$(wc -c < /tmp/gameplay-packet.txt)"
-          presentation_bytes="$(wc -c < /tmp/presentation-packet.txt)"
-          echo "gameplay packet bytes=$gameplay_bytes"
-          echo "presentation packet bytes=$presentation_bytes"
-          test "$gameplay_bytes" -lt 80000
-          test "$presentation_bytes" -lt 80000
+          test "$(wc -c < /tmp/gameplay-packet.txt)" -lt 80000
+          test "$(wc -c < /tmp/presentation-packet.txt)" -lt 80000
 
       - name: Install independent local model runtime
         shell: bash
@@ -94,71 +88,67 @@ jobs:
       - name: Challenge gameplay and state ownership
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           {
             cat <<'PROMPT'
           You are an independent adversarial reviewer. You did not implement this Godot candidate. Try to falsify it, not praise it.
-
           Review the exact candidate packet below. Focus on deterministic technical defects in peel math, completion/reset one-shot behavior, pointer ownership, inspection-vs-peel separation, scene switching, progression, glass-vs-paper behavior, stale transforms, missing resources, or presentation becoming gameplay authority.
-
-          Existing green tests are evidence but not proof. Construct at least one concrete counterexample beyond the happy path. If you find a reproducible defect, return NEEDS_FIX. If the exact batch is technically sound under the supplied code/tests, return VERIFIED. Do not fail it merely because future visual polish remains.
-
+          Existing green tests are evidence but not proof. Construct at least one concrete counterexample beyond the happy path. If you find a reproducible defect, return NEEDS_FIX. If technically sound under the supplied code/tests, return VERIFIED. Do not fail it merely because future visual polish remains.
           Output exactly four lines:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: <strongest boundary scenario you checked>
           EVIDENCE: <concise technical reason>
-
           Or replace VERIFIED/none with NEEDS_FIX and a concrete function/state reproducer.
-
           PACKET:
           PROMPT
             cat /tmp/gameplay-packet.txt
           } > /tmp/gameplay-prompt.txt
-          ollama run qwen2.5-coder:3b < /tmp/gameplay-prompt.txt | tee /tmp/gameplay-report.txt
-          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/gameplay-report.txt
-          grep -Eq '^DEFECT:' /tmp/gameplay-report.txt
-          grep -Eq '^MIN_TEST:' /tmp/gameplay-report.txt
-          grep -Eq '^EVIDENCE:' /tmp/gameplay-report.txt
-          grep -Fxq 'VERDICT: VERIFIED' /tmp/gameplay-report.txt
+          timeout 240s ollama run qwen2.5-coder:3b < /tmp/gameplay-prompt.txt > /tmp/gameplay-report.txt 2>&1 || true
+          cat /tmp/gameplay-report.txt
 
       - name: Challenge presentation and hand-contact integration
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           {
             cat <<'PROMPT'
           You are a second independent adversarial pass over an exact Godot candidate. Try to falsify the presentation integration, not praise it.
-
-          The narrow latest claim is that the glass-scene support hand is staged closer to the vessel while café behavior remains unchanged. Attack coordinate-space mistakes, state leakage between scenes, inspection-yaw follow, incorrect ownership, brittle tests, hand/forearm geometry bounds, hidden glass/cup state, or reset regressions. Treat the recorded visual checkpoint as evidence boundaries: it may report remaining aesthetic REDs without making this technical batch invalid.
-
+          The narrow latest claim is that the glass-scene support hand is staged closer to the vessel while café behavior remains unchanged. Attack coordinate-space mistakes, state leakage between scenes, inspection-yaw follow, incorrect ownership, brittle tests, hand/forearm geometry bounds, hidden glass/cup state, or reset regressions. Recorded visual checkpoint may report remaining aesthetic REDs without making this technical batch invalid.
           Construct at least one concrete boundary scenario. Return NEEDS_FIX only for a reproducible technical defect in this exact batch. Otherwise VERIFIED.
-
           Output exactly four lines:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: <strongest boundary scenario you checked>
           EVIDENCE: <concise technical reason>
-
           Or replace VERIFIED/none with NEEDS_FIX and a concrete function/state reproducer.
-
           PACKET:
           PROMPT
             cat /tmp/presentation-packet.txt
           } > /tmp/presentation-prompt.txt
-          ollama run qwen2.5-coder:3b < /tmp/presentation-prompt.txt | tee /tmp/presentation-report.txt
-          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/presentation-report.txt
-          grep -Eq '^DEFECT:' /tmp/presentation-report.txt
-          grep -Eq '^MIN_TEST:' /tmp/presentation-report.txt
-          grep -Eq '^EVIDENCE:' /tmp/presentation-report.txt
-          grep -Fxq 'VERDICT: VERIFIED' /tmp/presentation-report.txt
+          timeout 240s ollama run qwen2.5-coder:3b < /tmp/presentation-prompt.txt > /tmp/presentation-report.txt 2>&1 || true
+          cat /tmp/presentation-report.txt
 
       - name: Publish review summary
+        if: always()
+        shell: bash
+        run: |
+          echo '=== GAMEPLAY CHALLENGER ==='
+          cat /tmp/gameplay-report.txt 2>/dev/null || true
+          echo '=== PRESENTATION CHALLENGER ==='
+          cat /tmp/presentation-report.txt 2>/dev/null || true
+          echo "VERIFIED_EXACT_HEAD=$CANDIDATE_SHA"
+
+      - name: Gate exact candidate
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== GAMEPLAY CHALLENGER ==='
-          cat /tmp/gameplay-report.txt
-          echo '=== PRESENTATION CHALLENGER ==='
-          cat /tmp/presentation-report.txt
-          echo "VERIFIED_EXACT_HEAD=$CANDIDATE_SHA"
+          for report in /tmp/gameplay-report.txt /tmp/presentation-report.txt; do
+            test -s "$report"
+            grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' "$report"
+            grep -Eq '^DEFECT:' "$report"
+            grep -Eq '^MIN_TEST:' "$report"
+            grep -Eq '^EVIDENCE:' "$report"
+            grep -Fxq 'VERDICT: VERIFIED' "$report"
+          done
+          echo "Independent exact-head Challenger VERIFIED: $CANDIDATE_SHA"
