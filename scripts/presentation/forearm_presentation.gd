@@ -1,7 +1,7 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 28
+const CURVE_RINGS := 30
 const RING_SIDES := 28
 const AUTHORED_HAND_SCALE := 3.60
 const SUPPORT_FOLLOW_RATE := 8.5
@@ -57,9 +57,6 @@ func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 func _update_support_hand(delta: float) -> void:
 	if _support_hand == null or _cup == null:
 		return
-	# Café paper squeezing has its own exact, deterministic CrumpleHandStaging.
-	# Inspect support motion is reserved for glass profiles so the two owners
-	# never fight over the same transform or leave a stale post-ritual offset.
 	if _active_venue_id() == "cafe_window":
 		return
 	var yaw := _cup.rotation.y
@@ -80,25 +77,36 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	if authored == null:
 		return
 	var legacy_sleeve := authored.find_child("WristSleeve",true,false) as MeshInstance3D
-	if legacy_sleeve == null or legacy_sleeve.material_override == null:
+	var legacy_cuff := authored.find_child("WristCuff",true,false) as MeshInstance3D
+	if legacy_sleeve == null:
 		return
-	var cloth: Material = legacy_sleeve.material_override
-	cloth.resource_name = "SleeveFabric"
+	legacy_sleeve.visible = false
+	if legacy_cuff != null:
+		legacy_cuff.visible = false
+
+	var cloth := _make_cafe_cloth()
 	var skin: Material = _find_material(authored,"HandSkin") as Material
 	if skin == null:
 		var fallback_skin := StandardMaterial3D.new()
 		fallback_skin.resource_name = "HandSkin"
 		fallback_skin.albedo_color = Color(0.72,0.46,0.32,1.0)
-		fallback_skin.roughness = 0.70
+		fallback_skin.roughness = 0.72
 		skin = fallback_skin
-	legacy_sleeve.visible = false
 
-	var side := -1.0 if dynamic_hand else 1.0
 	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
 	if not _finite_vector(start):
 		return
-	var control := start+Vector3(0.045*side,-0.010,0.245)
-	var end := start+Vector3(0.125*side,-0.028,0.535)
+	var start_world := hand.to_global(start)
+	var cup_world := _cup.global_position if _cup != null else Vector3.ZERO
+	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
+	if absf(start_world.x-cup_world.x) < 0.05:
+		outward_sign = -1.0 if dynamic_hand else 1.0
+	# Explicit world-space routing makes the arms leave through the side edges
+	# like the reference photography instead of ending as visible tubes near the cup.
+	var control_world := start_world+Vector3(outward_sign*0.82,-0.12,0.22)
+	var end_world := start_world+Vector3(outward_sign*2.30,-0.30,0.58)
+	var control := hand.to_local(control_world)
+	var end := hand.to_local(end_world)
 
 	var forearm := MeshInstance3D.new()
 	forearm.name = "ForearmNatural"
@@ -109,6 +117,13 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	_forearms[hand_name] = forearm
 	_cloth_materials[hand_name] = cloth
 	_skin_materials[hand_name] = skin
+
+func _make_cafe_cloth() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.resource_name = "SleeveFabric"
+	material.albedo_color = Color(0.68,0.62,0.54,1.0)
+	material.roughness = 0.94
+	return material
 
 func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayMesh:
 	var vertices := PackedVector3Array()
@@ -126,7 +141,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.70,0.78,t)
+		var oval_height := lerpf(0.72,0.80,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -145,6 +160,18 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
+	# Seal both ends so even a transitional camera angle never exposes a hollow tube.
+	var start_center := vertices.size()
+	vertices.append(start)
+	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
+	var end_center := vertices.size()
+	vertices.append(end)
+	normals.append(_quadratic_tangent(start,control,end,1.0).normalized())
+	for side_index in range(RING_SIDES):
+		var side_next := (side_index+1)%RING_SIDES
+		indices.append(start_center); indices.append(side_next); indices.append(side_index)
+		var end_ring := (CURVE_RINGS-1)*RING_SIDES
+		indices.append(end_center); indices.append(end_ring+side_index); indices.append(end_ring+side_next)
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -156,7 +183,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 
 func _radius_profile(t: float) -> float:
 	var p := smoothstep(0.0,1.0,clampf(t,0.0,1.0))
-	return lerpf(0.072,0.102,p)
+	return lerpf(0.115,0.165,p)
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
