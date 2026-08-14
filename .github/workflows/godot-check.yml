@@ -150,7 +150,7 @@ jobs:
             sudo apt-get install -y -qq xvfb
           fi
           mkdir -p artifacts/reference_frames
-          xvfb-run -a ./godot --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
           for name in cafe bar market; do
             test -s "artifacts/reference_frames/${name}.png"
           done
