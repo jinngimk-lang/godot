@@ -1,0 +1,30 @@
+name: Bootstrap PR43 Challenger
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  dispatch:
+    if: contains(github.event.head_commit.message, 'bootstrap PR43 challenger')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve exact PR 43 head and dispatch challengers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(gh pr view 43 --repo "$REPO" --json headRefOid -q .headRefOid)"
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "PR43 exact head: $HEAD_SHA"
+          gh workflow run agent-challenger.yml --repo "$REPO" \
+            -f task_id=43 -f pr_number=43 -f expected_head_sha="$HEAD_SHA" -f round=1
+          gh workflow run agent-challenger-local.yml --repo "$REPO" \
+            -f task_id=43 -f pr_number=43 -f expected_head_sha="$HEAD_SHA" -f round=1
