@@ -3,32 +3,70 @@ class_name ForearmPresentation
 
 const CURVE_RINGS := 28
 const RING_SIDES := 28
+const AUTHORED_HAND_SCALE := 3.60
+const SUPPORT_FOLLOW_RATE := 8.5
 
 var _applied := false
 var _forearms: Dictionary = {}
 var _cloth_materials: Dictionary = {}
 var _skin_materials: Dictionary = {}
 var _last_venue := ""
+var _support_hand: HandVisual
+var _cup: MeshInstance3D
 
 func _ready() -> void:
 	call_deferred("_apply")
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _applied:
 		return
 	var venue_id := _active_venue_id()
-	if venue_id == _last_venue:
-		return
-	_last_venue = venue_id
-	_apply_venue_materials(venue_id)
+	if venue_id != _last_venue:
+		_last_venue = venue_id
+		_apply_venue_materials(venue_id)
+	_update_support_hand(delta)
 
 func _apply() -> void:
 	if _applied:
 		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	_support_hand = parent.get_node_or_null("LeftHand") as HandVisual
+	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
+	_scale_hand_preserve_pinch(parent.get_node_or_null("RightHand") as HandVisual)
+	_scale_hand_preserve_pinch(_support_hand)
 	_build_for_hand("RightHand",true)
 	_build_for_hand("LeftHand",false)
 	_applied = true
 	_last_venue = ""
+
+func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
+	if hand == null:
+		return
+	var authored := hand.get_node_or_null("AuthoredHand") as Node3D
+	if authored == null:
+		return
+	var old_pinch := hand.get_pinch_world_position()
+	authored.scale = Vector3.ONE*AUTHORED_HAND_SCALE
+	# snap_to refreshes authored bone anchors; offset the root so scaling changes
+	# visual presence without breaking the physical fingertip contact point.
+	hand.snap_to(hand.position)
+	var new_pinch := hand.get_pinch_world_position()
+	hand.position += old_pinch-new_pinch
+	hand.set_grip_target(old_pinch)
+
+func _update_support_hand(delta: float) -> void:
+	if _support_hand == null or _cup == null:
+		return
+	var yaw := _cup.rotation.y
+	# The support hand cups the vessel rather than hovering at a fixed world
+	# coordinate. It follows inspection yaw with a damped, comfort-first motion.
+	var target := Vector3(0.76+sin(yaw)*0.10,0.18,0.48+cos(yaw)*0.045)
+	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
+	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
+	_support_hand.position = _support_hand.position.lerp(target,weight)
+	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(40.0)+yaw*0.32,weight)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
@@ -55,14 +93,11 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	legacy_sleeve.visible = false
 
 	var side := -1.0 if dynamic_hand else 1.0
-	# Only the wrist anchor inherits authored-hand scale. Forearm reach and
-	# thickness stay in gameplay-world units so enlarging the hand for realistic
-	# framing cannot recreate the old giant cone/hose artifact.
 	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
 	if not _finite_vector(start):
 		return
-	var control := start + Vector3(0.045*side,-0.010,0.245)
-	var end := start + Vector3(0.125*side,-0.028,0.535)
+	var control := start+Vector3(0.045*side,-0.010,0.245)
+	var end := start+Vector3(0.125*side,-0.028,0.535)
 
 	var forearm := MeshInstance3D.new()
 	forearm.name = "ForearmNatural"
@@ -90,15 +125,14 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		# Flatten the section like a real forearm instead of using a circular pipe.
 		var oval_height := lerpf(0.70,0.78,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
 			var sin_a := sin(angle)
-			var radial := ring_x*cos_a*radius + ring_y*sin_a*radius*oval_height
+			var radial := ring_x*cos_a*radius+ring_y*sin_a*radius*oval_height
 			vertices.append(point+radial)
-			normals.append((ring_x*cos_a + ring_y*sin_a/oval_height).normalized())
+			normals.append((ring_x*cos_a+ring_y*sin_a/oval_height).normalized())
 	for ring_index in range(CURVE_RINGS-1):
 		var current := ring_index*RING_SIDES
 		var next := (ring_index+1)*RING_SIDES
@@ -133,7 +167,7 @@ func _active_venue_id() -> String:
 	return "cafe_window"
 
 func _apply_venue_materials(venue_id: String) -> void:
-	var use_cloth := venue_id == "cafe_window"
+	var use_cloth := venue_id=="cafe_window"
 	for hand_name in _forearms.keys():
 		var forearm := _forearms[hand_name] as MeshInstance3D
 		if forearm == null:
@@ -143,13 +177,13 @@ func _apply_venue_materials(venue_id: String) -> void:
 func _find_material(node: Node, wanted_name: String):
 	if node is MeshInstance3D:
 		var mesh_instance := node as MeshInstance3D
-		if mesh_instance.material_override != null and mesh_instance.material_override.resource_name == wanted_name:
+		if mesh_instance.material_override != null and mesh_instance.material_override.resource_name==wanted_name:
 			return mesh_instance.material_override
 		var mesh := mesh_instance.mesh
 		if mesh != null:
 			for surface_index in range(mesh.get_surface_count()):
 				var material := mesh.surface_get_material(surface_index)
-				if material != null and material.resource_name == wanted_name:
+				if material != null and material.resource_name==wanted_name:
 					return material
 	for child in node.get_children():
 		var found = _find_material(child,wanted_name)
@@ -159,15 +193,15 @@ func _find_material(node: Node, wanted_name: String):
 
 func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
 	var one_minus := 1.0-t
-	return start*one_minus*one_minus + control*2.0*one_minus*t + end*t*t
+	return start*one_minus*one_minus+control*2.0*one_minus*t+end*t*t
 
 func _quadratic_tangent(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
-	return (control-start)*(2.0*(1.0-t)) + (end-control)*(2.0*t)
+	return (control-start)*(2.0*(1.0-t))+(end-control)*(2.0*t)
 
 func _descendant_point_to_ancestor(descendant: Node3D, ancestor: Node3D, point: Vector3) -> Vector3:
 	var current := descendant
 	var converted := point
-	while current != ancestor:
+	while current!=ancestor:
 		if current.is_set_as_top_level():
 			return Vector3(INF,INF,INF)
 		converted = current.transform*converted
