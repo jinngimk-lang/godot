@@ -61,6 +61,22 @@ func run() -> Array[String]:
 	if model.get_unlocked_count() != 3 or not bool(unlock_three.get("unlocked_new", false)):
 		failures.append("third tactile profile should unlock on fifth completed ritual")
 
+	# Every current tactile cup should take a short sequence of deliberate squeezes,
+	# not jump from fresh to complete on one representative 50 px inward drag.
+	var crumple_script := load("res://scripts/cup/cup_crumple_model.gd")
+	for variant in model.VARIANTS:
+		var profile: Dictionary = variant.get("crumple_profile", {})
+		var crumple = crumple_script.new(profile)
+		crumple.begin_gesture(-100.0, 0.0)
+		crumple.apply_drag(50.0)
+		var first_squeeze: float = float(crumple.get_progress())
+		if first_squeeze <= 0.05 or first_squeeze >= 0.45:
+			failures.append("RED: %s should need several intentional squeezes; first 50px progress=%.3f" % [String(variant.get("id", "unknown")), first_squeeze])
+		for _i in range(5):
+			crumple.apply_drag(50.0)
+		if not crumple.is_complete():
+			failures.append("%s should still reach completion within a short six-squeeze ritual" % String(variant.get("id", "unknown")))
+
 	# Legacy score API stays compatible for old callers, but score is no longer required for progression.
 	model.restart_run()
 	var legacy_result: Dictionary = model.record_clean_peel(75)
