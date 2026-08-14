@@ -68,13 +68,24 @@ func _run() -> void:
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
 
+	# Support-root choreography has one owner. ForearmPresentation owns geometry
+	# and venue material only; HandChoreographyPresentation owns glass grip root
+	# placement and inspection-follow. Two writers caused small reset drift and
+	# would become visible jitter once higher-fidelity arms are introduced.
+	if presentation.has_method("_update_support_hand"):
+		_fail("ForearmPresentation must not retain glass support-root ownership",scene)
+		return
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as Node
+	if choreography == null:
+		_fail("missing HandChoreographyPresentation support owner",scene)
+		return
 	var left := scene.get_node("LeftHand") as HandVisual
 	var cup := scene.get_node("Cup") as MeshInstance3D
 	var before_support := left.position
 	cup.rotation.y = 0.55
-	presentation.call("_update_support_hand",0.1)
+	choreography.call("_process",0.1)
 	if left.position.distance_to(before_support) < 0.025:
-		_fail("glass-scene support hand must move with inspected vessel yaw",scene)
+		_fail("glass-scene support owner must move with inspected vessel yaw",scene)
 		return
 
 	scene.call("debug_select_variant",2)
@@ -85,7 +96,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands and offscreen-continuing forearms stay coherent")
+	print("PASS: reference-scale hands, forearms and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
