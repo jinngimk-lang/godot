@@ -51,18 +51,8 @@ func _run() -> void:
 			_fail("%s must hide the duplicate long authored sleeve" % hand_name,scene)
 			return
 
-	# The support hand must actually track vessel inspection instead of remaining
-	# a static decoration while only the cup rotates.
-	var left := scene.get_node("LeftHand") as HandVisual
-	var cup := scene.get_node("Cup") as MeshInstance3D
-	var before_support := left.position
-	cup.rotation.y = 0.55
-	presentation.call("_update_support_hand",0.1)
-	if left.position.distance_to(before_support) < 0.025:
-		_fail("support hand must move with inspected vessel yaw",scene)
-		return
-
-	# Bar and market references use natural bare forearms rather than dark tubes.
+	# Café support staging stays owned by the deterministic paper-crumple layer.
+	# Inspect follow starts only after switching to a glass scene.
 	scene.call("debug_select_variant",1)
 	await process_frame
 	await process_frame
@@ -72,6 +62,15 @@ func _run() -> void:
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
 
+	var left := scene.get_node("LeftHand") as HandVisual
+	var cup := scene.get_node("Cup") as MeshInstance3D
+	var before_support := left.position
+	cup.rotation.y = 0.55
+	presentation.call("_update_support_hand",0.1)
+	if left.position.distance_to(before_support) < 0.025:
+		_fail("glass-scene support hand must move with inspected vessel yaw",scene)
+		return
+
 	scene.call("debug_select_variant",2)
 	await process_frame
 	for hand_name in ["RightHand","LeftHand"]:
@@ -80,7 +79,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, natural forearms, and support motion stay coherent")
+	print("PASS: reference-scale hands, paper-staging isolation, and glass support follow stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
