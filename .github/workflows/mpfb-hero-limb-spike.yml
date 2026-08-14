@@ -102,6 +102,61 @@ jobs:
           grep -Fq "MPFB_REIMPORT_SUCCESS" artifacts/mpfb_limb/logs/reimport.log
           ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/reimport.log
 
+      - name: Import source candidate in Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o .spike-tools/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  .spike-tools/godot.zip" | sha256sum -c -
+          unzip -q .spike-tools/godot.zip -d .spike-tools
+          mv .spike-tools/Godot_v4.7.1-stable_linux.x86_64 .spike-tools/godot
+          chmod +x .spike-tools/godot
+          .spike-tools/godot --version | tee artifacts/mpfb_limb/logs/godot-version.txt
+
+          cp artifacts/mpfb_limb/assets/mpfb-human-source.glb assets/models/hands/_spike_mpfb_human.glb
+          .spike-tools/godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_limb/logs/godot-import.log
+          ! grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load|Cannot open file" artifacts/mpfb_limb/logs/godot-import.log
+
+          cat > tests/_spike_inspect_mpfb.gd <<'GDSCRIPT'
+          extends SceneTree
+
+          func _initialize() -> void:
+              var packed = load("res://assets/models/hands/_spike_mpfb_human.glb")
+              if packed == null or not (packed is PackedScene):
+                  push_error("MPFB_GODOT_IMPORT: candidate did not import as PackedScene")
+                  quit(1)
+                  return
+              var root = packed.instantiate()
+              var stats = {"mesh_count": 0, "surface_count": 0, "skeleton_count": 0, "max_bones": 0}
+              _walk(root, stats)
+              print("MPFB_GODOT_IMPORT stats=", stats)
+              root.free()
+              if int(stats.mesh_count) < 1 or int(stats.surface_count) < 1 or int(stats.skeleton_count) < 1 or int(stats.max_bones) < 40:
+                  push_error("MPFB_GODOT_IMPORT: missing renderable mesh or full GameEngine skeleton")
+                  quit(1)
+                  return
+              print("MPFB_GODOT_IMPORT_SUCCESS")
+              quit(0)
+
+          func _walk(node: Node, stats: Dictionary) -> void:
+              if node is MeshInstance3D:
+                  stats.mesh_count = int(stats.mesh_count) + 1
+                  var mesh := (node as MeshInstance3D).mesh
+                  if mesh != null:
+                      stats.surface_count = int(stats.surface_count) + mesh.get_surface_count()
+              if node is Skeleton3D:
+                  stats.skeleton_count = int(stats.skeleton_count) + 1
+                  stats.max_bones = maxi(int(stats.max_bones), (node as Skeleton3D).get_bone_count())
+              for child in node.get_children():
+                  _walk(child, stats)
+          GDSCRIPT
+
+          .spike-tools/godot --headless --path . --script res://tests/_spike_inspect_mpfb.gd 2>&1 | tee artifacts/mpfb_limb/logs/godot-inspect.log
+          grep -Fq "MPFB_GODOT_IMPORT_SUCCESS" artifacts/mpfb_limb/logs/godot-inspect.log
+          ! grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" artifacts/mpfb_limb/logs/godot-inspect.log
+          rm -f tests/_spike_inspect_mpfb.gd assets/models/hands/_spike_mpfb_human.glb assets/models/hands/_spike_mpfb_human.glb.import
+
       - name: Upload MPFB source candidate evidence
         if: always()
         uses: actions/upload-artifact@v4
