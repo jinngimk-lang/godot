@@ -3,7 +3,7 @@ class_name ReferenceBackdrop
 
 const TEXTURES := {
 	"cafe_window":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"night_bar":"res://art/reference_backdrops/cafe_backdrop.jpg",
+	"night_bar":"res://art/reference_backdrops/bar_backdrop.jpg",
 	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg"
 }
 
@@ -42,7 +42,9 @@ func _apply(profile_id: String) -> void:
 	if profile_id == "market_coldcase":
 		modulate = Color(0.96,0.96,0.96,1.0)
 	elif profile_id == "night_bar":
-		modulate = Color(0.60,0.40,0.26,1.0)
+		# The dedicated plate is already warm/dark; keep its practical highlights
+		# instead of crushing it through the old café-recolor multiplier.
+		modulate = Color(0.92,0.84,0.76,1.0)
 	else:
 		modulate = Color(0.91,0.88,0.84,1.0)
 
@@ -50,9 +52,6 @@ func _mask_blockout_geometry() -> void:
 	var venue := get_parent().get_node_or_null("VenuePresentation")
 	if venue == null:
 		return
-	# VenuePresentation keeps semantic roots and lighting/profile ownership for
-	# deterministic tests. Its early blockout meshes are intentionally hidden in
-	# the hero viewport now that approved mood plates exist.
 	for root_name in ["CafeWindows","BarBackShelf","MarketCooler"]:
 		var root := venue.get_node_or_null(root_name) as Node3D
 		if root == null:
