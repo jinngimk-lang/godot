@@ -21,4 +21,5 @@ func run() -> Array[String]:
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y, 0.7):
 		failures.append("product decoration should follow inspection yaw")
+	product.free()
 	return failures
