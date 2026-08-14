@@ -20,7 +20,6 @@ func run() -> Array[String]:
 	controller.set_grab_region(Rect2(Vector2(70,70), Vector2(130,70)))
 	var pointer = pointer_script.new()
 
-	# The center/right side of the label is deliberately far outside the old 34px edge hotspot.
 	pointer.set_frame(true, Vector2(170,100), Vector2.ZERO, Vector2.ZERO, false)
 	var anywhere: Dictionary = controller.process_pointer(pointer, 0.016)
 	if controller.get_state_name() != "EDGE_LIFT":
@@ -35,13 +34,12 @@ func run() -> Array[String]:
 		if not anywhere.has(key):
 			failures.append("RED: controller output missing physical quality field %s" % key)
 
-	var before_release := controller.get_progress()
+	var before_release: float = float(controller.get_progress())
 	pointer.set_frame(false, pointer.position, Vector2.ZERO, Vector2.ZERO, true)
 	controller.process_pointer(pointer, 0.016)
 	if controller.get_progress() < before_release:
 		failures.append("releasing grip must not reverse peel progress")
 
-	# Re-grab on a different label location, not the moving edge.
 	pointer.set_frame(true, Vector2(135,92), Vector2.ZERO, Vector2.ZERO, false)
 	controller.process_pointer(pointer, 0.016)
 	for i in range(70):
