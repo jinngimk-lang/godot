@@ -7,6 +7,8 @@ const AUTHORED_HAND_SCALE := 4.15
 
 var _applied := false
 var _forearms: Dictionary = {}
+var _integrated_forearms: Dictionary = {}
+var _integrated_sleeves: Dictionary = {}
 var _cloth_materials: Dictionary = {}
 var _skin_materials: Dictionary = {}
 var _last_venue := ""
@@ -36,6 +38,7 @@ func _apply() -> void:
 	_build_for_hand("LeftHand",false)
 	_applied = true
 	_last_venue = ""
+	_apply_venue_materials(_active_venue_id())
 
 func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 	if hand == null:
@@ -62,12 +65,26 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 		return
 	var legacy_sleeve := authored.find_child("WristSleeve",true,false) as MeshInstance3D
 	var legacy_cuff := authored.find_child("WristCuff",true,false) as MeshInstance3D
-	if legacy_sleeve == null:
-		return
-	legacy_sleeve.visible = false
+	if legacy_sleeve != null:
+		legacy_sleeve.visible = false
 	if legacy_cuff != null:
 		legacy_cuff.visible = false
 
+	# A future/high-fidelity authored asset may carry a rigged anatomical forearm
+	# and café sleeve inside the same GLB. Prefer that continuous tactile limb and
+	# do not stack the legacy procedural tube on top of it.
+	var integrated := authored.find_child("IntegratedForearmMesh",true,false) as MeshInstance3D
+	var integrated_sleeve := authored.find_child("IntegratedSleeveMesh",true,false) as MeshInstance3D
+	if integrated != null:
+		_integrated_forearms[hand_name] = integrated
+		if integrated_sleeve != null:
+			_integrated_sleeves[hand_name] = integrated_sleeve
+		return
+
+	# Existing production GLBs stop at the wrist. Keep the proven procedural
+	# fallback until an integrated candidate wins direct reference comparison.
+	if legacy_sleeve == null:
+		return
 	var cloth := _make_cafe_cloth()
 	var skin: Material = _find_material(authored,"HandSkin") as Material
 	if skin == null:
@@ -77,8 +94,6 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 		fallback_skin.roughness = 0.80
 		skin = fallback_skin
 	elif skin is StandardMaterial3D:
-		# Re-use the actual imported hand material so the forearm/hand join stays
-		# continuous, but calibrate the XR asset away from the prototype pink read.
 		var skin_mat := skin as StandardMaterial3D
 		skin_mat.albedo_color = Color(0.66,0.43,0.31,1.0)
 		skin_mat.roughness = 0.78
@@ -93,8 +108,6 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var outward_sign := -1.0 if start_world.x<cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x)<0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
-	# Reference hands enter from the lower corners with a visible elbow arc and
-	# broaden toward the viewer, rather than forming straight tubes across table.
 	var control_world := start_world+Vector3(outward_sign*0.78,-0.36,0.14)
 	var end_world := start_world+Vector3(outward_sign*4.90,-1.28,0.66)
 	var control := hand.to_local(control_world)
@@ -193,6 +206,13 @@ func _apply_venue_materials(venue_id: String) -> void:
 		if forearm == null:
 			continue
 		forearm.material_override = (_cloth_materials.get(hand_name) as Material) if use_cloth else (_skin_materials.get(hand_name) as Material)
+	for hand_name in _integrated_forearms.keys():
+		var integrated := _integrated_forearms[hand_name] as MeshInstance3D
+		if integrated != null:
+			integrated.visible = not use_cloth
+		var sleeve := _integrated_sleeves.get(hand_name) as MeshInstance3D
+		if sleeve != null:
+			sleeve.visible = use_cloth
 
 func _find_material(node: Node, wanted_name: String):
 	if node is MeshInstance3D:
