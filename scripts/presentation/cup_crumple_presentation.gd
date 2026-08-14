@@ -5,12 +5,15 @@ const RINGS := 7
 const SEGMENTS := 16
 
 var _cup: MeshInstance3D
+var _lid: MeshInstance3D
 var _shell: MeshInstance3D
 var _profile: Dictionary = {}
 var _progress := 0.0
 var _side := -1
 var _pulse := 0.0
 var _last_signature := Vector4(-1.0, 0.0, 0.0, 0.0)
+var _baseline_lid_transform := Transform3D.IDENTITY
+var _has_lid_baseline := false
 
 func _ready() -> void:
 	call_deferred("_bind_cup")
@@ -24,8 +27,12 @@ func _process(_delta: float) -> void:
 
 func set_profile(profile: Dictionary) -> void:
 	_profile = profile.duplicate(true)
+	if _cup == null:
+		_bind_cup()
+	_capture_lid_baseline()
 	_last_signature.x = -1.0
 	_rebuild_shell()
+	_apply_lid_follow()
 
 func set_crumple(progress: float, side: int, pulse: float) -> void:
 	_progress = clampf(progress if is_finite(progress) else 0.0, 0.0, 1.0)
@@ -33,6 +40,7 @@ func set_crumple(progress: float, side: int, pulse: float) -> void:
 	_pulse = clampf(pulse if is_finite(pulse) else 0.0, 0.0, 1.0)
 	_rebuild_shell()
 	_apply_visibility()
+	_apply_lid_follow()
 
 func reset_visual() -> void:
 	_progress = 0.0
@@ -40,6 +48,7 @@ func reset_visual() -> void:
 	_last_signature.x = -1.0
 	_rebuild_shell()
 	_apply_visibility()
+	_restore_lid_baseline()
 
 func get_progress() -> float:
 	return _progress
@@ -54,6 +63,7 @@ func _bind_cup() -> void:
 	if _cup == null or not (_cup.mesh is CylinderMesh):
 		_cup = null
 		return
+	_lid = parent.get_node_or_null("Lid") as MeshInstance3D
 	if _shell == null:
 		_shell = MeshInstance3D.new()
 		_shell.name = "CrumpledCup"
@@ -61,8 +71,35 @@ func _bind_cup() -> void:
 		add_child(_shell)
 	_shell.transform = global_transform.affine_inverse() * _cup.global_transform
 	_sync_material()
+	_capture_lid_baseline()
 	_rebuild_shell()
 	_apply_visibility()
+
+func _capture_lid_baseline() -> void:
+	if _lid == null:
+		var parent := get_parent()
+		if parent != null:
+			_lid = parent.get_node_or_null("Lid") as MeshInstance3D
+	if _lid == null:
+		_has_lid_baseline = false
+		return
+	_baseline_lid_transform = _lid.transform
+	_has_lid_baseline = true
+
+func _apply_lid_follow() -> void:
+	if _lid == null or not _has_lid_baseline:
+		return
+	var dims := _dimensions()
+	var total_shortening := dims.z * _progress * 0.09
+	var target := _baseline_lid_transform
+	# The generated cup shell shortens symmetrically around its center. The lid
+	# follows the top rim, which therefore moves downward by half the total loss.
+	target.origin.y -= total_shortening * 0.5
+	_lid.transform = target
+
+func _restore_lid_baseline() -> void:
+	if _lid != null and _has_lid_baseline:
+		_lid.transform = _baseline_lid_transform
 
 func _apply_visibility() -> void:
 	if _cup == null or _shell == null:
