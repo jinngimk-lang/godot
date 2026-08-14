@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Flap Normal v28
+name: MPFB Hero Limb Root Align v29
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-flap-normal-v28
+      - spike/mpfb-hero-limb-root-align-v29
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  flap-normal:
+  root-align:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -54,19 +54,19 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render actual flap-face surface-servo candidate
+      - name: Render root-aligned visible-surface pinch candidate
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_flap_normal_v28.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/flap-normal-v28.log
-          grep -Fq "MPFB_FLAP_NORMAL_V28_SUCCESS" artifacts/mpfb_limb/logs/flap-normal-v28.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_root_align_v29.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/root-align-v29.log
+          grep -Fq "MPFB_ROOT_ALIGN_V29_SUCCESS" artifacts/mpfb_limb/logs/root-align-v29.log
           test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
-          test -s artifacts/mpfb_limb/previews/surface_v28_flap_normal.png
-      - name: Upload actual flap-face evidence
+          test -s artifacts/mpfb_limb/previews/surface_v29_root_align.png
+      - name: Upload root-align evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-flap-normal-v28
+          name: mpfb-hero-limb-root-align-v29
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
