@@ -32,7 +32,7 @@ const VARIANTS := [
 		"label_height": 0.46,
 		"cup_color": Color(0.80, 0.86, 0.82),
 		"cup_shell": "paper",
-		"cup_dimensions": {"top_radius": 0.52, "bottom_radius": 0.44, "height": 1.52},
+		"cup_dimensions": {"top_radius": 0.50, "bottom_radius": 0.41, "height": 1.58},
 		"crumple_profile": {"rigidity": 0.025, "dent_gain": 0.0052, "max_compression": 0.28},
 		"contents_profile": {"type": "none"},
 		"reward_theme": "silky",
@@ -50,9 +50,9 @@ const VARIANTS := [
 		"label_height": 0.38,
 		"cup_color": Color(0.86, 0.78, 0.70),
 		"cup_shell": "paper",
-		"cup_dimensions": {"top_radius": 0.55, "bottom_radius": 0.46, "height": 1.42},
+		"cup_dimensions": {"top_radius": 0.58, "bottom_radius": 0.47, "height": 1.38},
 		"crumple_profile": {"rigidity": 0.055, "dent_gain": 0.0035, "max_compression": 0.18},
-		"contents_profile": {"type": "none"},
+		"contents_profile": {"type": "ice", "count": 3, "cube_size": 0.145, "motion_gain": 0.55},
 		"reward_theme": "crisp",
 		"hint": "firmer catch • crisp releases"
 	}

@@ -18,6 +18,7 @@ var _session: SessionModel
 var _ritual: RitualFlow
 var _crumple: CupCrumpleModel
 var _crumple_presentation: CupCrumplePresentation
+var _contents_presentation: CupContentsPresentation
 var _release_count := 0
 # Legacy sentinels are kept neutral for compatibility with older verifier code.
 # V5 never schedules automatic next-item progression from these fields.
@@ -31,6 +32,7 @@ var _paused := false
 func _ready() -> void:
 	_build_world()
 	_crumple_presentation = get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
+	_contents_presentation = get_node_or_null("CupContentsPresentation") as CupContentsPresentation
 	_session = SessionModel.new()
 	_ritual = RitualFlow.new()
 	_lifecycle = LabelLifecycle.new(0.16)
@@ -110,9 +112,9 @@ func _process_crumple_pointer(state: PointerState) -> void:
 			_crumple.begin_gesture(state.position.x, cup_screen.x)
 			phase = _ritual.get_phase_name()
 	elif phase == "CRUMPLING" and state.pressed and _crumple.get_gesture_side() == 0:
-		# A completed release ends only the current squeeze gesture. The ritual
-		# intentionally remains in CRUMPLING so a later fresh press can make
-		# another dent without resetting the cup or farming progression.
+		# A release ends only the current squeeze gesture. A later fresh press
+		# must reacquire side ownership so the player can continue the ritual
+		# without keeping one continuous button hold.
 		var cup_screen := _camera.unproject_position(_cup.global_position)
 		_crumple.begin_gesture(state.position.x, cup_screen.x)
 
@@ -127,6 +129,8 @@ func _process_crumple_pointer(state: PointerState) -> void:
 	var pulse := float(change.get("event_strength", 0.0))
 	if _crumple_presentation != null:
 		_crumple_presentation.set_crumple(_crumple.get_progress(), _crumple.get_gesture_side(), pulse)
+	if _contents_presentation != null:
+		_contents_presentation.set_crumple(_crumple.get_progress(), _crumple.get_gesture_side(), pulse)
 	if pulse > 0.0:
 		_audio.trigger_crumple(pulse)
 	if _crumple.is_complete() and _ritual.mark_crumple_complete():
@@ -405,6 +409,9 @@ func _apply_current_variant() -> void:
 	if _crumple_presentation != null:
 		_crumple_presentation.set_profile(variant)
 		_crumple_presentation.reset_visual()
+	if _contents_presentation != null:
+		_contents_presentation.set_profile(variant)
+		_contents_presentation.reset_visual()
 
 func _reset_session() -> void:
 	if _pointer != null:
@@ -420,6 +427,8 @@ func _reset_session() -> void:
 		_crumple.reset()
 	if _crumple_presentation != null:
 		_crumple_presentation.reset_visual()
+	if _contents_presentation != null:
+		_contents_presentation.reset_visual()
 	_release_count = 0
 	_pending_score = 0
 	_completed_this_frame = false
