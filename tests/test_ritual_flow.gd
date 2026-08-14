@@ -68,6 +68,21 @@ func run() -> Array[String]:
 	if skip_flow.consume_reward_event():
 		failures.append("skipping crumple should not fabricate a crumple reward event")
 
+	# CHALLENGER: skip remains a skip even after the player has begun squeezing.
+	# Once next is explicitly requested from CRUMPLING, stale drag/completion
+	# callbacks from that outgoing cup must not turn the skipped tactile bonus
+	# back on. Otherwise a fast release/request ordering can award the optional
+	# crumple bonus despite the player's choice to move on.
+	var mid_skip = load(required).new()
+	mid_skip.on_label_detached()
+	mid_skip.update(1.0)
+	if not mid_skip.begin_crumple():
+		failures.append("mid-crumple skip fixture must enter CRUMPLING")
+	if not mid_skip.request_next():
+		failures.append("CRUMPLING should allow pressure-free next request")
+	if mid_skip.mark_crumple_complete() and mid_skip.consume_reward_event():
+		failures.append("RED: next requested during CRUMPLING must cancel optional crumple reward eligibility")
+
 	var safe_flow = load(required).new()
 	safe_flow.on_label_detached()
 	safe_flow.update(NAN)
