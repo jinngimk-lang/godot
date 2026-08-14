@@ -129,11 +129,14 @@ func _base_transform_for(index: int, count: int) -> Transform3D:
 	var angle := 0.35 + (TAU * float(index) / maxf(float(count), 1.0))
 	var radius_scale := 0.24 + 0.12 * float(index % 2)
 	var radius := inner_radius * radius_scale
-	# Keep the small ice payload near the open rim where it can read as a sensory
-	# reward. It remains well below the rim and is still clamped by the cup bounds.
+	# The open iced cup is viewed from a shallow downward camera angle. Keep two
+	# cubes at the highest center height already allowed by the conservative cup
+	# clamp, with one slightly lower cube for depth. Their top faces remain below
+	# the physical rim, but now enter the visible line of sight instead of being
+	# fully occluded by the front wall.
 	var half_height := maxf(dims.z * 0.5 - _cube_size * 0.75, 0.01)
 	var vertical_stagger := _cube_size * 0.16 * float(index % 2)
-	var upper_y := half_height - _cube_size * 0.42 - vertical_stagger
+	var upper_y := half_height - vertical_stagger
 	var position := Vector3(cos(angle) * radius, upper_y, sin(angle) * radius)
 	position = _clamp_position(position, dims)
 	var rotation := Vector3(0.12 * float(index + 1), angle * 0.22, -0.08 * float(index))
