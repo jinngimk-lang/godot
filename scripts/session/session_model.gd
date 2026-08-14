@@ -17,6 +17,14 @@ const VARIANTS := [
 		"cup_dimensions": {"top_radius": 0.54, "bottom_radius": 0.45, "height": 1.48},
 		"crumple_profile": {"rigidity": 0.04, "dent_gain": 0.0042, "max_compression": 0.22},
 		"contents_profile": {"type": "none"},
+		"scene_profile": {
+			"id": "cafe_window",
+			"table_color": Color(0.24, 0.16, 0.11),
+			"table_roughness": 0.82,
+			"ambient_color": Color(0.18, 0.16, 0.14),
+			"accent_color": Color(1.0, 0.72, 0.46),
+			"light_energy": 1.10
+		},
 		"reward_theme": "warm",
 		"hint": "soft paper • balanced adhesive"
 	},
@@ -35,6 +43,14 @@ const VARIANTS := [
 		"cup_dimensions": {"top_radius": 0.52, "bottom_radius": 0.44, "height": 1.52},
 		"crumple_profile": {"rigidity": 0.025, "dent_gain": 0.0052, "max_compression": 0.28},
 		"contents_profile": {"type": "none"},
+		"scene_profile": {
+			"id": "night_bar",
+			"table_color": Color(0.075, 0.055, 0.045),
+			"table_roughness": 0.64,
+			"ambient_color": Color(0.045, 0.035, 0.040),
+			"accent_color": Color(1.0, 0.48, 0.16),
+			"light_energy": 1.34
+		},
 		"reward_theme": "silky",
 		"hint": "long peel • lighter glue"
 	},
@@ -53,6 +69,14 @@ const VARIANTS := [
 		"cup_dimensions": {"top_radius": 0.55, "bottom_radius": 0.46, "height": 1.42},
 		"crumple_profile": {"rigidity": 0.055, "dent_gain": 0.0035, "max_compression": 0.18},
 		"contents_profile": {"type": "none"},
+		"scene_profile": {
+			"id": "market_coldcase",
+			"table_color": Color(0.71, 0.72, 0.69),
+			"table_roughness": 0.74,
+			"ambient_color": Color(0.64, 0.69, 0.70),
+			"accent_color": Color(0.68, 0.90, 1.0),
+			"light_energy": 0.92
+		},
 		"reward_theme": "crisp",
 		"hint": "firmer catch • crisp releases"
 	}
