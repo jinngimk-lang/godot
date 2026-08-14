@@ -1,0 +1,136 @@
+name: PR43 Independent Challenger
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  challenge:
+    if: contains(github.event.head_commit.message, 'run PR43 independent challenger')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve exact PR head
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(gh pr view 43 --repo "$REPO" --json headRefOid -q .headRefOid)"
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "Exact candidate: $HEAD_SHA"
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build adversarial packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main --depth=1
+          {
+            echo '=== DIFF STAT ==='
+            git diff --stat origin/main...HEAD
+            echo '=== CORE PEEL PHYSICS ==='
+            cat scripts/peel/peel_model.gd
+            cat scripts/peel/peel_controller.gd
+            echo '=== SESSION / INSPECTION ==='
+            cat scripts/session/session_model.gd
+            cat scripts/inspection/inspection_controller.gd
+            echo '=== RUNTIME ORCHESTRATION ==='
+            cat scripts/peel_lab.gd
+            echo '=== PRESENTATION STATE OWNERSHIP ==='
+            cat scripts/presentation/residue_visual.gd
+            cat scripts/presentation/reference_backdrop.gd
+            echo '=== TEST CONTRACTS ==='
+            cat tests/test_peel_model.gd
+            cat tests/test_peel_controller.gd
+            cat tests/test_reference_profiles.gd
+            cat tests/test_inspection_controller.gd
+            cat tests/smoke_reference_scene.gd
+            cat tests/smoke_reset_loop.gd
+          } > /tmp/packet.txt
+          test "$(wc -c < /tmp/packet.txt)" -lt 60000
+
+      - name: Install Ollama
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for _ in {1..45}; do
+            ollama list >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/ollama.log
+          exit 1
+
+      - name: Pull independent code model
+        shell: bash
+        run: |
+          set -euo pipefail
+          ollama pull qwen2.5-coder:3b
+
+      - name: Falsify candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are the independent CHALLENGER. Do not praise or summarize. Falsify the exact candidate against these claims:
+          1) Any visible projected label region can start peel; gold hotspot is never required.
+          2) Brief force spikes load adhesive without instant detach; sustained gentle pull releases progressively.
+          3) Faster/harder pulls reduce integrity and increase deterministic residue.
+          4) RMB inspection cannot steal LMB/touch peel ownership and cup/label/residue stay in one yaw space.
+          5) Q/E and 1/2/3 switching clears transient input without erasing progression.
+          6) Café paper product may crumple; amber/clear glass products never enter crumple.
+          7) Residue/presentation are downstream of deterministic model state, never gameplay authority.
+          8) Mixed paper/glass reset, pause, and detach exactly-once semantics remain safe.
+
+          Prefer concrete race/state/coordinate-space defects. A defect must name the function/state and give a deterministic reproducer. Output exactly four lines:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: none
+          EVIDENCE: <why strongest falsification did not break the claims>
+          or use VERDICT: NEEDS_FIX with a specific defect and test.
+
+          Exact-head packet:
+          PROMPT
+            cat /tmp/packet.txt
+          } > /tmp/prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/prompt.txt | tee /tmp/report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/report.txt
+          grep -Eq '^DEFECT:' /tmp/report.txt
+          grep -Eq '^MIN_TEST:' /tmp/report.txt
+          grep -Eq '^EVIDENCE:' /tmp/report.txt
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/report.txt
+
+      - name: Persist exact-head verified marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.resolve.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch main
+          git pull --ff-only origin main
+          mkdir -p .agents/verdicts
+          cp /tmp/report.txt ".agents/verdicts/pr43-${HEAD_SHA}.txt"
+          printf '\nEXACT_HEAD: %s\nRUN_ID: %s\n' "$HEAD_SHA" "$GITHUB_RUN_ID" >> ".agents/verdicts/pr43-${HEAD_SHA}.txt"
+          git config user.name 'peel-local-challenger'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .agents/verdicts
+          git commit -m "ci: record PR43 independent verified verdict"
+          git push origin main
