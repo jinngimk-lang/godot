@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Pinch Tight v27
+name: MPFB Hero Limb Flap Normal v28
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pinch-tight-v27
+      - spike/mpfb-hero-limb-flap-normal-v28
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  pinch-tight:
+  flap-normal:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -54,19 +54,19 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render Pinch Tight surface-servo candidate
+      - name: Render actual flap-face surface-servo candidate
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_pinch_tight_v27.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/pinch-tight-v27.log
-          grep -Fq "MPFB_PINCH_TIGHT_V27_SUCCESS" artifacts/mpfb_limb/logs/pinch-tight-v27.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_flap_normal_v28.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/flap-normal-v28.log
+          grep -Fq "MPFB_FLAP_NORMAL_V28_SUCCESS" artifacts/mpfb_limb/logs/flap-normal-v28.log
           test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
-          test -s artifacts/mpfb_limb/previews/surface_v27_pinch_tight.png
-      - name: Upload Pinch Tight evidence
+          test -s artifacts/mpfb_limb/previews/surface_v28_flap_normal.png
+      - name: Upload actual flap-face evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pinch-tight-v27
+          name: mpfb-hero-limb-flap-normal-v28
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
