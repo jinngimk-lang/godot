@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
@@ -9,6 +9,8 @@
 [ext_resource type="Script" path="res://scripts/presentation/reference_backdrop.gd" id="7_backdrop"]
 [ext_resource type="Script" path="res://scripts/presentation/table_surface_presentation.gd" id="8_table"]
 [ext_resource type="Script" path="res://scripts/presentation/hud_chrome_presentation.gd" id="9_hud"]
+[ext_resource type="Script" path="res://scripts/presentation/cup_contents_presentation.gd" id="10_contents"]
+[ext_resource type="Script" path="res://scripts/presentation/cup_contents_runtime_bridge.gd" id="11_contents_bridge"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -36,3 +38,9 @@ script = ExtResource("4_crumple")
 
 [node name="CrumpleHandStaging" type="Node3D" parent="."]
 script = ExtResource("5_crumple_hand")
+
+[node name="CupContentsPresentation" type="Node3D" parent="."]
+script = ExtResource("10_contents")
+
+[node name="CupContentsRuntimeBridge" type="Node" parent="."]
+script = ExtResource("11_contents_bridge")
