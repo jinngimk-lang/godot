@@ -16,53 +16,41 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
 	await _settle_frames(10)
 
-	# Café: base -> partial tactile peel -> optional squeeze ritual.
 	scene.call("debug_select_variant",0)
 	await _settle_frames(8)
-	if not await _capture("cafe"):
-		return
+	if not await _capture("cafe"): return
 	_stage_peel(scene,0.38,0.05,0.94)
 	await _settle_frames(5)
-	if not await _capture("cafe_peel38"):
-		return
+	if not await _capture("cafe_peel38"): return
 	scene.call("debug_select_variant",0)
 	await _settle_frames(4)
 	_stage_crumple(scene,0.55)
 	await _settle_frames(8)
-	if not await _capture("cafe_crumple55"):
-		return
+	if not await _capture("cafe_crumple55"): return
 
-	# Bar: base -> rougher fibrous peel -> residue inspection yaw.
 	scene.call("debug_select_variant",1)
 	await _settle_frames(8)
-	if not await _capture("bar"):
-		return
+	if not await _capture("bar"): return
 	_stage_peel(scene,0.48,0.18,0.78)
 	await _settle_frames(5)
-	if not await _capture("bar_peel48"):
-		return
+	if not await _capture("bar_peel48"): return
 	scene.call("debug_select_variant",1)
 	await _settle_frames(4)
 	_stage_inspect(scene,0.58,0.22,0.78)
 	await _settle_frames(8)
-	if not await _capture("bar_inspect"):
-		return
+	if not await _capture("bar_inspect"): return
 
-	# Market: base -> clean glass peel -> rotated clear bottle with ice/residue.
 	scene.call("debug_select_variant",2)
 	await _settle_frames(8)
-	if not await _capture("market"):
-		return
+	if not await _capture("market"): return
 	_stage_peel(scene,0.45,0.07,0.93)
 	await _settle_frames(5)
-	if not await _capture("market_peel45"):
-		return
+	if not await _capture("market_peel45"): return
 	scene.call("debug_select_variant",2)
 	await _settle_frames(4)
 	_stage_inspect(scene,-0.62,0.10,0.90)
 	await _settle_frames(8)
-	if not await _capture("market_inspect"):
-		return
+	if not await _capture("market_inspect"): return
 
 	scene.queue_free()
 	await process_frame
@@ -77,7 +65,9 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
 	var front := label.get_front_position(progress)
-	var grip_local := front+Vector3(-0.48,0.06,0.30)
+	# Exaggerate the staging pull enough to make the lifted flap and adhesive
+	# bend readable in a single screenshot; gameplay still uses live pointer input.
+	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
 	hand.set_pinch_amount(1.0)
 	var current_pinch := hand.get_pinch_world_position()
