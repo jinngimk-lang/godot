@@ -1,8 +1,8 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 24
-const RING_SIDES := 24
+const CURVE_RINGS := 28
+const RING_SIDES := 28
 
 var _applied := false
 var _forearms: Dictionary = {}
@@ -55,17 +55,14 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	legacy_sleeve.visible = false
 
 	var side := -1.0 if dynamic_hand else 1.0
-	# Keep the extension close to the actual wrist. Previous values pushed a
-	# dark tapered cone across half the screen; the reference hands instead have
-	# a short anatomical forearm that exits the frame without becoming the hero.
-	var start_authored := Vector3(0.0,0.0,0.022)
-	var control_authored := Vector3(0.018*side,-0.003,0.105)
-	var end_authored := Vector3(0.070*side,-0.010,0.270)
-	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,start_authored)
-	var control: Vector3 = _descendant_point_to_ancestor(authored,hand,control_authored)
-	var end: Vector3 = _descendant_point_to_ancestor(authored,hand,end_authored)
-	if not _finite_vector(start) or not _finite_vector(control) or not _finite_vector(end):
+	# Only the wrist anchor inherits authored-hand scale. Forearm reach and
+	# thickness stay in gameplay-world units so enlarging the hand for realistic
+	# framing cannot recreate the old giant cone/hose artifact.
+	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
+	if not _finite_vector(start):
 		return
+	var control := start + Vector3(0.045*side,-0.010,0.245)
+	var end := start + Vector3(0.125*side,-0.028,0.535)
 
 	var forearm := MeshInstance3D.new()
 	forearm.name = "ForearmNatural"
@@ -93,7 +90,8 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.72,0.82,t)
+		# Flatten the section like a real forearm instead of using a circular pipe.
+		var oval_height := lerpf(0.70,0.78,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -122,7 +120,8 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 	return mesh
 
 func _radius_profile(t: float) -> float:
-	return lerpf(0.050,0.074,smoothstep(0.0,1.0,clampf(t,0.0,1.0)))
+	var p := smoothstep(0.0,1.0,clampf(t,0.0,1.0))
+	return lerpf(0.072,0.102,p)
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
