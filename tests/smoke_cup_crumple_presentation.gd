@@ -43,6 +43,8 @@ func _run() -> void:
 			if shell == null or not (shell.mesh is ArrayMesh):
 				failures.append("CRUMPLE_PRESENTATION_RED: presentation must generate one continuous ArrayMesh cup shell")
 			else:
+				if not _clockwise_faces_align_with_normals(shell.mesh as ArrayMesh):
+					failures.append("CRUMPLE_PRESENTATION_RED: ArrayMesh triangle winding must expose outward cup normals as Godot clockwise front faces")
 				if shell.visible:
 					failures.append("CRUMPLE_PRESENTATION_RED: zero-progress overlay should stay hidden behind production Cup")
 				if cup != null and not cup.visible:
@@ -56,9 +58,6 @@ func _run() -> void:
 				var deformed_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
 				if not shell.visible or (cup != null and cup.visible):
 					failures.append("CRUMPLE_PRESENTATION_RED: positive crumple should swap visible shell without changing peel authority node")
-				# The paper rim/base may intentionally keep their original diameter. Measure
-				# the actual waist ring rather than whole-mesh AABB so a real mid-wall dent
-				# cannot be hidden by undeformed end rings.
 				if baseline_mid_span <= 0.0 or deformed_mid_span >= baseline_mid_span * 0.97:
 					failures.append("CRUMPLE_PRESENTATION_RED: mid crumple must visibly compress the cup waist")
 				if deformed.size.x <= baseline.size.x * 0.55 or deformed.size.y <= baseline.size.y * 0.70:
@@ -80,7 +79,7 @@ func _run() -> void:
 					failures.append("CRUMPLE_PRESENTATION_RED: reset must restore exact baseline Lid transform")
 
 	if failures.is_empty():
-		print("PASS: cup crumple presentation is bounded, lid-following, resettable and presentation-only")
+		print("PASS: cup crumple presentation has visible clockwise faces, bounded deformation, lid follow and clean reset")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -88,6 +87,30 @@ func _run() -> void:
 	for failure in failures:
 		push_error(failure)
 	quit(1)
+
+func _clockwise_faces_align_with_normals(mesh: ArrayMesh) -> bool:
+	if mesh == null or mesh.get_surface_count() == 0:
+		return false
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	var normals := arrays[Mesh.ARRAY_NORMAL] as PackedVector3Array
+	var indices := arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
+	if vertices.is_empty() or normals.size() != vertices.size() or indices.size() < 3:
+		return false
+	var triangle_count := mini(indices.size() / 3, 24)
+	for triangle in range(triangle_count):
+		var i0 := indices[triangle * 3]
+		var i1 := indices[triangle * 3 + 1]
+		var i2 := indices[triangle * 3 + 2]
+		var edge_a := vertices[i1] - vertices[i0]
+		var edge_b := vertices[i2] - vertices[i0]
+		# Godot's visible front face uses clockwise winding, so the outward face
+		# normal is the reverse of the conventional CCW cross product.
+		var front_normal := edge_b.cross(edge_a).normalized()
+		var authored_normal := (normals[i0] + normals[i1] + normals[i2]).normalized()
+		if front_normal.dot(authored_normal) <= 0.25:
+			return false
+	return true
 
 func _mid_ring_x_span(mesh: ArrayMesh) -> float:
 	if mesh == null or mesh.get_surface_count() == 0:
