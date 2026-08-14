@@ -78,12 +78,12 @@ jobs:
             exit 1
           fi
 
-      - name: Scene smoke
+      - name: Reference scene smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_scene.gd
-          ./godot --headless --path . --script res://tests/smoke_scene.gd
+          test -f tests/smoke_reference_scene.gd
+          ./godot --headless --path . --script res://tests/smoke_reference_scene.gd
 
       - name: Label cup-surface smoke
         shell: bash
