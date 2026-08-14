@@ -1,16 +1,15 @@
-"""Solve and render MPFB hero-hand contact candidates with anatomy-aware opposition.
+"""Solve and render MPFB hero-hand support and pinch contact candidates.
 
-Evidence from prior spikes:
-- local +Z is the credible flexion axis for the four long finger chains;
-- unconstrained endpoint minimization can produce a numerically close thumb while
-  creating a visually unusable hook/claw silhouette;
-- v7 proved continuous MPFB anatomy is promising, but its support pose over-curled
-  the long fingers and its pinch pose hid a looped thumb behind a three-finger claw.
+v8 established a useful split in the problem: anatomy regularization removed the
+support-hand C-claw, but applying the same conservative prior to label pinch left
+the thumb roughly 27 mm from its goal and exposed several dangling fingers. A
+real peel pinch is a different pose class from a vessel wrap.
 
-This stage keeps physical endpoint contact while adding a meaningful pose prior:
-long-finger curls are reduced to photographic ranges, thumb joint bounds are
-narrowed, and a normalized squared-motion penalty prevents a distal-contact win
-from overwhelming anatomy. Winners still require visual review before gameplay.
+This stage therefore keeps the v8 support solution unchanged while giving pinch
+its own contact prior: the index curls toward the thumb, the unused fingers fold
+into the palm, the thumb gets a slightly wider proximal opposition envelope, and
+the objective targets the opposite face of a thin flap rather than demanding two
+fingertips occupy one mathematical point. Visual review remains mandatory.
 """
 from __future__ import annotations
 import math, sys, traceback
@@ -95,32 +94,30 @@ def _curl_chain(arm,prefix,degrees):
     for index,deg in enumerate(degrees,1): _set_axis(arm,f'{prefix}_0{index}_r','z',deg)
 
 def _support_fingers(arm):
-    # v7's 31..67 degree chains made a visible C-shaped claw around the proxy.
-    # Use a graded but substantially softer wrap so knuckles remain hand-like.
     _curl_chain(arm,'index',(18,30,20)); _curl_chain(arm,'middle',(23,36,24)); _curl_chain(arm,'ring',(27,42,29)); _curl_chain(arm,'pinky',(31,47,33))
 
 def _pinch_fingers(arm):
-    # Index participates in the pinch while the other fingers stay softly curled,
-    # rather than presenting three parallel claws to the camera.
-    _curl_chain(arm,'index',(16,27,17)); _curl_chain(arm,'middle',(9,14,8)); _curl_chain(arm,'ring',(13,19,11)); _curl_chain(arm,'pinky',(17,24,14))
+    # The index is the only long finger that should visually participate in the
+    # flap contact. Fold the remaining digits toward the palm so the silhouette
+    # reads as one deliberate pinch rather than three parallel hanging claws.
+    _curl_chain(arm,'index',(22,34,22)); _curl_chain(arm,'middle',(34,52,34)); _curl_chain(arm,'ring',(41,60,40)); _curl_chain(arm,'pinky',(46,66,44))
 
 def _apply_thumb(arm,p):
     _set_xyz(arm,'thumb_01_r',p[0:3]); _set_xyz(arm,'thumb_02_r',p[3:6]); _set_xyz(arm,'thumb_03_r',p[6:9]); bpy.context.view_layer.update()
 
-# Conservative joint-space envelope. v7 allowed 55/60-degree proximal sweeps and
-# 55-degree distal rotation, which could win endpoint distance with a looped thumb.
-BOUNDS=[(-38,38),(-40,40),(-42,42),(-14,14),(-18,18),(-36,36),(-10,10),(-10,10),(-28,28)]
+SUPPORT_BOUNDS=[(-38,38),(-40,40),(-42,42),(-14,14),(-18,18),(-36,36),(-10,10),(-10,10),(-28,28)]
+# Contact needs more proximal opposition than support, but the distal joints stay
+# conservative so the solver cannot recreate v7's looped thumb.
+PINCH_BOUNDS=[(-50,50),(-48,48),(-52,52),(-16,16),(-20,20),(-38,38),(-10,10),(-10,10),(-30,30)]
 
 def _clamp(v,lo,hi): return max(lo,min(hi,v))
 
-def _regularization(p):
-    # Normalize every joint by its own range, then penalize squared displacement.
-    # This keeps small coordinated opposition cheaper than one extreme joint.
+def _regularization(p,bounds,weight):
     energy=0.0
-    for value,(lo,hi) in zip(p,BOUNDS):
+    for value,(lo,hi) in zip(p,bounds):
         span=max(abs(lo),abs(hi),1.0)
         energy+=(value/span)**2
-    return energy*0.0045
+    return energy*weight
 
 def _finger_centroid(arm):
     pts=[_world_pose(arm,'index_02_r',True),_world_pose(arm,'middle_02_r',True),_world_pose(arm,'ring_02_r',True)]
@@ -133,40 +130,47 @@ def _support_target(arm):
     side.normalize()
     return fingers+side*0.070
 
-def _pinch_target(arm): return _world_pose(arm,'index_03_r',True)
+def _pinch_target(arm):
+    # Target the opposite face of an approximately 4 mm paper/flap contact gap,
+    # not the exact index-tip point. This gives the proxy somewhere physical to sit.
+    index_tip=_world_pose(arm,'index_03_r',True); rest_thumb=_world_rest(arm,'thumb_03_r',True)
+    toward_thumb=rest_thumb-index_tip
+    if toward_thumb.length<1e-6: toward_thumb=Vector((1,0,0))
+    toward_thumb.normalize()
+    return index_tip+toward_thumb*0.004
 
-def _score(arm,target_fn,p):
+def _score(arm,target_fn,p,bounds,reg_weight):
     _apply_thumb(arm,p); goal=target_fn(arm); tip=_world_pose(arm,'thumb_03_r',True)
-    return (tip-goal).length+_regularization(p),(tip-goal).length,goal.copy(),tip.copy()
+    return (tip-goal).length+_regularization(p,bounds,reg_weight),(tip-goal).length,goal.copy(),tip.copy()
 
-def _solve_seed(arm,base_pose,target_fn,seed):
-    p=[_clamp(v,*BOUNDS[i]) for i,v in enumerate(seed)]; _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
-    for step in (18.0,9.0,4.5,2.25):
+def _solve_seed(arm,base_pose,target_fn,seed,bounds,reg_weight):
+    p=[_clamp(v,*bounds[i]) for i,v in enumerate(seed)]; _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p,bounds,reg_weight)
+    for step in (20.0,10.0,5.0,2.5):
         changed=True; passes=0
         while changed and passes<3:
             changed=False; passes+=1
-            for i,(lo,hi) in enumerate(BOUNDS):
+            for i,(lo,hi) in enumerate(bounds):
                 local_best=best; local_p=p
                 for direction in (-1.0,1.0):
                     q=p.copy(); q[i]=_clamp(q[i]+direction*step,lo,hi)
                     if q[i]==p[i]: continue
-                    _clear_pose(arm); base_pose(arm); cand=_score(arm,target_fn,q)
+                    _clear_pose(arm); base_pose(arm); cand=_score(arm,target_fn,q,bounds,reg_weight)
                     if cand[0]+1e-8<local_best[0]: local_best=cand; local_p=q
                 if local_p is not p:
                     p=local_p; best=local_best; changed=True
                 else:
-                    _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
+                    _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p,bounds,reg_weight)
     return best[0],best[1],tuple(round(v,3) for v in p),best[2],best[3]
 
-def _solve_multi(arm,base_pose,target_fn):
+def _solve_multi(arm,base_pose,target_fn,bounds,reg_weight):
     seeds=[
         (0,0,0, 0,0,0, 0,0,0),
-        (18,18,12, 0,0,12, 0,0,8),
-        (18,-18,12, 0,0,12, 0,0,8),
-        (-15,22,-8, 0,0,14, 0,0,8),
-        (28,0,22, 0,0,-10, 0,0,4),
+        (22,20,16, 0,0,14, 0,0,8),
+        (22,-20,16, 0,0,14, 0,0,8),
+        (-18,26,-10, 0,0,16, 0,0,8),
+        (34,0,26, 0,0,-10, 0,0,4),
     ]
-    ranked=[_solve_seed(arm,base_pose,target_fn,s) for s in seeds]
+    ranked=[_solve_seed(arm,base_pose,target_fn,s,bounds,reg_weight) for s in seeds]
     ranked.sort(key=lambda r:r[0])
     unique=[]
     for row in ranked:
@@ -182,7 +186,7 @@ def _support_proxy(arm):
 def _pinch_proxy(arm):
     index_tip=_world_pose(arm,'index_03_r',True); thumb_tip=_world_pose(arm,'thumb_03_r',True); center=index_tip.lerp(thumb_tip,.5)
     bpy.ops.mesh.primitive_cube_add(size=1,location=center)
-    obj=bpy.context.object; obj.name='PoseProxy_Flap'; obj.scale=(.024,.003,.016); obj.data.materials.append(_proxy_material('FlapProxy',(0.74,0.62,0.38,1),.82))
+    obj=bpy.context.object; obj.name='PoseProxy_Flap'; obj.scale=(.024,.002,.016); obj.data.materials.append(_proxy_material('FlapProxy',(0.74,0.62,0.38,1),.82))
 
 def _render(cam,name,target,offset):
     cam.location=target+offset; _look(cam,target); bpy.context.scene.render.filepath=str(OUT/f'{name}.png'); bpy.ops.render.render(write_still=True)
@@ -190,22 +194,24 @@ def _render(cam,name,target,offset):
     if not p.is_file() or p.stat().st_size<=0: raise RuntimeError('render failed '+name)
     print('MPFB_POSE_FRAME',name,p.stat().st_size)
 
-def _render_solved(arm,cam,target,offset,prefix,base_pose,target_fn,proxy_fn):
-    ranked=_solve_multi(arm,base_pose,target_fn)
+def _render_solved(arm,cam,target,offset,prefix,base_pose,target_fn,proxy_fn,bounds,reg_weight):
+    ranked=_solve_multi(arm,base_pose,target_fn,bounds,reg_weight)
     for rank,row in enumerate(ranked,1):
         _,distance,params,goal,tip=row
-        print('MPFB_POSE_SOLVE',prefix,'rank',rank,'distance',f'{distance:.6f}','params',params,'goal',tuple(round(v,5) for v in goal),'thumb_tip',tuple(round(v,5) for v in tip))
-        _clear_pose(arm); base_pose(arm); _apply_thumb(arm,params); proxy_fn(arm); bpy.context.view_layer.update(); _render(cam,f'{prefix}_{rank}',target,offset)
+        _clear_pose(arm); base_pose(arm); _apply_thumb(arm,params)
+        index_tip=_world_pose(arm,'index_03_r',True)
+        print('MPFB_POSE_SOLVE',prefix,'rank',rank,'distance',f'{distance:.6f}','tip_gap',f'{(tip-index_tip).length:.6f}','params',params,'goal',tuple(round(v,5) for v in goal),'thumb_tip',tuple(round(v,5) for v in tip))
+        proxy_fn(arm); bpy.context.view_layer.update(); _render(cam,f'{prefix}_{rank}',target,offset)
     return ranked
 
 def _run():
     global INPUT,OUT; INPUT,OUT=_args(); OUT.mkdir(parents=True,exist_ok=True); mesh,arm,cam=_setup()
     target=(_world_rest(arm,'hand_r')+_world_rest(arm,'middle_03_r',True))*0.5; offset=Vector((-0.18,-0.28,0.10))
     _clear_pose(arm); _render(cam,'pose_neutral',target,offset)
-    support=_render_solved(arm,cam,target,offset,'support_solved',_support_fingers,_support_target,_support_proxy)
-    pinch=_render_solved(arm,cam,target,offset,'pinch_solved',_pinch_fingers,_pinch_target,_pinch_proxy)
+    support=_render_solved(arm,cam,target,offset,'support_solved',_support_fingers,_support_target,_support_proxy,SUPPORT_BOUNDS,.0045)
+    pinch=_render_solved(arm,cam,target,offset,'pinch_solved',_pinch_fingers,_pinch_target,_pinch_proxy,PINCH_BOUNDS,.0018)
     print('MPFB_POSE_BEST support_distance',f'{support[0][1]:.6f}','pinch_distance',f'{pinch[0][1]:.6f}')
-    print('MPFB_POSE_PRIOR anatomy_regularized_v8')
+    print('MPFB_POSE_PRIOR contact_specific_v9')
     print(SUCCESS)
 if __name__=='__main__':
     try:_run()
