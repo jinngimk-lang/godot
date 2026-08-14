@@ -4,27 +4,24 @@ class_name ForearmPresentation
 const CURVE_RINGS := 36
 const RING_SIDES := 32
 const AUTHORED_HAND_SCALE := 4.15
-const SUPPORT_FOLLOW_RATE := 8.5
 
 var _applied := false
 var _forearms: Dictionary = {}
 var _cloth_materials: Dictionary = {}
 var _skin_materials: Dictionary = {}
 var _last_venue := ""
-var _support_hand: HandVisual
 var _cup: MeshInstance3D
 
 func _ready() -> void:
 	call_deferred("_apply")
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if not _applied:
 		return
 	var venue_id := _active_venue_id()
 	if venue_id != _last_venue:
 		_last_venue = venue_id
 		_apply_venue_materials(venue_id)
-	_update_support_hand(delta)
 
 func _apply() -> void:
 	if _applied:
@@ -32,10 +29,9 @@ func _apply() -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	_support_hand = parent.get_node_or_null("LeftHand") as HandVisual
 	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
 	_scale_hand_preserve_pinch(parent.get_node_or_null("RightHand") as HandVisual)
-	_scale_hand_preserve_pinch(_support_hand)
+	_scale_hand_preserve_pinch(parent.get_node_or_null("LeftHand") as HandVisual)
 	_build_for_hand("RightHand",true)
 	_build_for_hand("LeftHand",false)
 	_applied = true
@@ -53,19 +49,6 @@ func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 	var new_pinch := hand.get_pinch_world_position()
 	hand.position += old_pinch-new_pinch
 	hand.set_grip_target(old_pinch)
-
-func _update_support_hand(delta: float) -> void:
-	if _support_hand == null or _cup == null:
-		return
-	if _active_venue_id() == "cafe_window":
-		return
-	var yaw := _cup.rotation.y
-	var target := Vector3(0.71+sin(yaw)*0.11,0.15,0.43+cos(yaw)*0.055)
-	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
-	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
-	_support_hand.position = _support_hand.position.lerp(target,weight)
-	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(34.0)+yaw*0.36,weight)
-	_support_hand.rotation.z = lerp_angle(_support_hand.rotation.z,deg_to_rad(32.0),weight)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
