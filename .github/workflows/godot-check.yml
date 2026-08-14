@@ -113,6 +113,13 @@ jobs:
           test -f tests/smoke_forearm_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
 
+      - name: Ritual loop smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_ritual_loop.gd
+          ./godot --headless --path . --script res://tests/smoke_ritual_loop.gd
+
       - name: Repeated-session reset smoke
         shell: bash
         run: |
