@@ -14,11 +14,29 @@ func run() -> Array[String]:
 	if model.get_unlocked_count() != 1:
 		failures.append("session should start with one unlocked tactile profile")
 
-	for key in ["cup_shell", "cup_dimensions", "crumple_profile", "contents_profile", "reward_theme"]:
+	for key in ["cup_shell", "cup_dimensions", "crumple_profile", "contents_profile", "reward_theme", "scene_profile"]:
 		if not first.has(key):
 			failures.append("RED: tactile profile missing V5 sensory field %s" % key)
 	if failures.size() > 0:
 		return failures
+
+	var expected_scene_ids := ["cafe_window", "night_bar", "market_coldcase"]
+	var seen_scene_ids: Dictionary = {}
+	for i in range(model.VARIANTS.size()):
+		var variant: Dictionary = model.VARIANTS[i]
+		var scene_profile: Dictionary = variant.get("scene_profile", {})
+		var scene_id := String(scene_profile.get("id", ""))
+		if scene_id != expected_scene_ids[i]:
+			failures.append("RED: %s should use contextual scene %s, got %s" % [String(variant.get("id", "unknown")), expected_scene_ids[i], scene_id])
+		if scene_id.is_empty():
+			failures.append("RED: %s scene profile id must not be empty" % String(variant.get("id", "unknown")))
+		elif seen_scene_ids.has(scene_id):
+			failures.append("RED: scene profile ids must be unique across tactile variants: %s" % scene_id)
+		else:
+			seen_scene_ids[scene_id] = true
+		for scene_key in ["table_color", "table_roughness", "ambient_color", "accent_color", "light_energy"]:
+			if not scene_profile.has(scene_key):
+				failures.append("RED: %s scene profile missing %s" % [scene_id, scene_key])
 
 	var first_dims: Dictionary = first.get("cup_dimensions", {})
 	var first_crumple: Dictionary = first.get("crumple_profile", {})
