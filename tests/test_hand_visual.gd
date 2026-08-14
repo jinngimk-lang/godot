@@ -55,7 +55,7 @@ func run() -> Array[String]:
 	var support = hand_script.new()
 	support.setup(false)
 	var support_pose := String(support.get("_last_authored_pose"))
-	if support_pose != "Default pose":
-		failures.append("RED: authored support hand must use neutral Default pose, got %s" % support_pose)
+	if support_pose != "Cup":
+		failures.append("RED: authored support hand must use vessel-wrapping Cup pose, got %s" % support_pose)
 	support.free()
 	return failures
