@@ -27,6 +27,36 @@ func _run() -> void:
 			var wall := backdrop.mesh as BoxMesh
 			if wall.size.x < 7.5:
 				failures.append("CAFE_RED: backdrop must cover wide viewport without black side gutters")
+			if not (backdrop.material_override is StandardMaterial3D):
+				failures.append("CAFE_RED: backdrop needs controllable warm material")
+			else:
+				var wall_color := (backdrop.material_override as StandardMaterial3D).albedo_color
+				if _perceived_value(wall_color) < 0.24:
+					failures.append("REFERENCE_RED: cafe wall is still too dark/technical-demo; value=%.3f" % _perceived_value(wall_color))
+
+		var world := presentation.get_node_or_null("WorldEnvironment") as WorldEnvironment
+		if world == null or world.environment == null:
+			failures.append("CAFE_RED: missing WorldEnvironment")
+		else:
+			if _perceived_value(world.environment.background_color) < 0.16:
+				failures.append("REFERENCE_RED: environment background is too crushed for the warm reference look")
+			if world.environment.ambient_light_energy < 0.34:
+				failures.append("REFERENCE_RED: foreground fill is too low to preserve hand/cup material detail")
+
+		# Reference-image contract: the background should read as a café, not one
+		# flat wall. These remain presentation-only, far behind the gameplay cup.
+		for node_name in ["WindowGlow", "CafeCounter", "BackShelf", "PropMug", "PropJar"]:
+			var prop := presentation.get_node_or_null(node_name) as Node3D
+			if prop == null:
+				failures.append("REFERENCE_RED: missing layered cafe background cue %s" % node_name)
+			elif prop.position.z > -1.0:
+				failures.append("CAFE_RED: background cue %s is too close to gameplay space" % node_name)
+
+		for node_name in ["BokehWarmLeft", "BokehWarmRight"]:
+			var bokeh := presentation.get_node_or_null(node_name) as Sprite3D
+			if bokeh == null or bokeh.texture == null:
+				failures.append("REFERENCE_RED: missing soft bokeh/depth cue %s" % node_name)
+
 		var ground_shadow := presentation.get_node_or_null("GroundShadow") as MeshInstance3D
 		if ground_shadow == null or ground_shadow.mesh == null or ground_shadow.material_override == null:
 			failures.append("CAFE_RED: missing soft cup GroundShadow")
@@ -55,8 +85,6 @@ func _run() -> void:
 		elif not (lip_shadow.material_override is StandardMaterial3D):
 			failures.append("CAFE_RED: CupLipShadow must use a controllable semantic material")
 
-		# Presentation colors must follow the current tactile cup palette instead of
-		# remaining hard-coded to the first warm-paper variant.
 		var cup := scene.get_node_or_null("Cup") as MeshInstance3D
 		if cup == null:
 			failures.append("CAFE_RED: missing production Cup for palette-sync contract")
@@ -74,14 +102,28 @@ func _run() -> void:
 			if after_seam.r >= probe_material.albedo_color.r or after_fold.r >= probe_material.albedo_color.r:
 				failures.append("CAFE_RED: seam/base paper details should remain a subtle darker structural variation of the Cup palette")
 
+	var table := scene.get_node_or_null("Table") as MeshInstance3D
+	if table == null or not (table.material_override is StandardMaterial3D):
+		failures.append("REFERENCE_RED: missing controllable tabletop material")
+	else:
+		var table_color := (table.material_override as StandardMaterial3D).albedo_color
+		if _perceived_value(table_color) < 0.30:
+			failures.append("REFERENCE_RED: tabletop is too dark; target is warm light wood/stone, value=%.3f" % _perceived_value(table_color))
+
 	var key := scene.get_node_or_null("KeyLight") as DirectionalLight3D
+	var fill := scene.get_node_or_null("FillLight") as OmniLight3D
 	if key == null:
 		failures.append("CAFE_RED: missing KeyLight")
-	elif key.shadow_enabled:
-		failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
+	else:
+		if key.shadow_enabled:
+			failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
+		if key.light_energy < 0.68 or key.light_energy > 1.15:
+			failures.append("REFERENCE_RED: warm key should preserve readable close-up material range; energy=%.3f" % key.light_energy)
+	if fill == null or fill.light_energy < 0.65:
+		failures.append("REFERENCE_RED: soft fill must keep hand/cup shadows open")
 
 	if failures.is_empty():
-		print("PASS: cafe backdrop, soft grounding, paper-cup structure and palette sync")
+		print("PASS: warm layered cafe reference presentation, soft lighting and paper-cup structure")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -89,3 +131,6 @@ func _run() -> void:
 	for failure in failures:
 		push_error(failure)
 	quit(1)
+
+func _perceived_value(color: Color) -> float:
+	return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722
