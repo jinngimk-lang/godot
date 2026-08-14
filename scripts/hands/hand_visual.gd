@@ -4,7 +4,7 @@ class_name HandVisual
 const RIGHT_ASSET_PATH := "res://assets/models/hands/hand_right.glb"
 const LEFT_ASSET_PATH := "res://assets/models/hands/hand_left.glb"
 const FINGER_NAMES := ["Thumb", "Index", "Middle", "Ring", "Little"]
-const AUTHORED_PRESENTATION_SCALE := 2.25
+const AUTHORED_PRESENTATION_SCALE := 2.65
 
 var follow_rate := 11.0
 var pinch_follow_rate := 16.0
@@ -138,14 +138,35 @@ func _try_build_authored_hand() -> bool:
 		_skeleton = null
 		return false
 
-	# GLBs are authored in XR-scale units; presentation scale makes them read beside the game cup.
+	# GLBs are authored in XR-scale units; a modest reference-look lift makes
+	# the hands read as the tactile subject instead of tiny VR props beside cup.
 	_authored_root.position = Vector3.ZERO
 	_authored_root.rotation = Vector3.ZERO
 	_authored_root.scale = Vector3.ONE * AUTHORED_PRESENTATION_SCALE
+	_apply_authored_material_overrides(_authored_root)
 	_build_authored_wrist_cover()
 	_apply_authored_pose(required_pose)
 	_refresh_authored_anchors()
 	return true
+
+func _apply_authored_material_overrides(node: Node) -> void:
+	# Preserve the imported meshes/material resources and override only this hand
+	# instance. The stock XR skin is warm enough to turn orange under our cafe
+	# lighting; a neutral-peach matte response matches the clean semi-realistic
+	# owner reference while keeping all authored geometry/animation untouched.
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh != null:
+			for surface_index in range(mesh_instance.mesh.get_surface_count()):
+				var source := mesh_instance.mesh.surface_get_material(surface_index)
+				if source is StandardMaterial3D and source.resource_name == "HandSkin":
+					var skin := (source as StandardMaterial3D).duplicate() as StandardMaterial3D
+					skin.resource_name = "HandSkin"
+					skin.albedo_color = Color(0.70, 0.59, 0.55, 1.0)
+					skin.roughness = 0.72
+					mesh_instance.set_surface_override_material(surface_index, skin)
+	for child in node.get_children():
+		_apply_authored_material_overrides(child)
 
 func _build_authored_wrist_cover() -> void:
 	if _authored_root == null:
@@ -153,8 +174,7 @@ func _build_authored_wrist_cover() -> void:
 
 	# Real-render diagnostics show both imported hand meshes ending at local
 	# +Z ~= 0.026, with Wrist_L/Wrist_R rooted at +Z ~= 0.027. The cloth starts
-	# just inside that plane and extends beyond the camera edge. Keeping the
-	# forearm narrow and dark makes the hand/label interaction remain primary.
+	# just inside that plane and extends beyond the camera edge.
 	_sleeve_fabric = StandardMaterial3D.new()
 	_sleeve_fabric.resource_name = "SleeveFabric"
 	_sleeve_fabric.albedo_color = Color(0.18, 0.13, 0.11, 1.0)
