@@ -1,5 +1,8 @@
 extends SceneTree
 
+const TEST_SEGMENTS := 16
+const TEST_MID_RING := 3
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -42,13 +45,18 @@ func _run() -> void:
 				if cup != null and not cup.visible:
 					failures.append("CRUMPLE_PRESENTATION_RED: zero-progress state must keep production Cup visible")
 				var baseline := shell.mesh.get_aabb()
+				var baseline_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
 				presentation.set_crumple(0.60, -1, 0.7)
 				await process_frame
 				var deformed := shell.mesh.get_aabb()
+				var deformed_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
 				if not shell.visible or (cup != null and cup.visible):
 					failures.append("CRUMPLE_PRESENTATION_RED: positive crumple should swap visible shell without changing peel authority node")
-				if deformed.size.x >= baseline.size.x * 0.995:
-					failures.append("CRUMPLE_PRESENTATION_RED: mid crumple must visibly compress cup width")
+				# The paper rim/base may intentionally keep their original diameter. Measure
+				# the actual waist ring rather than whole-mesh AABB so a real mid-wall dent
+				# cannot be hidden by undeformed end rings.
+				if baseline_mid_span <= 0.0 or deformed_mid_span >= baseline_mid_span * 0.97:
+					failures.append("CRUMPLE_PRESENTATION_RED: mid crumple must visibly compress the cup waist")
 				if deformed.size.x <= baseline.size.x * 0.55 or deformed.size.y <= baseline.size.y * 0.70:
 					failures.append("CRUMPLE_PRESENTATION_RED: bounded crumple must not numerically collapse/invert cup shell")
 				if not is_finite(deformed.size.x) or not is_finite(deformed.size.y) or not is_finite(deformed.size.z):
@@ -72,3 +80,18 @@ func _run() -> void:
 	for failure in failures:
 		push_error(failure)
 	quit(1)
+
+func _mid_ring_x_span(mesh: ArrayMesh) -> float:
+	if mesh == null or mesh.get_surface_count() == 0:
+		return 0.0
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	var start := TEST_MID_RING * TEST_SEGMENTS
+	if vertices.size() < start + TEST_SEGMENTS:
+		return 0.0
+	var min_x := INF
+	var max_x := -INF
+	for i in range(start, start + TEST_SEGMENTS):
+		min_x = minf(min_x, vertices[i].x)
+		max_x = maxf(max_x, vertices[i].x)
+	return max_x - min_x
