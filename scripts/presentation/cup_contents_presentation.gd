@@ -113,15 +113,19 @@ func _sync_open_top_for_contents(has_ice: bool) -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
+	var kind := String((_profile.get("container_profile", {}) as Dictionary).get("kind", "paper_cup"))
+	var paper_container := kind == "paper_cup"
 	var lid := parent.get_node_or_null("Lid") as MeshInstance3D
 	if lid != null:
-		lid.visible = not has_ice
+		# Contents may open/close a paper cup, but they must never resurrect the
+		# paper lid on a glass bottle merely because that bottle contains no ice.
+		lid.visible = paper_container and not has_ice
 	var cafe := parent.get_node_or_null("CafePresentation") as Node3D
 	if cafe != null:
 		for node_name in ["LidInset", "LidCenter"]:
 			var detail := cafe.get_node_or_null(node_name) as MeshInstance3D
 			if detail != null:
-				detail.visible = not has_ice
+				detail.visible = paper_container and not has_ice
 
 func _base_transform_for(index: int, count: int) -> Transform3D:
 	var dims := _dimensions()
