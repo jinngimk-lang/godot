@@ -54,17 +54,25 @@ func _run() -> void:
 			failures.append("contained ice must stay presentation-only without RigidBody3D/SoftBody3D")
 		var base_transforms: Array[Transform3D] = []
 		var dims: Dictionary = ice_profile.get("cup_dimensions", {})
-		var visible_floor := float(dims.get("height", 0.0)) * 0.24
+		var cube_size := 0.115
+		var rim_y := float(dims.get("height", 0.0)) * 0.5
+		var readable_count := 0
 		for child in container.get_children():
 			if not (child is MeshInstance3D):
 				failures.append("ice contents should contain only mesh presentation children")
 				continue
 			var cube := child as MeshInstance3D
 			base_transforms.append(cube.transform)
-			if not _inside_cup(cube.position, 0.115, dims):
+			if not _inside_cup(cube.position, cube_size, dims):
 				failures.append("ice base position escaped configured cup bounds: %s" % cube.position)
-			if cube.position.y < visible_floor:
-				failures.append("RED: contained ice must sit in the upper visible cup layer; y=%.3f floor=%.3f" % [cube.position.y, visible_floor])
+			var cube_top := cube.position.y + cube_size * 0.5
+			var rim_clearance := rim_y - cube_top
+			if rim_clearance < -0.0001:
+				failures.append("RED: contained ice top must not protrude above open cup rim; clearance=%.3f" % rim_clearance)
+			elif rim_clearance <= 0.035:
+				readable_count += 1
+		if readable_count < 2:
+			failures.append("RED: at least two ice tops must sit within 3.5cm below the open rim for static visual readability; readable=%d" % readable_count)
 
 		presentation.set_crumple(1.0, -1, 1.0)
 		for child in container.get_children():
@@ -72,7 +80,7 @@ func _run() -> void:
 				var cube := child as MeshInstance3D
 				if not _is_finite_vec3(cube.position):
 					failures.append("max crumple pulse produced non-finite ice position")
-				if not _inside_cup(cube.position, 0.115, dims):
+				if not _inside_cup(cube.position, cube_size, dims):
 					failures.append("max crumple pulse pushed ice outside configured cup bounds: %s" % cube.position)
 
 		presentation.set_crumple(0.72, 1, 0.9)
@@ -86,7 +94,7 @@ func _run() -> void:
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: contained ice presentation is deterministic, upper-layer visible, finite, bounded and physics-free")
+		print("PASS: contained ice presentation is deterministic, rim-readable, finite, bounded and physics-free")
 		quit(0)
 		return
 	for failure in failures:
