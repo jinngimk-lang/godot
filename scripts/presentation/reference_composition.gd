@@ -11,8 +11,9 @@ func _apply() -> void:
 	var camera := root.get_node_or_null("Camera") as Camera3D
 	if camera == null:
 		return
-	# The reference frames leave breathing room for both forearms and context;
-	# the old prototype camera made the vessel fill most of the viewport.
-	camera.position = Vector3(0.0,0.82,4.48)
-	camera.fov = 40.0
-	camera.look_at(Vector3(0.0,0.16,0.0),Vector3.UP)
+	# Reference frames are hand-and-object closeups: the vessel fills roughly
+	# half to two-thirds of frame height and the hands are tactile foreground,
+	# while the venue remains contextual rather than the main subject.
+	camera.position = Vector3(0.0,0.80,3.55)
+	camera.fov = 39.0
+	camera.look_at(Vector3(0.0,0.15,0.0),Vector3.UP)
