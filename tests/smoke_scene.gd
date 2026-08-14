@@ -67,6 +67,10 @@ func _run() -> void:
 		if authored_root == null:
 			failures.append("%s missing authored hand scene instance" % hand_name)
 		else:
+			# Measure only palm/finger render geometry here. A high-fidelity authored
+			# GLB may also contain a long integrated forearm/sleeve; including that
+			# limb in the hand AABB would falsely report a normal full limb as an
+			# oversized hand. Integrated limb geometry has its own bounded gate below.
 			var presentation := _hand_presentation(authored_root)
 			var vertices := int(presentation["vertices"])
 			var max_extent := float(presentation["max_extent"])
@@ -79,6 +83,19 @@ func _run() -> void:
 				failures.append("%s authored hand presentation is implausibly oversized: extent=%.3f" % [hand_name, max_extent])
 			if not materials.has("HandSkin") or not materials.has("HandNail"):
 				failures.append("%s authored hand missing HandSkin/HandNail materials: %s" % [hand_name, str(materials)])
+
+			var integrated := authored_root.find_child("IntegratedForearmMesh", true, false) as MeshInstance3D
+			var integrated_sleeve := authored_root.find_child("IntegratedSleeveMesh", true, false) as MeshInstance3D
+			if integrated != null:
+				if integrated.mesh == null:
+					failures.append("%s integrated forearm must own renderable mesh" % hand_name)
+				else:
+					var limb_size := integrated.mesh.get_aabb().size
+					var limb_length := maxf(limb_size.x, maxf(limb_size.y, limb_size.z))
+					if limb_length < 0.50 or limb_length > 0.85:
+						failures.append("%s integrated forearm length outside authored bounds: %.3f" % [hand_name, limb_length])
+				if integrated_sleeve == null or integrated_sleeve.mesh == null:
+					failures.append("%s integrated forearm requires authored café sleeve companion" % hand_name)
 
 			var sleeve := authored_root.find_child("WristSleeve", true, false) as MeshInstance3D
 			var cuff := authored_root.find_child("WristCuff", true, false) as MeshInstance3D
@@ -177,7 +194,9 @@ func _hand_presentation(node: Node) -> Dictionary:
 	var vertices := 0
 	var max_extent := 0.0
 	var materials: Array[String] = []
-	if node.name in ["WristSleeve", "WristCuff"]:
+	# Long limb and legacy cover nodes have dedicated bounds/material gates and
+	# must not inflate the palm/finger presentation AABB.
+	if node.name in ["WristSleeve", "WristCuff", "IntegratedForearmMesh", "IntegratedSleeveMesh"]:
 		return {"vertices": 0, "max_extent": 0.0, "materials": materials}
 	if node is MeshInstance3D:
 		var mesh_instance := node as MeshInstance3D
