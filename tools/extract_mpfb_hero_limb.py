@@ -1,4 +1,11 @@
-"""Extract one skinned MPFB GameEngine hero limb from a full-body source GLB."""
+"""Extract one skinned MPFB GameEngine hero limb from a full-body source GLB.
+
+The source body has broad blend weights around the shoulder. A naive
+"any arm influence" rule leaks torso vertices into the hero limb and those
+vertices become giant stretched sheets when the arm is posed. Keep vertices
+only when the selected arm owns most of the deform influence and the vertex
+is on the selected side of the shoulder plane.
+"""
 from __future__ import annotations
 import json, sys, traceback
 from pathlib import Path
@@ -7,6 +14,9 @@ from mathutils import Vector
 
 SUCCESS_MARKER='MPFB_HERO_LIMB_EXTRACT_SUCCESS'
 ERROR_MARKER='MPFB_HERO_LIMB_EXTRACT_ERROR'
+MIN_ALLOWED_SHARE=0.58
+RIGHT_SHOULDER_PLANE_X=-0.105
+LEFT_SHOULDER_PLANE_X=0.105
 
 def _args():
     if '--' not in sys.argv: raise RuntimeError('expected -- <input.glb> <left|right> <output.glb> <report.json>')
@@ -42,19 +52,28 @@ def _weighted_counts(obj, suffix):
         out[vg.name]=count
     return out
 
-def _extract(obj, suffix):
+def _extract(obj, suffix, side):
     allowed={g.index for g in obj.vertex_groups if _allowed(g.name,suffix)}
     if not allowed: raise RuntimeError(f'no deform groups for {suffix}')
-    keep=set()
+    keep=set(); rejected_share=0; rejected_plane=0
     for v in obj.data.vertices:
-        if any(e.group in allowed and e.weight>0.0001 for e in v.groups): keep.add(v.index)
+        total=sum(e.weight for e in v.groups if e.weight>0.0)
+        arm=sum(e.weight for e in v.groups if e.group in allowed and e.weight>0.0)
+        if total<=0.0 or arm/total<MIN_ALLOWED_SHARE:
+            rejected_share+=1; continue
+        world=obj.matrix_world@v.co
+        if side=='right' and world.x>RIGHT_SHOULDER_PLANE_X:
+            rejected_plane+=1; continue
+        if side=='left' and world.x<LEFT_SHOULDER_PLANE_X:
+            rejected_plane+=1; continue
+        keep.add(v.index)
     if not keep: raise RuntimeError('no vertices selected for limb')
     full=len(obj.data.vertices)
     bm=bmesh.new(); bm.from_mesh(obj.data); bm.verts.ensure_lookup_table()
     doomed=[v for v in bm.verts if v.index not in keep]
     bmesh.ops.delete(bm, geom=doomed, context='VERTS')
     bm.to_mesh(obj.data); bm.free(); obj.data.update()
-    return full, len(obj.data.vertices)
+    return full, len(obj.data.vertices), rejected_share, rejected_plane
 
 def _bounds(obj):
     pts=[obj.matrix_world@Vector(c) for c in obj.bound_box]
@@ -67,13 +86,15 @@ def _export(path, mesh, arm):
 def _run():
     inp, side, out, report=_args(); out.parent.mkdir(parents=True,exist_ok=True); report.parent.mkdir(parents=True,exist_ok=True)
     _reset(); bpy.ops.import_scene.gltf(filepath=str(inp)); mesh,arm=_find_source(); suffix='_r' if side=='right' else '_l'
-    before_counts=_weighted_counts(mesh,suffix); full, retained=_extract(mesh,suffix); after_counts=_weighted_counts(mesh,suffix)
+    before_counts=_weighted_counts(mesh,suffix); full, retained, rejected_share, rejected_plane=_extract(mesh,suffix,side); after_counts=_weighted_counts(mesh,suffix)
     mesh.name=f'MPFBHeroLimb_{side}'; mesh.data.name=f'MPFBHeroLimbMesh_{side}'
     _export(out,mesh,arm)
     if not out.is_file() or out.stat().st_size<=0: raise RuntimeError('limb GLB export failed')
+    bounds=_bounds(mesh)
     summary={
       'side':side,
-      'mesh':{'source_vertices':full,'vertices':retained,'polygons':len(mesh.data.polygons),'bounds_world':_bounds(mesh)},
+      'selection':{'min_allowed_share':MIN_ALLOWED_SHARE,'right_shoulder_plane_x':RIGHT_SHOULDER_PLANE_X,'left_shoulder_plane_x':LEFT_SHOULDER_PLANE_X,'rejected_share':rejected_share,'rejected_plane':rejected_plane},
+      'mesh':{'source_vertices':full,'vertices':retained,'polygons':len(mesh.data.polygons),'bounds_world':bounds},
       'retained_groups':{
         'upperarm':sum(v for k,v in after_counts.items() if 'upperarm' in k.lower()),
         'lowerarm':sum(v for k,v in after_counts.items() if 'lowerarm' in k.lower()),
