@@ -36,15 +36,15 @@ func run() -> Array[String]:
 	if authored == null:
 		failures.append("RED: normal runtime must instantiate AuthoredHand")
 	else:
-		var authored_scale := authored.scale.x
+		var authored_scale: float = authored.scale.x
 		if authored_scale < MIN_AUTHORED_SCALE or authored_scale > MAX_AUTHORED_SCALE:
 			failures.append("REFERENCE_RED: authored hand remains too small beside cup/forearm; scale=%.3f target=%.2f..%.2f" % [authored_scale, MIN_AUTHORED_SCALE, MAX_AUTHORED_SCALE])
-		var semantic := _collect_semantic_materials(authored)
+		var semantic: Dictionary = _collect_semantic_materials(authored)
 		if not semantic.has("HandSkin"):
 			failures.append("REFERENCE_RED: authored hand missing semantic HandSkin material")
 		else:
 			var skin := semantic["HandSkin"] as StandardMaterial3D
-			var skin_value := _perceived_value(skin.albedo_color)
+			var skin_value: float = _perceived_value(skin.albedo_color)
 			if skin_value < MIN_SKIN_VALUE or skin_value > MAX_SKIN_VALUE:
 				failures.append("REFERENCE_RED: authored HandSkin value %.3f outside semi-realistic close-up range %.2f..%.2f color=%s" % [skin_value, MIN_SKIN_VALUE, MAX_SKIN_VALUE, str(skin.albedo_color)])
 			if skin.albedo_color.r - skin.albedo_color.g > MAX_SKIN_RED_GREEN_GAP:
@@ -60,10 +60,6 @@ func run() -> Array[String]:
 			if nail.roughness < 0.38 or nail.roughness > 0.68:
 				failures.append("REFERENCE_RED: authored HandNail roughness %.3f should read as natural satin" % nail.roughness)
 
-	# Owner playtest showed the fully open dynamic rest pose reading as a
-	# deformed two-finger claw in the actual game camera. HandVisual stores the
-	# authored pose it deliberately applied, so verify that policy directly
-	# instead of AnimationPlayer.current_animation (which is blank after pause).
 	var relaxed_pose := String(hand.get("_last_authored_pose"))
 	if relaxed_pose != "Pinch Up":
 		failures.append("RED: relaxed dynamic authored hand must use Pinch Up, got %s" % relaxed_pose)
@@ -83,13 +79,13 @@ func run() -> Array[String]:
 	elif cuff.material_override.resource_name != "SleeveRib":
 		failures.append("WristCuff must use semantic SleeveRib material")
 
-	# Enlarging presentation must not weaken pinch-point authority.
 	hand.set_pinch_amount(1.0)
 	var target := Vector3(1.0, 0.5, 0.8)
 	hand.set_grip_target(target)
 	for _i in range(8):
 		hand.tick(0.1)
-	var pinch_error := hand.get_pinch_world_position().distance_to(target)
+	var pinch_position: Vector3 = hand.get_pinch_world_position() as Vector3
+	var pinch_error: float = pinch_position.distance_to(target)
 	if pinch_error > 0.002:
 		failures.append("REFERENCE_RED: presentation scaling must preserve pinch-point authority; error=%.6f" % pinch_error)
 	var active_pose := String(hand.get("_last_authored_pose"))
@@ -97,9 +93,6 @@ func run() -> Array[String]:
 		failures.append("active authored hand must close to Pinch Tight, got %s" % active_pose)
 	hand.free()
 
-	# The upstream Cup pose has strong multi-finger flexion and the owner frame
-	# shows it reading as twisted anatomy from this support-hand angle. A neutral
-	# open authored pose pressed against the cup is the safer baseline.
 	var support = hand_script.new()
 	support.setup(false)
 	var support_pose := String(support.get("_last_authored_pose"))
@@ -122,7 +115,7 @@ func _collect_semantic_materials(node: Node) -> Dictionary:
 				if material is StandardMaterial3D and not material.resource_name.is_empty():
 					result[material.resource_name] = material as StandardMaterial3D
 	for child in node.get_children():
-		var child_materials := _collect_semantic_materials(child)
+		var child_materials: Dictionary = _collect_semantic_materials(child)
 		for key in child_materials.keys():
 			result[key] = child_materials[key]
 	return result
