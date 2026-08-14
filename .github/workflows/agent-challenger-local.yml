@@ -1,0 +1,183 @@
+name: Peel Local Independent Challenger
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Numeric task id
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact 40-character PR head SHA
+        required: true
+        type: string
+      round:
+        description: Challenge round
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  challenge:
+    name: qwen3b-exact-head-challenger
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate exact PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_head="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
+          test "$current_head" = "$EXPECTED_HEAD_SHA" || {
+            echo "Stale challenge: current=$current_head expected=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          }
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare adversarial review packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main --depth=1
+          {
+            echo "TASK_ID=${{ inputs.task_id }}"
+            echo "PR_NUMBER=${{ inputs.pr_number }}"
+            echo "EXPECTED_HEAD_SHA=${{ inputs.expected_head_sha }}"
+            echo "ROUND=${{ inputs.round }}"
+            echo '=== CHANGE STAT ==='
+            git diff --stat origin/main...HEAD
+            echo '=== PEEL MODEL ==='
+            cat scripts/peel/peel_model.gd
+            echo '=== PEEL CONTROLLER ==='
+            cat scripts/peel/peel_controller.gd
+            echo '=== SESSION PROFILES ==='
+            cat scripts/session/session_model.gd
+            echo '=== INSPECTION ==='
+            cat scripts/inspection/inspection_controller.gd
+            echo '=== PEEL LAB ORCHESTRATION (selected) ==='
+            awk '/^func _process\(/,/^func _process_crumple_pointer\(/' scripts/peel_lab.gd
+            awk '/^func _update_hud\(/,/^func _quality_grade\(/' scripts/peel_lab.gd
+            awk '/^func _handle_detached_label\(/,/^func _unhandled_key_input\(/' scripts/peel_lab.gd
+            awk '/^func _unhandled_key_input\(/,/^func _consume_next_request\(/' scripts/peel_lab.gd
+            awk '/^func _apply_current_variant\(/,/^func _reset_session\(/' scripts/peel_lab.gd
+            awk '/^func _update_inspection\(/,/^func _crumple_feedback_text\(/' scripts/peel_lab.gd
+            echo '=== REFERENCE CONTRACT TESTS ==='
+            cat tests/test_peel_model.gd
+            cat tests/test_peel_controller.gd
+            cat tests/test_reference_profiles.gd
+            cat tests/test_inspection_controller.gd
+            cat tests/smoke_reference_scene.gd
+          } > /tmp/review-packet.txt
+          bytes="$(wc -c < /tmp/review-packet.txt)"
+          echo "review packet bytes=$bytes"
+          test "$bytes" -lt 42000
+
+      - name: Install local Ollama runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
+          for _ in {1..40}; do
+            if ollama list >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ollama-server.log
+          exit 1
+
+      - name: Pull local code model
+        shell: bash
+        run: |
+          set -euo pipefail
+          ollama pull qwen2.5-coder:3b
+
+      - name: Run independent exact-head challenge
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are CHALLENGER, independent from the implementation author. Review the exact PR-head production code and tests below. Try to falsify the claims; do not praise or summarize.
+
+          Claims to falsify:
+          A. Any visible projected label region can start a peel; the old gold point is not required.
+          B. A short force spike loads adhesive but cannot instantly detach it; sustained force releases progressively.
+          C. Faster/harder pulls reduce integrity and increase residue relative to gentle pulls.
+          D. RMB inspection changes only inspection yaw and cannot steal LMB/touch peel ownership.
+          E. Q/E and 1/2/3 scene navigation reset transient interaction safely while preserving earned progression.
+          F. Café uses paper cup + optional crumple; Bar amber bottle and Market clear bottle never enter crumple post-peel.
+          G. Residue presentation is derived from deterministic model state, not a second gameplay authority.
+          H. Scene switching does not leave stale label/local-world transforms that would move peel hit testing away from the visible label.
+
+          Pay special attention to race/state bugs, wrong coordinate spaces, input ownership, direct-navigation/progression interaction, stale transforms, reset after detach, and tests that accidentally pass without exercising the claimed path.
+
+          Respond EXACTLY with these four single-line fields and no markdown/headings:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: none
+          EVIDENCE: <concise reason the strongest falsification attempts did not break the claims>
+
+          If you find a concrete defect, use VERDICT: NEEDS_FIX, name exact functions/state transition in DEFECT, and give one deterministic reproducer in MIN_TEST.
+
+          Exact-head packet follows:
+          PROMPT
+            cat /tmp/review-packet.txt
+          } > /tmp/review-prompt.txt
+
+          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-report.txt
+          test -s /tmp/review-report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt
+          for field in DEFECT MIN_TEST EVIDENCE; do
+            grep -Eq "^${field}:" /tmp/review-report.txt
+          done
+
+      - name: Comment exact-head report on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          ROUND: ${{ inputs.round }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### Local Challenger — round $ROUND"
+            echo
+            echo "Exact head: \`$EXPECTED_HEAD_SHA\`"
+            echo
+            echo '```text'
+            if [ -s /tmp/review-report.txt ]; then
+              cat /tmp/review-report.txt
+            else
+              echo 'VERDICT: INFRA_FAILURE'
+              echo 'DEFECT: local model did not produce a conforming report'
+            fi
+            echo '```'
+          } > /tmp/pr-comment.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/pr-comment.md
+
+      - name: Enforce Challenger verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/review-report.txt
