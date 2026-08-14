@@ -70,12 +70,16 @@ func _run() -> void:
 				await process_frame
 				var full := shell.mesh.get_aabb()
 				var full_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
+				var upper_crease_center := _ring_center_x(shell.mesh as ArrayMesh, 2)
+				var lower_crease_center := _ring_center_x(shell.mesh as ArrayMesh, 4)
 				if full.size.x <= 0.20 or full.size.y <= baseline.size.y * 0.70:
 					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must remain a bounded cup-like shell")
 				if full_mid_span >= baseline_mid_span * 0.82:
 					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must produce a clearly compressed waist, not a nearly unchanged cup")
 				if full.size.y >= baseline.size.y * 0.88:
 					failures.append("CRUMPLE_PRESENTATION_RED: full crumple must visibly shorten the paper cup")
+				if absf(upper_crease_center - lower_crease_center) < 0.015:
+					failures.append("CRUMPLE_PRESENTATION_RED: completed paper cup needs staggered crease bands, not a smooth symmetric hourglass")
 				presentation.reset_visual()
 				await process_frame
 				if shell.visible or (cup != null and not cup.visible):
@@ -84,7 +88,7 @@ func _run() -> void:
 					failures.append("CRUMPLE_PRESENTATION_RED: reset must restore exact baseline Lid transform")
 
 	if failures.is_empty():
-		print("PASS: cup crumple presentation has visible clockwise faces, strong bounded deformation, lid follow and clean reset")
+		print("PASS: cup crumple presentation has visible clockwise faces, staggered bounded creases, lid follow and clean reset")
 		scene.queue_free()
 		await process_frame
 		quit(0)
@@ -116,11 +120,14 @@ func _clockwise_faces_align_with_normals(mesh: ArrayMesh) -> bool:
 	return true
 
 func _mid_ring_x_span(mesh: ArrayMesh) -> float:
+	return _ring_x_span(mesh, TEST_MID_RING)
+
+func _ring_x_span(mesh: ArrayMesh, ring: int) -> float:
 	if mesh == null or mesh.get_surface_count() == 0:
 		return 0.0
 	var arrays := mesh.surface_get_arrays(0)
 	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
-	var start := TEST_MID_RING * TEST_SEGMENTS
+	var start := ring * TEST_SEGMENTS
 	if vertices.size() < start + TEST_SEGMENTS:
 		return 0.0
 	var min_x := INF
@@ -129,3 +136,18 @@ func _mid_ring_x_span(mesh: ArrayMesh) -> float:
 		min_x = minf(min_x, vertices[i].x)
 		max_x = maxf(max_x, vertices[i].x)
 	return max_x - min_x
+
+func _ring_center_x(mesh: ArrayMesh, ring: int) -> float:
+	if mesh == null or mesh.get_surface_count() == 0:
+		return 0.0
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	var start := ring * TEST_SEGMENTS
+	if vertices.size() < start + TEST_SEGMENTS:
+		return 0.0
+	var min_x := INF
+	var max_x := -INF
+	for i in range(start, start + TEST_SEGMENTS):
+		min_x = minf(min_x, vertices[i].x)
+		max_x = maxf(max_x, vertices[i].x)
+	return (min_x + max_x) * 0.5
