@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v6
+      - spike/mpfb-hero-limb-pose-v7
   workflow_dispatch:
 
 permissions:
@@ -89,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v6
+          name: mpfb-hero-limb-pose-v7
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
