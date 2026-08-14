@@ -43,14 +43,26 @@ func _run() -> void:
 			if world.environment.ambient_light_energy < 0.34:
 				failures.append("REFERENCE_RED: foreground fill is too low to preserve hand/cup material detail")
 
-		# Reference-image contract: the background should read as a café, not one
-		# flat wall. These remain presentation-only, far behind the gameplay cup.
 		for node_name in ["WindowGlow", "CafeCounter", "BackShelf", "PropMug", "PropJar"]:
 			var prop := presentation.get_node_or_null(node_name) as Node3D
 			if prop == null:
 				failures.append("REFERENCE_RED: missing layered cafe background cue %s" % node_name)
 			elif prop.position.z > -1.0:
 				failures.append("CAFE_RED: background cue %s is too close to gameplay space" % node_name)
+
+		# The first real V7 frame still read as hard primitive geometry. In the
+		# Compatibility renderer the owner-reference depth look is approximated
+		# with soft alpha sprites, not sharp boxes/cylinders crossing the action.
+		for node_name in ["WindowGlow", "BackShelf", "PropMug", "PropJar"]:
+			var soft_cue := presentation.get_node_or_null(node_name) as Sprite3D
+			if soft_cue == null or soft_cue.texture == null:
+				failures.append("REFERENCE_RED: %s must be a soft textured depth cue, not a hard primitive silhouette" % node_name)
+		var shelf := presentation.get_node_or_null("BackShelf") as Node3D
+		if shelf != null and absf(shelf.position.x) < 0.85:
+			failures.append("REFERENCE_RED: background shelf must stay out of the central cup action column")
+		var haze := presentation.get_node_or_null("CafeHaze") as Sprite3D
+		if haze == null or haze.texture == null:
+			failures.append("REFERENCE_RED: missing broad CafeHaze layer for low-frequency compatibility depth")
 
 		for node_name in ["BokehWarmLeft", "BokehWarmRight"]:
 			var bokeh := presentation.get_node_or_null(node_name) as Sprite3D
@@ -123,7 +135,7 @@ func _run() -> void:
 		failures.append("REFERENCE_RED: soft fill must keep hand/cup shadows open")
 
 	if failures.is_empty():
-		print("PASS: warm layered cafe reference presentation, soft lighting and paper-cup structure")
+		print("PASS: warm layered cafe reference presentation with soft compatibility depth cues")
 		scene.queue_free()
 		await process_frame
 		quit(0)
