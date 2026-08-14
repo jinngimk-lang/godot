@@ -1,16 +1,20 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
 [ext_resource type="Script" path="res://scripts/presentation/forearm_presentation.gd" id="3_forearm"]
 [ext_resource type="Script" path="res://scripts/presentation/cup_crumple_presentation.gd" id="4_crumple"]
 [ext_resource type="Script" path="res://scripts/presentation/crumple_hand_staging.gd" id="5_crumple_hand"]
+[ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
 
 [node name="CafePresentation" type="Node3D" parent="."]
 script = ExtResource("2_presentation")
+
+[node name="VenuePresentation" type="Node3D" parent="."]
+script = ExtResource("6_venue")
 
 [node name="ForearmPresentation" type="Node3D" parent="."]
 script = ExtResource("3_forearm")
