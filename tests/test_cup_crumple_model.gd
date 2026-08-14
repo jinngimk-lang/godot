@@ -50,6 +50,25 @@ func run() -> Array[String]:
 	if not is_equal_approx(float(model.get_progress()), after_right):
 		failures.append("stationary/non-finite input must not change crumple progress")
 
+	# A physical gesture must not feel different merely because the OS/device
+	# sampled the same movement as one coarse packet or many fine packets. The
+	# Crisp profile's rigidity deliberately exceeds a 1 px packet so the old
+	# per-packet deadzone implementation is falsified here.
+	var sampling_profile := {"rigidity": 0.055, "dent_gain": 0.0035, "max_compression": 0.18}
+	var coarse = load(required).new(sampling_profile)
+	var fine = load(required).new(sampling_profile)
+	coarse.begin_gesture(-100.0, 0.0)
+	fine.begin_gesture(-100.0, 0.0)
+	coarse.apply_drag(20.0)
+	for _i in range(20):
+		fine.apply_drag(1.0)
+	var coarse_progress := float(coarse.get_progress())
+	var fine_progress := float(fine.get_progress())
+	if coarse_progress <= 0.0:
+		failures.append("sampling-invariance fixture must produce real coarse crumple progress")
+	if absf(coarse_progress - fine_progress) > 0.0001:
+		failures.append("RED: equal 20px inward gesture must be sampling-invariant; coarse=%.4f fine=%.4f" % [coarse_progress, fine_progress])
+
 	for _i in range(20):
 		model.apply_drag(-100.0)
 	if float(model.get_progress()) < 0.999 or float(model.get_progress()) > 1.0:
