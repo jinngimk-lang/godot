@@ -26,7 +26,7 @@ func _ready() -> void:
 	_material.albedo_color = Color(0.97, 0.955, 0.90, 1.0)
 	_material.roughness = 0.9
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_try_configure_from_runtime_cup()
+	_sync_from_runtime_cup()
 	set_peel(0.0, get_front_position(0.0))
 
 func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
@@ -49,6 +49,7 @@ func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: 
 		set_peel(_last_progress, grip)
 
 func get_center_cup_radius() -> float:
+	_sync_from_runtime_cup()
 	if not _uses_frustum_profile:
 		return cup_radius
 	return CupSurface.frustum_radius_at_y(
@@ -166,7 +167,9 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
 
-func _try_configure_from_runtime_cup() -> void:
+func _sync_from_runtime_cup() -> void:
+	if not is_inside_tree():
+		return
 	var parent := get_parent()
 	if parent == null:
 		return
@@ -174,13 +177,33 @@ func _try_configure_from_runtime_cup() -> void:
 	if cup == null or not (cup.mesh is CylinderMesh):
 		return
 	var cup_mesh := cup.mesh as CylinderMesh
-	var cup_center_local := to_local(cup.global_position).y
-	configure_cup_frustum(
-		cup_mesh.bottom_radius,
-		cup_mesh.top_radius,
-		cup_mesh.height,
-		cup_center_local
+	var bottom := maxf(cup_mesh.bottom_radius, 0.001)
+	var top := maxf(cup_mesh.top_radius, 0.001)
+	var height := maxf(absf(cup_mesh.height), 0.001)
+	var center_y := to_local(cup.global_position).y
+	if _uses_frustum_profile \
+	and is_equal_approx(bottom, _cup_bottom_radius) \
+	and is_equal_approx(top, _cup_top_radius) \
+	and is_equal_approx(height, _cup_height) \
+	and is_equal_approx(center_y, _cup_center_y):
+		return
+	_cup_bottom_radius = bottom
+	_cup_top_radius = top
+	_cup_height = height
+	_cup_center_y = center_y
+	_uses_frustum_profile = true
+	cup_radius = CupSurface.frustum_radius_at_y(
+		label_y,
+		_cup_bottom_radius,
+		_cup_top_radius,
+		_cup_height,
+		_cup_center_y
 	)
+
+func _try_configure_from_runtime_cup() -> void:
+	# Backward-compatible helper retained for older tests/callers. Runtime sync
+	# no longer re-enters set_peel(), so changing tactile cup silhouettes is safe.
+	_sync_from_runtime_cup()
 
 func _is_attached_u(u: float) -> bool:
 	if not _uses_frustum_profile:
