@@ -9,7 +9,6 @@ var _parent: Node3D
 var _right_hand: HandVisual
 var _left_hand: HandVisual
 var _cup: MeshInstance3D
-var _label: LabelVisual
 var _controller: PeelController
 var _venue: VenuePresentation
 
@@ -19,6 +18,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _parent == null:
 		_bind()
+	if _parent != null:
+		# PeelLab creates a fresh PeelController when the showcase variant changes.
+		# Refresh this presentation reference so Q/E and 1/2/3 never leave hand
+		# choreography following stale interaction state from the previous scene.
+		_controller = _parent.get("_controller") as PeelController
 	if _right_hand == null or _left_hand == null or _cup == null or _controller == null:
 		return
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
@@ -33,7 +37,6 @@ func _bind() -> void:
 	_right_hand = _parent.get_node_or_null("RightHand") as HandVisual
 	_left_hand = _parent.get_node_or_null("LeftHand") as HandVisual
 	_cup = _parent.get_node_or_null("Cup") as MeshInstance3D
-	_label = _parent.get_node_or_null("PeelLabel") as LabelVisual
 	_venue = _parent.get_node_or_null("VenuePresentation") as VenuePresentation
 	_controller = _parent.get("_controller") as PeelController
 
