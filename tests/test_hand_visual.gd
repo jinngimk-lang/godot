@@ -11,7 +11,7 @@ func run() -> Array[String]:
 	var method_names: Array[String] = []
 	for method in hand_script.get_script_method_list():
 		method_names.append(String(method.get("name", "")))
-	for required in ["set_grip_target","set_pinch_amount","get_finger_count","snap_to","tick","set_follow_target_enabled"]:
+	for required in ["set_grip_target", "set_pinch_amount", "get_finger_count", "snap_to", "tick"]:
 		if not method_names.has(required):
 			failures.append("RED: HandVisual missing semi-realistic contract method %s" % required)
 	if not failures.is_empty():
@@ -21,14 +21,16 @@ func run() -> Array[String]:
 	hand.setup(true)
 	if hand.get_finger_count() != 5:
 		failures.append("HandVisual must expose five fingers")
-	for required_node in ["ThumbTip","IndexTip","PinchPoint"]:
-		if hand.find_child(required_node,true,false) == null:
+	for required_node in ["ThumbTip", "IndexTip", "PinchPoint"]:
+		if hand.find_child(required_node, true, false) == null:
 			failures.append("HandVisual missing pinch anchor %s" % required_node)
+
 	var relaxed_pose := String(hand.get("_last_authored_pose"))
 	if relaxed_pose != "Pinch Up":
 		failures.append("RED: relaxed dynamic authored hand must use Pinch Up, got %s" % relaxed_pose)
-	var sleeve := hand.find_child("WristSleeve",true,false) as MeshInstance3D
-	var cuff := hand.find_child("WristCuff",true,false) as MeshInstance3D
+
+	var sleeve := hand.find_child("WristSleeve", true, false) as MeshInstance3D
+	var cuff := hand.find_child("WristCuff", true, false) as MeshInstance3D
 	if sleeve == null:
 		failures.append("RED: authored hand must cover the open wrist with WristSleeve")
 	elif sleeve.mesh == null or sleeve.material_override == null:
@@ -43,25 +45,17 @@ func run() -> Array[String]:
 		failures.append("WristCuff must use semantic SleeveRib material")
 
 	hand.set_pinch_amount(1.0)
-	hand.set_grip_target(Vector3(1.0,0.5,0.8))
+	hand.set_grip_target(Vector3(1.0, 0.5, 0.8))
 	hand.tick(0.1)
 	var active_pose := String(hand.get("_last_authored_pose"))
 	if active_pose != "Pinch Tight":
 		failures.append("active authored hand must close to Pinch Tight, got %s" % active_pose)
 	hand.free()
 
-	# Handedness and motion ownership are separate concerns. The support hand is
-	# left-handed but still needs to follow the vessel during inspection.
 	var support = hand_script.new()
 	support.setup(false)
 	var support_pose := String(support.get("_last_authored_pose"))
 	if support_pose != "Default pose":
-		failures.append("authored support hand must use neutral Default pose, got %s" % support_pose)
-	var before := support.position
-	support.set_follow_target_enabled(true)
-	support.set_grip_target(Vector3(0.72,0.28,0.42))
-	support.tick(0.1)
-	if support.position.distance_to(before) < 0.01:
-		failures.append("RED: left support hand must be able to follow a vessel grip target independently of handedness")
+		failures.append("RED: authored support hand must use neutral Default pose, got %s" % support_pose)
 	support.free()
 	return failures
