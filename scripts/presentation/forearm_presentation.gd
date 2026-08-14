@@ -1,7 +1,7 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 32
+const CURVE_RINGS := 34
 const RING_SIDES := 30
 const AUTHORED_HAND_SCALE := 3.75
 const SUPPORT_FOLLOW_RATE := 8.5
@@ -101,10 +101,11 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x) < 0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
-	# Bend through a lower elbow arc before leaving the frame. This avoids the
-	# ruler-straight rod silhouette while keeping the actual hand contact stable.
-	var control_world := start_world+Vector3(outward_sign*0.70,-0.34,0.10)
-	var end_world := start_world+Vector3(outward_sign*2.50,-0.72,0.48)
+	# The photographed references never expose an arm tip. Route the forearm
+	# through a soft elbow arc and continue well beyond the viewport before it is
+	# capped, so camera cropping creates the natural frame-entry silhouette.
+	var control_world := start_world+Vector3(outward_sign*0.92,-0.34,0.10)
+	var end_world := start_world+Vector3(outward_sign*5.20,-1.02,0.58)
 	var control := hand.to_local(control_world)
 	var end := hand.to_local(end_world)
 
@@ -141,7 +142,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.70,0.78,t)
+		var oval_height := lerpf(0.68,0.77,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -160,6 +161,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
+	# End caps remain, but the distal cap is now outside every product camera.
 	var start_center := vertices.size()
 	vertices.append(start)
 	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
@@ -181,8 +183,11 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 	return mesh
 
 func _radius_profile(t: float) -> float:
-	var p := smoothstep(0.0,1.0,clampf(t,0.0,1.0))
-	return lerpf(0.135,0.215,p)
+	var p := clampf(t,0.0,1.0)
+	# Wrist -> muscular forearm -> gently broader frame-edge section. The small
+	# sinusoidal fullness removes the manufactured straight-cylinder read.
+	var base := lerpf(0.135,0.225,smoothstep(0.0,1.0,p))
+	return base*(1.0+0.055*sin(p*PI))
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
