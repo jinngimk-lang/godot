@@ -1,7 +1,7 @@
 extends SceneTree
 
 const MAX_FOREARM_LENGTH := 0.82
-const MAX_FOREARM_THICKNESS := 0.20
+const MAX_FOREARM_VERTICAL_THICKNESS := 0.18
 
 func _init() -> void:
 	call_deferred("_run")
@@ -35,11 +35,13 @@ func _run() -> void:
 		if aabb.size.length() > MAX_FOREARM_LENGTH:
 			_fail("%s forearm remains too long/hose-like: %.3f" % [hand_name,aabb.size.length()],scene)
 			return
-		if maxf(aabb.size.x,aabb.size.y) > MAX_FOREARM_THICKNESS:
+		# The curve intentionally travels in X/Z toward the frame edge, so Y is
+		# the stable cross-section axis for rejecting the old giant cone silhouette.
+		if aabb.size.y > MAX_FOREARM_VERTICAL_THICKNESS:
 			_fail("%s forearm remains too thick/geometric: %s" % [hand_name,str(aabb.size)],scene)
 			return
 		if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
-			_fail("café forearm should start with soft SleeveFabric" ,scene)
+			_fail("café forearm should start with soft SleeveFabric",scene)
 			return
 		var legacy := hand.get_node_or_null("AuthoredHand/WristSleeve") as MeshInstance3D
 		if legacy == null or legacy.visible:
