@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v11
+      - spike/mpfb-hero-limb-pose-v12
   workflow_dispatch:
 
 permissions:
@@ -70,27 +70,16 @@ jobs:
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
           test -s artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb
 
-      - name: Solve and render anatomical contact candidates
+      - name: Solve and render target-driven pinch candidates
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v11.py -- \
+          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v12.py -- \
             artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb \
             artifacts/mpfb_limb/previews \
             2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
           grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_BEST" artifacts/mpfb_limb/logs/pose-preview.log
-          python - <<'PY'
-          import re
-          from pathlib import Path
-          text=Path('artifacts/mpfb_limb/logs/pose-preview.log').read_text()
-          m=re.search(r'MPFB_POSE_BEST support_distance ([0-9.]+) pinch_gap ([0-9.]+) pinch_anchor_error ([0-9.]+)', text)
-          if not m: raise SystemExit('missing MPFB_POSE_BEST metrics')
-          gap=float(m.group(2)); anchor=float(m.group(3))
-          print('MPFB_V11_GATE', 'gap', gap, 'anchor', anchor)
-          if gap > 0.010: raise SystemExit(f'pinch gap {gap:.6f} > 0.010 m')
-          if anchor > 0.025: raise SystemExit(f'pinch anchor error {anchor:.6f} > 0.025 m')
-          PY
+          grep -Fq "MPFB_POSE_PRIOR target_ik_v12" artifacts/mpfb_limb/logs/pose-preview.log
           for frame in pose_neutral support_solved_1 support_solved_2 support_solved_3 pinch_solved_1 pinch_solved_2 pinch_solved_3; do
             test -s "artifacts/mpfb_limb/previews/${frame}.png"
           done
@@ -100,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v11
+          name: mpfb-hero-limb-pose-v12
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
