@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Preview
+name: MPFB Hero Limb Reference Pose
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-retarget-v21
+      - spike/mpfb-hero-limb-reference-pose-v22
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  diagnose-retarget:
+  reference-pose:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -48,26 +48,28 @@ jobs:
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
           .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- artifacts/mpfb_limb/assets/mpfb-human-source.glb right artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json 2>&1 | tee artifacts/mpfb_limb/logs/extract-right.log
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
-      - name: Inspect XR to MPFB retarget contract
+      - name: Inspect XR to MPFB source contract
         shell: bash
         run: |
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render normalized-direction pose transfer
+      - name: Render fixed-target bounded pose candidates
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_direction_pose_v21.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/direction-v21.log
-          grep -Fq "MPFB_DIRECTION_V21_SUCCESS" artifacts/mpfb_limb/logs/direction-v21.log
-          test -s artifacts/mpfb_limb/previews/direction_v21_cup.png
-          test -s artifacts/mpfb_limb/previews/direction_v21_pinch_up.png
-          test -s artifacts/mpfb_limb/previews/direction_v21_pinch_tight.png
-      - name: Upload direction-transfer evidence
+          .preview-tools/blender/blender --background --python tools/render_mpfb_reference_pose_v22.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/reference-v22.log
+          grep -Fq "MPFB_REFERENCE_V22_SUCCESS" artifacts/mpfb_limb/logs/reference-v22.log
+          for pose in cup pinch_up; do
+            for variant in full_v21_control bounded_75 bounded_60; do
+              test -s "artifacts/mpfb_limb/previews/reference_v22_${pose}_${variant}.png"
+            done
+          done
+      - name: Upload fixed-target pose evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-retarget-v21
+          name: mpfb-hero-limb-reference-pose-v22
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
