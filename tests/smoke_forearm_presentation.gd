@@ -2,7 +2,7 @@ extends SceneTree
 
 const MIN_FOREARM_LENGTH := 1.35
 const MAX_FOREARM_LENGTH := 3.20
-const MAX_FOREARM_VERTICAL_THICKNESS := 0.36
+const MAX_FOREARM_RADIUS := 0.18
 const MIN_AUTHORED_HAND_SCALE := 3.45
 
 func _init() -> void:
@@ -24,6 +24,14 @@ func _run() -> void:
 		_fail("missing ForearmPresentation runtime layer",scene)
 		return
 
+	# Radius is the geometry's actual cross-section invariant. AABB axes are not:
+	# the arms curve through rotated local coordinates on purpose to reach the frame edges.
+	for sample in [0.0,0.25,0.5,0.75,1.0]:
+		var radius := float(presentation.call("_radius_profile",sample))
+		if radius <= 0.0 or radius > MAX_FOREARM_RADIUS:
+			_fail("forearm radius out of anatomical bound at %.2f: %.3f" % [sample,radius],scene)
+			return
+
 	for hand_name in ["RightHand","LeftHand"]:
 		var hand := scene.get_node_or_null(hand_name) as Node3D
 		if hand == null:
@@ -37,13 +45,9 @@ func _run() -> void:
 		if forearm == null or not (forearm.mesh is ArrayMesh):
 			_fail("%s must use one smooth ForearmNatural mesh" % hand_name,scene)
 			return
-		var aabb := (forearm.mesh as ArrayMesh).get_aabb()
-		var reach := aabb.size.length()
+		var reach := (forearm.mesh as ArrayMesh).get_aabb().size.length()
 		if reach < MIN_FOREARM_LENGTH or reach > MAX_FOREARM_LENGTH:
 			_fail("%s forearm must reach toward the frame edge without runaway geometry: %.3f" % [hand_name,reach],scene)
-			return
-		if aabb.size.y > MAX_FOREARM_VERTICAL_THICKNESS:
-			_fail("%s forearm cross-section is still too tube-like: %s" % [hand_name,str(aabb.size)],scene)
 			return
 		if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
 			_fail("café forearm should start with soft SleeveFabric",scene)
