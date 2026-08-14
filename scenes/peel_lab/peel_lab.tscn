@@ -1,17 +1,32 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
 [ext_resource type="Script" path="res://scripts/presentation/forearm_presentation.gd" id="3_forearm"]
 [ext_resource type="Script" path="res://scripts/presentation/cup_crumple_presentation.gd" id="4_crumple"]
 [ext_resource type="Script" path="res://scripts/presentation/crumple_hand_staging.gd" id="5_crumple_hand"]
-[ext_resource type="Script" path="res://scripts/presentation/cup_contents_presentation.gd" id="6_contents"]
+[ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
+[ext_resource type="Script" path="res://scripts/presentation/reference_backdrop.gd" id="7_backdrop"]
+[ext_resource type="Script" path="res://scripts/presentation/table_surface_presentation.gd" id="8_table"]
+[ext_resource type="Script" path="res://scripts/presentation/hud_chrome_presentation.gd" id="9_hud"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
 
 [node name="CafePresentation" type="Node3D" parent="."]
 script = ExtResource("2_presentation")
+
+[node name="ReferenceBackdrop" type="Sprite3D" parent="."]
+script = ExtResource("7_backdrop")
+
+[node name="VenuePresentation" type="Node3D" parent="."]
+script = ExtResource("6_venue")
+
+[node name="TableSurfacePresentation" type="Node" parent="."]
+script = ExtResource("8_table")
+
+[node name="HudChromePresentation" type="Node" parent="."]
+script = ExtResource("9_hud")
 
 [node name="ForearmPresentation" type="Node3D" parent="."]
 script = ExtResource("3_forearm")
@@ -21,6 +36,3 @@ script = ExtResource("4_crumple")
 
 [node name="CrumpleHandStaging" type="Node3D" parent="."]
 script = ExtResource("5_crumple_hand")
-
-[node name="CupContentsPresentation" type="Node3D" parent="."]
-script = ExtResource("6_contents")

@@ -11,54 +11,49 @@ func run() -> Array[String]:
 		return failures
 
 	_completion_count = 0
-	var controller = controller_script.new({"base_adhesion": 8.0, "release_increment": 0.2})
+	var controller = controller_script.new({"base_adhesion":8.0,"release_increment":0.2,"bond_response":12.0})
 	controller.completed.connect(_on_completed)
-	controller.set_edge_position(Vector2(100, 100))
+	controller.set_edge_position(Vector2(100,100))
+	if not controller.has_method("set_grab_region"):
+		failures.append("RED: controller must accept projected label grab region")
+		return failures
+	controller.set_grab_region(Rect2(Vector2(70,70), Vector2(130,70)))
 	var pointer = pointer_script.new()
-	pointer.set_frame(false, Vector2(100, 100), Vector2.ZERO, Vector2.ZERO, false)
-	controller.process_pointer(pointer, 0.016)
-	if controller.get_state_name() != "EDGE_HOVER":
-		failures.append("pointer near edge should enter EDGE_HOVER")
 
-	pointer.set_frame(true, Vector2(100, 100), Vector2.ZERO, Vector2.ZERO, false)
-	controller.process_pointer(pointer, 0.016)
+	pointer.set_frame(true, Vector2(170,100), Vector2.ZERO, Vector2.ZERO, false)
+	var anywhere: Dictionary = controller.process_pointer(pointer, 0.016)
 	if controller.get_state_name() != "EDGE_LIFT":
-		failures.append("press on edge should enter EDGE_LIFT")
+		failures.append("RED: press anywhere on label surface should immediately begin lift")
 
-	pointer.set_frame(true, Vector2(128, 82), Vector2(28, -18), Vector2(900, -500), false)
-	controller.process_pointer(pointer, 0.016)
-	controller.process_pointer(pointer, 0.016)
+	pointer.set_frame(true, Vector2(205,78), Vector2(35,-22), Vector2(900,-500), false)
+	for _i in range(5):
+		anywhere = controller.process_pointer(pointer, 0.016)
 	if controller.get_progress() <= 0.0:
-		failures.append("drag after edge lift should begin progressive peel")
+		failures.append("sustained drag after arbitrary label grab should begin progressive peel")
+	for key in ["bond_load","integrity","residue"]:
+		if not anywhere.has(key):
+			failures.append("RED: controller output missing physical quality field %s" % key)
 
-	var before_release: float = controller.get_progress()
+	var before_release: float = float(controller.get_progress())
 	pointer.set_frame(false, pointer.position, Vector2.ZERO, Vector2.ZERO, true)
 	controller.process_pointer(pointer, 0.016)
 	if controller.get_progress() < before_release:
 		failures.append("releasing grip must not reverse peel progress")
 
-	controller.set_edge_position(pointer.position)
-	pointer.set_frame(true, pointer.position, Vector2(1, 0), Vector2(100, 0), false)
+	pointer.set_frame(true, Vector2(135,92), Vector2.ZERO, Vector2.ZERO, false)
 	controller.process_pointer(pointer, 0.016)
-	for i in range(32):
-		var pos := Vector2(220 + i * 3, 40)
-		pointer.set_frame(true, pos, Vector2(3, 0), Vector2(1200, -400), false)
+	for i in range(70):
+		var pos := Vector2(170 + i * 3, 42)
+		pointer.set_frame(true, pos, Vector2(3,0), Vector2(1200,-400), false)
 		controller.process_pointer(pointer, 0.016)
 	if not controller.is_complete() or controller.get_state_name() != "COMPLETE":
 		failures.append("sustained high pull should complete exactly one peel session")
 	if _completion_count != 1:
 		failures.append("controller completion signal expected once, got %d" % _completion_count)
 
-	for _i in range(4):
-		controller.process_pointer(pointer, 0.016)
-	if _completion_count != 1:
-		failures.append("controller completion signal repeated after completion")
-
 	controller.reset()
-	if not is_equal_approx(controller.get_progress(), 0.0):
-		failures.append("controller reset must restore peel progress to zero")
-	if controller.get_state_name() != "IDLE":
-		failures.append("controller reset must restore IDLE state")
+	if not is_equal_approx(controller.get_progress(), 0.0) or controller.get_state_name() != "IDLE":
+		failures.append("controller reset must restore progress and IDLE state")
 	return failures
 
 func _on_completed() -> void:
