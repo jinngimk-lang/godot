@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Root Align v29
+name: MPFB Hero Limb Precision v30
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-root-align-v29
+      - spike/mpfb-hero-limb-precision-v30
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  root-align:
+  precision:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -54,19 +54,19 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render root-aligned visible-surface pinch candidate
+      - name: Render precision root-aligned surface pinch
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_root_align_v29.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/root-align-v29.log
-          grep -Fq "MPFB_ROOT_ALIGN_V29_SUCCESS" artifacts/mpfb_limb/logs/root-align-v29.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_precision_v30.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/precision-v30.log
+          grep -Fq "MPFB_PRECISION_V30_SUCCESS" artifacts/mpfb_limb/logs/precision-v30.log
           test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
           test -s artifacts/mpfb_limb/previews/surface_v29_root_align.png
-      - name: Upload root-align evidence
+      - name: Upload precision evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-root-align-v29
+          name: mpfb-hero-limb-precision-v30
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
