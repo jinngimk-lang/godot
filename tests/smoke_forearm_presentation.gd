@@ -4,6 +4,7 @@ const MIN_FOREARM_LENGTH := 3.20
 const MAX_FOREARM_LENGTH := 6.80
 const MAX_FOREARM_RADIUS := 0.31
 const MIN_AUTHORED_HAND_SCALE := 4.00
+const MAX_GLASS_SUPPORT_X := 0.70
 
 func _init() -> void:
 	call_deferred("_run")
@@ -75,6 +76,9 @@ func _run() -> void:
 	presentation.call("_update_support_hand",0.1)
 	if left.position.distance_to(before_support) < 0.025:
 		_fail("glass-scene support hand must move with inspected vessel yaw",scene)
+		return
+	if left.position.x > MAX_GLASS_SUPPORT_X:
+		_fail("RED: glass support hand must stage close enough to overlap the vessel silhouette; x=%.3f" % left.position.x,scene)
 		return
 
 	scene.call("debug_select_variant",2)
