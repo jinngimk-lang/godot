@@ -6,7 +6,7 @@ class_name LabelVisual
 @export var label_y := 0.72
 @export var cup_radius := 0.53
 @export var segments := 28
-@export var surface_offset := 0.018
+@export var surface_offset := 0.022
 
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
@@ -24,13 +24,12 @@ var _cup_center_y := 0.0
 func _ready() -> void:
 	mesh = _mesh
 	_material.albedo_color = Color(0.97,0.955,0.90,1.0)
-	_material.roughness = 0.9
+	_material.roughness = 0.90
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	# The sticker must remain visibly on top of translucent glass. Put it in the
-	# transparent queue with a later priority so overlapping glass shells cannot
-	# sort over the printed paper while the label is still attached.
-	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_material.render_priority = 4
+	# The printed paper itself is opaque. Keeping it in the opaque/depth-writing
+	# pass means translucent glass behind it cannot blend over and erase it.
+	# The small surface offset prevents z-fighting while remaining visually glued.
+	_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
 
