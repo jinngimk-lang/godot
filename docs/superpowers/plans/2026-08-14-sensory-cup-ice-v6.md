@@ -30,23 +30,23 @@
 - Produces: `current_variant()["cup_dimensions"]` with three materially distinct silhouettes.
 - Produces: `current_variant()["contents_profile"]`, where the late unlocked profile uses `{ "type": "ice", "count": int, "cube_size": float, "motion_gain": float }`.
 
-- [ ] **Step 1: Write the failing profile test**
+- [x] **Step 1: Write the failing profile test**
 
 Require all three variants to have different `(top_radius, bottom_radius, height)` signatures and require only the final unlock profile to have `contents_profile.type == "ice"` with bounded count `2..5`, cube size `0.07..0.16`, and motion gain `0.0..1.0`.
 
-- [ ] **Step 2: Run the unit suite and prove RED**
+- [x] **Step 2: Run the unit suite and prove RED**
 
-Run the canonical Godot unit runner. Expected: failure because all current `contents_profile.type` values are `none` and cup silhouettes are only subtly different.
+Godot Check `31773222737` failed at Unit Tests only on the missing final ice profile; import/default launch passed first.
 
-- [ ] **Step 3: Implement minimal profile values**
+- [x] **Step 3: Implement minimal profile values**
 
-Keep first cup as the current baseline. Make second cup slightly taller/narrower and final cup shorter/wider enough to be visibly distinct at the fixed camera. Set final profile to a small ice payload (3 cubes) only.
+Keep first cup as the current baseline. Make second cup taller/narrower and final cup shorter/wider at the fixed camera. Set final profile to a small ice payload (3 cubes) only.
 
-- [ ] **Step 4: Run unit suite and prove GREEN**
+- [x] **Step 4: Run unit suite and prove GREEN**
 
-Expected: all deterministic tests pass.
+Godot Check `31773259711` passed all canonical V5 gates on exact head `82846ce66ab99c6b96654baaa5546685c212b67e`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `feat: define distinct sensory cup and ice profiles`.
 
@@ -69,11 +69,11 @@ Commit message: `feat: define distinct sensory cup and ice profiles`.
 
 - [ ] **Step 1: Write failing smoke**
 
-Instantiate production scene and require: baseline/warm profile exposes zero content meshes; an ice profile creates exactly configured cube count; every cube remains within the cup inner radius and vertical bounds; repeated `set_crumple()` calls stay finite and bounded; `reset_visual()` restores deterministic base transforms; no `RigidBody3D`/`SoftBody3D` descendants exist.
+Instantiate `CupContentsPresentation` in an isolated test parent containing a fake tapered `Cup` `CylinderMesh`. Require: baseline/warm profile exposes zero content meshes; an ice profile creates exactly configured cube count; every cube remains within the cup inner radius and vertical bounds; repeated `set_crumple()` calls stay finite and bounded; `reset_visual()` restores deterministic base transforms; no `RigidBody3D`/`SoftBody3D` descendants exist. This task deliberately does **not** require PeelLab scene wiring; that belongs to Task 3.
 
 - [ ] **Step 2: Add smoke to CI and prove RED**
 
-Expected: dedicated `Cup contents presentation smoke` fails because the node/script does not yet exist.
+Expected: dedicated `Cup contents presentation smoke` fails because the presentation script/class does not yet exist.
 
 - [ ] **Step 3: Implement minimal presentation**
 
@@ -81,7 +81,7 @@ Create cubes as rounded-looking `BoxMesh` `MeshInstance3D` nodes under `IceConte
 
 - [ ] **Step 4: Run CI and prove GREEN**
 
-Expected: import, units, existing scene/presentation smokes, and new contents smoke pass.
+Expected: import, units, existing scene/presentation smokes, and new isolated contents smoke pass.
 
 - [ ] **Step 5: Commit**
 
