@@ -75,7 +75,9 @@ func _rebuild_contents() -> void:
 	_sync_container_to_cup()
 
 	var contents: Dictionary = _profile.get("contents_profile", {})
-	if String(contents.get("type", "none")) != "ice":
+	var content_type := String(contents.get("type", "none"))
+	_sync_open_top_for_contents(content_type == "ice")
+	if content_type != "ice":
 		return
 
 	var count := clampi(int(contents.get("count", 0)), 0, MAX_CONTENT_COUNT)
@@ -102,6 +104,24 @@ func _clear_contents() -> void:
 	for child in _container.get_children():
 		_container.remove_child(child)
 		child.queue_free()
+
+func _sync_open_top_for_contents(has_ice: bool) -> void:
+	if _cup == null:
+		_bind_cup()
+	if _cup != null and _cup.mesh is CylinderMesh:
+		(_cup.mesh as CylinderMesh).cap_top = not has_ice
+	var parent := get_parent()
+	if parent == null:
+		return
+	var lid := parent.get_node_or_null("Lid") as MeshInstance3D
+	if lid != null:
+		lid.visible = not has_ice
+	var cafe := parent.get_node_or_null("CafePresentation") as Node3D
+	if cafe != null:
+		for node_name in ["LidInset", "LidCenter"]:
+			var detail := cafe.get_node_or_null(node_name) as MeshInstance3D
+			if detail != null:
+				detail.visible = not has_ice
 
 func _base_transform_for(index: int, count: int) -> Transform3D:
 	var dims := _dimensions()
