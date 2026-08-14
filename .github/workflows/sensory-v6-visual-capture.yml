@@ -1,0 +1,67 @@
+name: Sensory V6 Visual Capture
+
+on:
+  push:
+    branches:
+      - verify/sensory-v6-after-v5-repairs-visual-r2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install X11/OpenGL capture dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Fresh import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee godot-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" godot-import.log; then
+            exit 1
+          fi
+
+      - name: Capture sensory V6 frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/sensory-v6
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 45s \
+            ./godot --path . --display-driver x11 --rendering-method gl_compatibility \
+            --script res://tests/capture_sensory_v6.gd 2>&1 | tee sensory-v6-capture.log
+          test -f artifacts/sensory-v6/01_warm_paper.png
+          test -f artifacts/sensory-v6/02_silky_long.png
+          test -f artifacts/sensory-v6/03_crisp_seal_ice.png
+          test -f artifacts/sensory-v6/04_crisp_mid_crumple.png
+
+      - name: Upload sensory V6 frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: sensory-v6-visual-audit-r2
+          path: |
+            artifacts/sensory-v6/*.png
+            sensory-v6-capture.log
+          if-no-files-found: error
