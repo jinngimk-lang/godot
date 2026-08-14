@@ -2,6 +2,7 @@ extends Node3D
 
 var _camera: Camera3D
 var _cup: MeshInstance3D
+var _lid: MeshInstance3D
 var _label: LabelVisual
 var _label_print: LabelPrint
 var _lifecycle: LabelLifecycle
@@ -14,7 +15,12 @@ var _hud: Label
 var _reward: Label
 var _edge_marker: MeshInstance3D
 var _session: SessionModel
+var _ritual: RitualFlow
+var _crumple: CupCrumpleModel
+var _crumple_presentation: CupCrumplePresentation
 var _release_count := 0
+# Legacy sentinels are kept neutral for compatibility with older verifier code.
+# V5 never schedules automatic next-item progression from these fields.
 var _reset_timer := -1.0
 var _completed_this_frame := false
 var _pending_score := 0
@@ -24,7 +30,9 @@ var _paused := false
 
 func _ready() -> void:
 	_build_world()
+	_crumple_presentation = get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
 	_session = SessionModel.new()
+	_ritual = RitualFlow.new()
 	_lifecycle = LabelLifecycle.new(0.16)
 	_apply_current_variant()
 	_reset_session()
@@ -36,13 +44,15 @@ func _process(delta: float) -> void:
 		_pointer.clear_transients()
 		return
 
-	if _reset_timer >= 0.0:
-		_reset_timer -= delta
-		if _reset_timer <= 0.0:
-			if _advance_after_reset:
-				_advance_to_next_item()
-			else:
-				_reset_session()
+	_ritual.update(delta)
+	var ritual_phase := _ritual.get_phase_name()
+	if ritual_phase in ["CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
+		var crumple_state: PointerState = _pointer.consume_frame()
+		_process_crumple_pointer(crumple_state)
+		_audio.reset_feedback()
+		_update_hud("", _lifecycle.get_phase_name(), _controller.get_progress())
+		_pointer.clear_transients()
+		return
 
 	var progress: float = _controller.get_progress()
 	var front_world: Vector3 = _label.get_front_position(progress)
@@ -89,6 +99,31 @@ func _process(delta: float) -> void:
 
 	_update_hud(state_name, phase_name, progress)
 	_pointer.clear_transients()
+
+func _process_crumple_pointer(state: PointerState) -> void:
+	if _ritual == null or _crumple == null:
+		return
+	var phase := _ritual.get_phase_name()
+	if phase == "CRUMPLE_READY" and state.pressed:
+		var cup_screen := _camera.unproject_position(_cup.global_position)
+		if _ritual.begin_crumple():
+			_crumple.begin_gesture(state.position.x, cup_screen.x)
+			phase = _ritual.get_phase_name()
+
+	if phase != "CRUMPLING":
+		return
+
+	if state.released_this_frame or not state.pressed:
+		_crumple.end_gesture()
+		return
+
+	var change: Dictionary = _crumple.apply_drag(state.relative.x)
+	var pulse := float(change.get("event_strength", 0.0))
+	if _crumple_presentation != null:
+		_crumple_presentation.set_crumple(_crumple.get_progress(), _crumple.get_gesture_side(), pulse)
+	if _crumple.is_complete() and _ritual.mark_crumple_complete():
+		if _ritual.consume_reward_event():
+			_reward.text = "%s\nStay a moment • R Next Cup" % _crumple_feedback_text()
 
 func _build_world() -> void:
 	_camera = Camera3D.new()
@@ -140,16 +175,16 @@ func _build_world() -> void:
 	_cup.material_override = _material(Color(0.89, 0.84, 0.74), 0.94)
 	add_child(_cup)
 
-	var lid := MeshInstance3D.new()
-	lid.name = "Lid"
+	_lid = MeshInstance3D.new()
+	_lid.name = "Lid"
 	var lid_mesh := CylinderMesh.new()
 	lid_mesh.top_radius = 0.57
 	lid_mesh.bottom_radius = 0.56
 	lid_mesh.height = 0.08
-	lid.mesh = lid_mesh
-	lid.position = Vector3(0, 0.83, 0)
-	lid.material_override = _material(Color(0.14, 0.125, 0.115), 0.76)
-	add_child(lid)
+	_lid.mesh = lid_mesh
+	_lid.position = Vector3(0, 0.83, 0)
+	_lid.material_override = _material(Color(0.14, 0.125, 0.115), 0.76)
+	add_child(_lid)
 
 	_label = LabelVisual.new()
 	_label.name = "PeelLabel"
@@ -222,34 +257,47 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 	if _session == null:
 		return
 	var variant := _session.current_variant()
-	var reset_hint := "R Reset Label"
-	if _reset_timer >= 0.0 and _advance_after_reset:
-		reset_hint = "R Next Now"
+	var ritual_phase := _ritual.get_phase_name() if _ritual != null else "PEEL"
+	var post_peel := ritual_phase in ["PEEL_SETTLE", "CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]
+	var reset_hint := "R Next Cup" if post_peel else "R Reset Label"
 	if _paused:
 		_hud.text = "PAUSED\nEsc Resume   •   %s   •   Shift+R Restart Run" % reset_hint
 		return
 
 	var percent := int(round(progress * 100.0))
 	var hint := "Grab the gold edge • press & hold (left mouse / touch) • pull gently"
-	if state_name == "EDGE_HOVER":
-		hint = "Press & hold (left mouse / touch), then pull away from the cup"
-	elif state_name in ["EDGE_LIFT", "PINCHED"]:
-		hint = "Keep holding • begin a slow steady pull"
-	elif state_name == "PEELING":
-		hint = "Steady pull • listen for each adhesive release"
-	elif state_name == "RELEASED":
-		hint = "Re-grab the gold edge to continue"
-	if phase_name == "DETACHING":
-		hint = "Last bit of adhesive…"
-	elif phase_name == "HELD":
-		hint = "Clean peel — nice."
+	var progress_line := "Peel %d%%" % percent
+	if post_peel:
+		var crumple_percent := int(round((_crumple.get_progress() if _crumple != null else 0.0) * 100.0))
+		progress_line = "Cup fold %d%%" % crumple_percent
+		match ritual_phase:
+			"PEEL_SETTLE":
+				hint = "Clean release • let the moment settle…"
+			"CRUMPLE_READY":
+				hint = "Squeeze the cup when you feel like it • or R Next Cup"
+			"CRUMPLING":
+				hint = "Press inward slowly • squeeze again or R Next Cup"
+			"RITUAL_COMPLETE":
+				hint = "Soft fold • stay a moment or R Next Cup"
+	else:
+		if state_name == "EDGE_HOVER":
+			hint = "Press & hold (left mouse / touch), then pull away from the cup"
+		elif state_name in ["EDGE_LIFT", "PINCHED"]:
+			hint = "Keep holding • begin a slow steady pull"
+		elif state_name == "PEELING":
+			hint = "Steady pull • listen for each adhesive release"
+		elif state_name == "RELEASED":
+			hint = "Re-grab the gold edge to continue"
+		if phase_name == "DETACHING":
+			hint = "Last bit of adhesive…"
+		elif phase_name == "HELD":
+			hint = "Clean release — nice."
 
-	_hud.text = "%s   •   Peel %d%%\n%s\nStamps %d   •   Score %d   •   Feels %d/3   •   Esc Pause   •   %s   •   Shift+R Restart Run" % [
+	_hud.text = "%s   •   %s\n%s\nRituals %d   •   Tactile set %d/3   •   Esc Pause   •   %s   •   Shift+R Restart Run" % [
 		String(variant.get("name", "Peel Calm")),
-		percent,
+		progress_line,
 		hint,
 		_session.get_clean_peels(),
-		_session.get_total_score(),
 		_session.get_unlocked_count(),
 		reset_hint
 	]
@@ -263,13 +311,17 @@ func _handle_detached_label() -> void:
 	if _detach_reward_recorded:
 		return
 	_detach_reward_recorded = true
-	var progress_result: Dictionary = _session.record_clean_peel(_pending_score)
-	var reward_text := "CLEAN PEEL  +%d" % _pending_score
+	var progress_result: Dictionary = _session.record_ritual_complete()
+	var reward_text := "CLEAN RELEASE"
 	if bool(progress_result.get("unlocked_new", false)):
-		reward_text += "\nNEW FEEL UNLOCKED"
+		reward_text += "\nNEW TACTILE CUP UNLOCKED"
+	else:
+		reward_text += "\nSqueeze the cup when you feel like it"
 	_reward.text = reward_text
-	_advance_after_reset = true
-	_reset_timer = 2.15
+	_reset_timer = -1.0
+	_advance_after_reset = false
+	_ritual.on_label_detached()
+	_pointer.quarantine_current_press()
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
@@ -290,10 +342,19 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_session.restart_run()
 			_apply_current_variant()
 			_reset_session()
-		elif _reset_timer >= 0.0 and _advance_after_reset:
-			_advance_to_next_item()
-		else:
-			_reset_session()
+			return
+		var ritual_phase := _ritual.get_phase_name() if _ritual != null else "PEEL"
+		if ritual_phase in ["CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
+			if _crumple != null:
+				_crumple.end_gesture()
+			if _ritual.request_next():
+				_consume_next_request()
+			return
+		_reset_session()
+
+func _consume_next_request() -> void:
+	if _ritual != null and _ritual.consume_next_request():
+		_advance_to_next_item()
 
 func _advance_to_next_item() -> void:
 	_session.advance_item()
@@ -314,6 +375,29 @@ func _apply_current_variant() -> void:
 	var cup_color: Color = variant.get("cup_color", Color(0.89, 0.84, 0.74))
 	_cup.material_override = _material(cup_color, 0.94)
 
+	var cup_dims: Dictionary = variant.get("cup_dimensions", {})
+	var cup_mesh := _cup.mesh as CylinderMesh
+	if cup_mesh != null and not cup_dims.is_empty():
+		cup_mesh.top_radius = maxf(float(cup_dims.get("top_radius", cup_mesh.top_radius)), 0.10)
+		cup_mesh.bottom_radius = maxf(float(cup_dims.get("bottom_radius", cup_mesh.bottom_radius)), 0.10)
+		cup_mesh.height = maxf(float(cup_dims.get("height", cup_mesh.height)), 0.40)
+		_label.cup_radius = cup_mesh.top_radius - 0.01
+		if _lid != null and _lid.mesh is CylinderMesh:
+			var lid_mesh := _lid.mesh as CylinderMesh
+			lid_mesh.top_radius = cup_mesh.top_radius + 0.03
+			lid_mesh.bottom_radius = cup_mesh.top_radius + 0.02
+			_lid.position.y = _cup.position.y + cup_mesh.height * 0.5 + lid_mesh.height * 0.5
+
+	var crumple_profile: Dictionary = variant.get("crumple_profile", {})
+	if _crumple == null:
+		_crumple = CupCrumpleModel.new(crumple_profile)
+	else:
+		_crumple.configure(crumple_profile)
+		_crumple.reset()
+	if _crumple_presentation != null:
+		_crumple_presentation.set_profile(variant)
+		_crumple_presentation.reset_visual()
+
 func _reset_session() -> void:
 	if _pointer != null:
 		_pointer.resume_gameplay_input()
@@ -322,6 +406,12 @@ func _reset_session() -> void:
 		_controller.reset()
 	if _lifecycle != null:
 		_lifecycle.reset()
+	if _ritual != null:
+		_ritual.reset()
+	if _crumple != null:
+		_crumple.reset()
+	if _crumple_presentation != null:
+		_crumple_presentation.reset_visual()
 	_release_count = 0
 	_pending_score = 0
 	_completed_this_frame = false
@@ -353,6 +443,15 @@ func _reset_session() -> void:
 	if _audio != null:
 		_audio.reset_feedback()
 	_update_hud("", "ATTACHED", 0.0)
+
+func _crumple_feedback_text() -> String:
+	var variant := _session.current_variant() if _session != null else {}
+	match String(variant.get("reward_theme", "warm")):
+		"crisp":
+			return "CRISP CRUMPLE"
+		"silky":
+			return "SOFT FOLD"
+	return "GENTLE CRUMPLE"
 
 func _screen_to_plane(screen_position: Vector2, z_depth: float) -> Vector3:
 	var origin := _camera.project_ray_origin(screen_position)
