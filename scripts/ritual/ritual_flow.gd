@@ -54,7 +54,10 @@ func mark_crumple_complete() -> bool:
 	return true
 
 func request_next() -> bool:
-	if _phase not in [Phase.CRUMPLE_READY, Phase.CRUMPLING, Phase.RITUAL_COMPLETE]:
+	# The short settle is an invitation, never a mandatory lockout. Once the
+	# label is detached the player may continue immediately or linger into the
+	# optional crumple phase at their own pace.
+	if _phase not in [Phase.PEEL_SETTLE, Phase.CRUMPLE_READY, Phase.CRUMPLING, Phase.RITUAL_COMPLETE]:
 		return false
 	if _next_pending:
 		return false
