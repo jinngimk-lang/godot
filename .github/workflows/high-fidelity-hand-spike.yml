@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/hand_candidate/assets artifacts/hand_candidate/reports
+          mkdir -p artifacts/hand_candidate/assets artifacts/hand_candidate/reports artifacts/hand_candidate/logs
           blender --background --python tools/build_high_fidelity_hand_candidate.py -- \
             assets/models/hands/hand_left.glb \
             artifacts/hand_candidate/assets/hand_left.glb \
@@ -67,23 +67,37 @@ jobs:
       - name: Import candidate and validate authored-hand contract
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          mkdir -p artifacts/hand_candidate/logs
           ./godot --headless --editor --path . --quit 2>&1 | tee candidate-import.log
+          import_status=${PIPESTATUS[0]}
+          cp candidate-import.log artifacts/hand_candidate/logs/candidate-import.log
+
           if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" candidate-import.log; then
-            echo "Godot failed to import candidate hand assets."
+            echo "Godot failed to parse/import candidate runtime scripts."
+            import_status=1
+          fi
+
+          timeout 30s ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee candidate-unit.log
+          unit_status=${PIPESTATUS[0]}
+          cp candidate-unit.log artifacts/hand_candidate/logs/candidate-unit.log
+          if ! grep -Fq 'PASS: all deterministic tests' candidate-unit.log; then
+            unit_status=1
+          fi
+
+          printf 'import_status=%s\nunit_status=%s\n' "$import_status" "$unit_status" | tee artifacts/hand_candidate/logs/status.txt
+          if [ "$import_status" -ne 0 ] || [ "$unit_status" -ne 0 ]; then
             exit 1
           fi
-          timeout 30s ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee candidate-unit.log
-          grep -Fq 'PASS: all deterministic tests' candidate-unit.log
 
       - name: Validate scene and interaction ownership
         shell: bash
         run: |
           set -euo pipefail
-          ./godot --headless --path . --script res://tests/smoke_scene.gd
-          ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
-          ./godot --headless --path . --script res://tests/smoke_ritual_loop.gd
-          ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
+          ./godot --headless --path . --script res://tests/smoke_scene.gd 2>&1 | tee artifacts/hand_candidate/logs/smoke-scene.log
+          ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd 2>&1 | tee artifacts/hand_candidate/logs/smoke-forearm.log
+          ./godot --headless --path . --script res://tests/smoke_ritual_loop.gd 2>&1 | tee artifacts/hand_candidate/logs/smoke-ritual.log
+          ./godot --headless --path . --script res://tests/smoke_reset_loop.gd 2>&1 | tee artifacts/hand_candidate/logs/smoke-reset.log
 
       - name: Capture candidate reference matrix
         shell: bash
@@ -93,6 +107,7 @@ jobs:
           rm -rf artifacts/reference_frames
           mkdir -p artifacts/reference_frames
           xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee candidate-capture.log
+          cp candidate-capture.log artifacts/hand_candidate/logs/candidate-capture.log
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" candidate-capture.log; then
             echo "Godot emitted errors while capturing candidate frames."
             exit 1
@@ -103,6 +118,7 @@ jobs:
           cp artifacts/reference_frames/*.png artifacts/hand_candidate/frames/
 
       - name: Upload hand candidate bundle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: high-fidelity-hand-candidate
