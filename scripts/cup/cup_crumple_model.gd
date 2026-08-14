@@ -10,7 +10,8 @@ var _max_compression := 0.22
 var _progress := 0.0
 var _gesture_active := false
 var _gesture_side := 0
-var _gesture_inward_total := 0.0
+var _gesture_inward_position := 0.0
+var _gesture_peak_inward := 0.0
 var _gesture_effective_total := 0.0
 var _pending_event := 0.0
 
@@ -26,12 +27,14 @@ func reset() -> void:
 	_progress = 0.0
 	_gesture_active = false
 	_gesture_side = 0
-	_gesture_inward_total = 0.0
+	_gesture_inward_position = 0.0
+	_gesture_peak_inward = 0.0
 	_gesture_effective_total = 0.0
 	_pending_event = 0.0
 
 func begin_gesture(pointer_x: float, cup_center_x: float) -> void:
-	_gesture_inward_total = 0.0
+	_gesture_inward_position = 0.0
+	_gesture_peak_inward = 0.0
 	_gesture_effective_total = 0.0
 	if not is_finite(pointer_x) or not is_finite(cup_center_x):
 		_gesture_active = false
@@ -50,16 +53,20 @@ func apply_drag(relative_x: float) -> Dictionary:
 	if not _gesture_active or not is_finite(relative_x):
 		return result
 
-	var inward := relative_x if _gesture_side < 0 else -relative_x
-	if inward <= 0.0:
-		return result
+	# Track signed gesture-local displacement, not only positive input packets.
+	# Returning outward reduces the current inward position, so zero-net pointer
+	# jitter cannot accumulate enough positive half-cycles to defeat rigidity.
+	# Existing cup deformation remains permanent; only this gesture-local cursor
+	# depth moves back outward.
+	var inward_delta := relative_x if _gesture_side < 0 else -relative_x
+	_gesture_inward_position = maxf(_gesture_inward_position + inward_delta, 0.0)
+	_gesture_peak_inward = maxf(_gesture_peak_inward, _gesture_inward_position)
 
-	# Rigidity is a threshold for the physical gesture, not for each input
-	# packet. Accumulate inward displacement and charge the deadzone once so the
-	# same squeeze feels the same at coarse and fine pointer sampling rates.
+	# Rigidity is charged once against the deepest inward point reached during
+	# this physical press. Only a new peak beyond the prior effective depth can
+	# add deformation, preserving packetization invariance without jitter creep.
 	var deadzone_px := _rigidity * 20.0
-	_gesture_inward_total += inward
-	var effective_total := maxf(_gesture_inward_total - deadzone_px, 0.0)
+	var effective_total := maxf(_gesture_peak_inward - deadzone_px, 0.0)
 	var effective_px := maxf(effective_total - _gesture_effective_total, 0.0)
 	_gesture_effective_total = effective_total
 	if effective_px <= 0.0:
@@ -82,7 +89,8 @@ func apply_drag(relative_x: float) -> Dictionary:
 func end_gesture() -> void:
 	_gesture_active = false
 	_gesture_side = 0
-	_gesture_inward_total = 0.0
+	_gesture_inward_position = 0.0
+	_gesture_peak_inward = 0.0
 	_gesture_effective_total = 0.0
 
 func get_progress() -> float:
