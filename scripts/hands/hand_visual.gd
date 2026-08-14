@@ -129,7 +129,7 @@ func _try_build_authored_hand() -> bool:
 		_skeleton = null
 		return false
 
-	var required_pose := "Pinch Up" if _dynamic else "Default pose"
+	var required_pose := "Pinch Up" if _dynamic else "Cup"
 	if not _animation_player.has_animation(required_pose):
 		remove_child(_authored_root)
 		_authored_root.free()
@@ -203,7 +203,7 @@ func _apply_pose() -> void:
 	if not _built and not _using_authored_asset:
 		return
 	if _using_authored_asset:
-		var pose_name := "Default pose" if not _dynamic else ("Pinch Tight" if _pinch_amount >= 0.42 else "Pinch Up")
+		var pose_name := "Cup" if not _dynamic else ("Pinch Tight" if _pinch_amount >= 0.42 else "Pinch Up")
 		if _animation_player != null and not _animation_player.has_animation(pose_name):
 			pose_name = "Pinch Up" if _dynamic else "Default pose"
 		_apply_authored_pose(pose_name)
