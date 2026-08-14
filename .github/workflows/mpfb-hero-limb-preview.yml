@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-retarget-v17
+      - spike/mpfb-hero-limb-retarget-v18
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses}
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses,previews}
           curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
           echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
           tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
@@ -55,11 +55,20 @@ jobs:
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           test -s artifacts/mpfb_limb/reports/xr-mpfb-retarget.json
+      - name: Render semantic pose retarget
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/render_mpfb_retarget_preview_v18.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/retarget-v18.log
+          grep -Fq "MPFB_RETARGET_V18_SUCCESS" artifacts/mpfb_limb/logs/retarget-v18.log
+          test -s artifacts/mpfb_limb/previews/retarget_cup.png
+          test -s artifacts/mpfb_limb/previews/retarget_pinch_up.png
+          test -s artifacts/mpfb_limb/previews/retarget_pinch_tight.png
       - name: Upload retarget evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-retarget-v17
+          name: mpfb-hero-limb-retarget-v18
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
