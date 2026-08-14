@@ -1,0 +1,164 @@
+name: Reference Hand Contact V2 Independent Challenger
+
+on:
+  push:
+    branches: [verify/reference-hand-contact-v2-challenger]
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CANDIDATE_SHA: 96898f4da8d65a5aa8dbcb134dbcba3e52f5161b
+      BASE_SHA: 17fe40b41ae2e1fc8d10d5e4b4bfc5e689ddc875
+    steps:
+      - name: Checkout verifier workflow branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact candidate for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git fetch origin "$BASE_SHA" --depth=1 || true
+
+      - name: Build split adversarial packets
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
+            echo "BASE=$BASE_SHA"
+            echo '=== CHANGE STAT ==='
+            git diff --stat "$BASE_SHA...$CANDIDATE_SHA"
+            echo '=== CORE PEEL MODEL ==='
+            cat scripts/peel/peel_model.gd
+            echo '=== PEEL CONTROLLER ==='
+            cat scripts/peel/peel_controller.gd
+            echo '=== INSPECTION ==='
+            cat scripts/inspection/inspection_controller.gd
+            echo '=== SESSION ==='
+            cat scripts/session/session_model.gd
+            echo '=== CORE CONTRACT TESTS ==='
+            cat tests/test_peel_model.gd
+            cat tests/test_peel_controller.gd
+            cat tests/test_inspection_controller.gd
+            cat tests/test_reference_profiles.gd
+          } > /tmp/gameplay-packet.txt
+
+          {
+            echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
+            echo "BASE=$BASE_SHA"
+            echo '=== HAND CONTACT DIFF ==='
+            git diff "$BASE_SHA...$CANDIDATE_SHA" -- scripts/presentation/forearm_presentation.gd tests/smoke_forearm_presentation.gd scripts/hands/hand_visual.gd scenes/peel_lab/peel_lab.tscn
+            echo '=== CURRENT FOREARM PRESENTATION ==='
+            cat scripts/presentation/forearm_presentation.gd
+            echo '=== FOREARM SMOKE ==='
+            cat tests/smoke_forearm_presentation.gd
+            echo '=== REFERENCE SCENE SMOKE ==='
+            cat tests/smoke_reference_scene.gd
+            echo '=== CHECKPOINT 02 ==='
+            cat docs/superpowers/checkpoints/2026-08-14-reference-convergence-checkpoint-02.md
+          } > /tmp/presentation-packet.txt
+
+          gameplay_bytes="$(wc -c < /tmp/gameplay-packet.txt)"
+          presentation_bytes="$(wc -c < /tmp/presentation-packet.txt)"
+          echo "gameplay packet bytes=$gameplay_bytes"
+          echo "presentation packet bytes=$presentation_bytes"
+          test "$gameplay_bytes" -lt 80000
+          test "$presentation_bytes" -lt 80000
+
+      - name: Install independent local model runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for _ in {1..45}; do
+            ollama list >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/ollama.log
+          exit 1
+
+      - name: Pull independent code model
+        shell: bash
+        run: ollama pull qwen2.5-coder:3b
+
+      - name: Challenge gameplay and state ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are an independent adversarial reviewer. You did not implement this Godot candidate. Try to falsify it, not praise it.
+
+          Review the exact candidate packet below. Focus on deterministic technical defects in peel math, completion/reset one-shot behavior, pointer ownership, inspection-vs-peel separation, scene switching, progression, glass-vs-paper behavior, stale transforms, missing resources, or presentation becoming gameplay authority.
+
+          Existing green tests are evidence but not proof. Construct at least one concrete counterexample beyond the happy path. If you find a reproducible defect, return NEEDS_FIX. If the exact batch is technically sound under the supplied code/tests, return VERIFIED. Do not fail it merely because future visual polish remains.
+
+          Output exactly four lines:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: <strongest boundary scenario you checked>
+          EVIDENCE: <concise technical reason>
+
+          Or replace VERIFIED/none with NEEDS_FIX and a concrete function/state reproducer.
+
+          PACKET:
+          PROMPT
+            cat /tmp/gameplay-packet.txt
+          } > /tmp/gameplay-prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/gameplay-prompt.txt | tee /tmp/gameplay-report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/gameplay-report.txt
+          grep -Eq '^DEFECT:' /tmp/gameplay-report.txt
+          grep -Eq '^MIN_TEST:' /tmp/gameplay-report.txt
+          grep -Eq '^EVIDENCE:' /tmp/gameplay-report.txt
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/gameplay-report.txt
+
+      - name: Challenge presentation and hand-contact integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are a second independent adversarial pass over an exact Godot candidate. Try to falsify the presentation integration, not praise it.
+
+          The narrow latest claim is that the glass-scene support hand is staged closer to the vessel while café behavior remains unchanged. Attack coordinate-space mistakes, state leakage between scenes, inspection-yaw follow, incorrect ownership, brittle tests, hand/forearm geometry bounds, hidden glass/cup state, or reset regressions. Treat the recorded visual checkpoint as evidence boundaries: it may report remaining aesthetic REDs without making this technical batch invalid.
+
+          Construct at least one concrete boundary scenario. Return NEEDS_FIX only for a reproducible technical defect in this exact batch. Otherwise VERIFIED.
+
+          Output exactly four lines:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: <strongest boundary scenario you checked>
+          EVIDENCE: <concise technical reason>
+
+          Or replace VERIFIED/none with NEEDS_FIX and a concrete function/state reproducer.
+
+          PACKET:
+          PROMPT
+            cat /tmp/presentation-packet.txt
+          } > /tmp/presentation-prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/presentation-prompt.txt | tee /tmp/presentation-report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/presentation-report.txt
+          grep -Eq '^DEFECT:' /tmp/presentation-report.txt
+          grep -Eq '^MIN_TEST:' /tmp/presentation-report.txt
+          grep -Eq '^EVIDENCE:' /tmp/presentation-report.txt
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/presentation-report.txt
+
+      - name: Publish review summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== GAMEPLAY CHALLENGER ==='
+          cat /tmp/gameplay-report.txt
+          echo '=== PRESENTATION CHALLENGER ==='
+          cat /tmp/presentation-report.txt
+          echo "VERIFIED_EXACT_HEAD=$CANDIDATE_SHA"
