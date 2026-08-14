@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v5
+      - spike/mpfb-hero-limb-pose-v6
   workflow_dispatch:
 
 permissions:
@@ -70,7 +70,7 @@ jobs:
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
           test -s artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb
 
-      - name: Render vessel-wrap and pinch pose families
+      - name: Solve and render contact pose candidates
         shell: bash
         run: |
           set -euo pipefail
@@ -79,7 +79,8 @@ jobs:
             artifacts/mpfb_limb/previews \
             2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
           grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
-          for frame in pose_neutral support_xp support_xn support_zp support_zn pinch_xp pinch_xn pinch_zp pinch_zn; do
+          grep -Fq "MPFB_POSE_BEST" artifacts/mpfb_limb/logs/pose-preview.log
+          for frame in pose_neutral support_solved_1 support_solved_2 support_solved_3 pinch_solved_1 pinch_solved_2 pinch_solved_3; do
             test -s "artifacts/mpfb_limb/previews/${frame}.png"
           done
           ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/pose-preview.log
@@ -88,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v5
+          name: mpfb-hero-limb-pose-v6
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
