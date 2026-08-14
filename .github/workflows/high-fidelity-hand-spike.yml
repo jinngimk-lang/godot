@@ -1,0 +1,109 @@
+name: High Fidelity Hand Spike
+
+on:
+  push:
+    branches:
+      - spike/high-fidelity-hand-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Blender and Xvfb
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender xvfb
+          blender --version | head -n 2
+
+      - name: Build subdivided rig-preserving candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/hand_candidate/assets artifacts/hand_candidate/reports
+          blender --background --python tools/build_high_fidelity_hand_candidate.py -- \
+            assets/models/hands/hand_left.glb \
+            artifacts/hand_candidate/assets/hand_left.glb \
+            artifacts/hand_candidate/reports/hand_left.json
+          blender --background --python tools/build_high_fidelity_hand_candidate.py -- \
+            assets/models/hands/hand_right.glb \
+            artifacts/hand_candidate/assets/hand_right.glb \
+            artifacts/hand_candidate/reports/hand_right.json
+          test -s artifacts/hand_candidate/assets/hand_left.glb
+          test -s artifacts/hand_candidate/assets/hand_right.glb
+          cat artifacts/hand_candidate/reports/hand_left.json
+          cat artifacts/hand_candidate/reports/hand_right.json
+
+      - name: Stage candidate into runtime paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/hand_candidate/assets/hand_left.glb assets/models/hands/hand_left.glb
+          cp artifacts/hand_candidate/assets/hand_right.glb assets/models/hands/hand_right.glb
+          rm -rf .godot
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Import candidate and validate authored-hand contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee candidate-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" candidate-import.log; then
+            echo "Godot failed to import candidate hand assets."
+            exit 1
+          fi
+          timeout 30s ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee candidate-unit.log
+          grep -Fq 'PASS: all deterministic tests' candidate-unit.log
+
+      - name: Validate scene and interaction ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --script res://tests/smoke_scene.gd
+          ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
+          ./godot --headless --path . --script res://tests/smoke_ritual_loop.gd
+          ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
+
+      - name: Capture candidate reference matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/hand_candidate/frames
+          rm -rf artifacts/reference_frames
+          mkdir -p artifacts/reference_frames
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee candidate-capture.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" candidate-capture.log; then
+            echo "Godot emitted errors while capturing candidate frames."
+            exit 1
+          fi
+          test -s artifacts/reference_frames/cafe.png
+          test -s artifacts/reference_frames/bar.png
+          test -s artifacts/reference_frames/market.png
+          cp artifacts/reference_frames/*.png artifacts/hand_candidate/frames/
+
+      - name: Upload hand candidate bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: high-fidelity-hand-candidate
+          path: artifacts/hand_candidate/
+          if-no-files-found: error
