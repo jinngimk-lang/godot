@@ -1,0 +1,70 @@
+name: Peel Challenger Comment Dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.actor == github.repository_owner &&
+      startsWith(github.event.comment.body, 'TYPE: DISPATCH_CHALLENGER')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Parse owner command and dispatch exact-head Challenger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          field() {
+            local key="$1"
+            printf '%s\n' "$COMMAND_BODY" | sed -n "s/^${key}:[[:space:]]*//p" | tail -n 1
+          }
+
+          task_id="$(field TASK_ID)"
+          pr_number="$(field PR_NUMBER)"
+          expected_head_sha="$(field EXPECTED_HEAD_SHA)"
+          round="$(field ROUND)"
+
+          if ! [[ "$task_id" =~ ^[0-9]+$ ]]; then
+            echo "Invalid TASK_ID: $task_id" >&2
+            exit 1
+          fi
+          if ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "Invalid PR_NUMBER: $pr_number" >&2
+            exit 1
+          fi
+          if ! [[ "$expected_head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid EXPECTED_HEAD_SHA: $expected_head_sha" >&2
+            exit 1
+          fi
+          if [ -z "$round" ]; then
+            round="1"
+          fi
+          if ! [[ "$round" =~ ^[0-9]+$ ]] || [ "$round" -gt 20 ]; then
+            echo "Invalid ROUND: $round" >&2
+            exit 1
+          fi
+
+          current_head="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
+          if [ "$current_head" != "$expected_head_sha" ]; then
+            echo "Refusing stale dispatch: PR #$pr_number current head=$current_head requested=$expected_head_sha" >&2
+            exit 1
+          fi
+
+          gh workflow run agent-challenger.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f task_id="$task_id" \
+            -f pr_number="$pr_number" \
+            -f expected_head_sha="$expected_head_sha" \
+            -f round="$round"
+
+          echo "Dispatched Challenger for task #$task_id PR #$pr_number exact head $expected_head_sha round $round"
