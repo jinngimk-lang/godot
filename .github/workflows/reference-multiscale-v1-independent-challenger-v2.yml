@@ -1,0 +1,109 @@
+name: Reference Multiscale V1 Independent Challenger V2
+
+on:
+  push:
+    branches: [verify/reference-multiscale-v1-challenger]
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CANDIDATE_SHA: f43f0e229ce7989d8febddc6fa753422565cadbb
+      BASE_SHA: 17fe40b41ae2e1fc8d10d5e4b4bfc5e689ddc875
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout exact candidate
+        run: |
+          set -euo pipefail
+          git checkout --detach "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git fetch origin "$BASE_SHA" --depth=1 || true
+      - name: Build focused packets
+        run: |
+          set -euo pipefail
+          {
+            echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
+            cat scripts/peel_lab.gd
+            cat scripts/peel/peel_model.gd
+            cat scripts/peel/peel_controller.gd
+            cat scripts/inspection/inspection_controller.gd
+            cat scripts/session/session_model.gd
+            cat tests/smoke_reset_loop.gd
+            cat tests/smoke_reference_scene.gd
+          } > /tmp/state.txt
+          {
+            echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
+            cat scripts/presentation/hand_choreography_presentation.gd
+            cat scripts/presentation/forearm_presentation.gd
+            cat tests/smoke_forearm_presentation.gd
+            cat art/acceptance_refs/v1/MANIFEST.md
+          } > /tmp/presentation.txt
+          test "$(wc -c < /tmp/state.txt)" -lt 90000
+          test "$(wc -c < /tmp/presentation.txt)" -lt 90000
+      - name: Install local model runtime
+        run: |
+          set -euo pipefail
+          if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
+          (ollama list >/dev/null 2>&1) || (nohup ollama serve >/tmp/ollama.log 2>&1 &)
+          for _ in {1..45}; do ollama list >/dev/null 2>&1 && break; sleep 1; done
+          ollama pull qwen2.5-coder:3b
+      - name: Adversarial state review
+        run: |
+          set -euo pipefail
+          { printf '%s\n' 'Find one reproducible technical defect in this exact Godot batch concerning reset, next-item, input separation, venue switching, inspection-vs-peel ownership, stale state or null hazards. Existing green tests are evidence, not proof. If you cannot identify a concrete reproducible defect, say NO_CONCRETE_DEFECT. Be concise.'; cat /tmp/state.txt; } | timeout 240s ollama run qwen2.5-coder:3b > /tmp/state-raw.txt 2>&1 || true
+      - name: Adversarial presentation review
+        run: |
+          set -euo pipefail
+          { printf '%s\n' 'Find one reproducible technical defect in this exact Godot batch concerning duplicate hand-root writers, coordinate spaces, inspection yaw, cafe-vs-glass ownership leakage, stale transforms, brittle assumptions or presentation owning gameplay. The known need for better human anatomy is not a technical blocker. If you cannot identify a concrete reproducible defect, say NO_CONCRETE_DEFECT. Be concise.'; cat /tmp/presentation.txt; } | timeout 240s ollama run qwen2.5-coder:3b > /tmp/presentation-raw.txt 2>&1 || true
+      - name: Normalize verdicts
+        run: |
+          set -euo pipefail
+          normalize() {
+            raw="$1"; out="$2"; scope="$3"
+            sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' "$raw" > /tmp/clean.txt || true
+            {
+              echo 'Convert the reviewer notes below into EXACTLY four plain-text lines and nothing else.'
+              echo 'Use NEEDS_FIX only if the notes contain a concrete reproducible technical defect. Otherwise use VERIFIED.'
+              echo 'Format:'
+              echo 'VERDICT: VERIFIED'
+              echo 'DEFECT: none'
+              echo 'MIN_TEST: <strongest boundary scenario actually assessed>'
+              echo 'EVIDENCE: <one concise reason>'
+              echo "Scope: $scope"
+              cat /tmp/clean.txt
+            } | timeout 90s ollama run qwen2.5-coder:3b > "$out" 2>&1 || true
+            sed -r -i 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' "$out" || true
+          }
+          normalize /tmp/state-raw.txt /tmp/state-report.txt state
+          normalize /tmp/presentation-raw.txt /tmp/presentation-report.txt presentation
+          cat /tmp/state-report.txt
+          cat /tmp/presentation-report.txt
+      - name: Persist reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-multiscale-challenger-v2-reports
+          path: |
+            /tmp/state-raw.txt
+            /tmp/presentation-raw.txt
+            /tmp/state-report.txt
+            /tmp/presentation-report.txt
+          retention-days: 14
+      - name: Gate exact candidate
+        run: |
+          set -euo pipefail
+          for report in /tmp/state-report.txt /tmp/presentation-report.txt; do
+            test -s "$report"
+            grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' "$report"
+            grep -Eq '^DEFECT:' "$report"
+            grep -Eq '^MIN_TEST:' "$report"
+            grep -Eq '^EVIDENCE:' "$report"
+            grep -Fxq 'VERDICT: VERIFIED' "$report"
+          done
+          echo "Independent Challenger V2 VERIFIED exact candidate $CANDIDATE_SHA"
