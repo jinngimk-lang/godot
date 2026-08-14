@@ -1,6 +1,8 @@
 extends Node3D
 class_name CupCrumplePresentation
 
+signal crumple_changed(progress: float)
+
 const RINGS := 7
 const SEGMENTS := 16
 const VISUAL_COMPRESSION_GAIN := 1.35
@@ -43,6 +45,7 @@ func set_crumple(progress: float, side: int, pulse: float) -> void:
 	_rebuild_shell()
 	_apply_visibility()
 	_apply_lid_follow()
+	crumple_changed.emit(_progress)
 
 func reset_visual() -> void:
 	_progress = 0.0
@@ -51,6 +54,7 @@ func reset_visual() -> void:
 	_rebuild_shell()
 	_apply_visibility()
 	_restore_lid_baseline()
+	crumple_changed.emit(0.0)
 
 func get_progress() -> float:
 	return _progress
@@ -94,8 +98,6 @@ func _apply_lid_follow() -> void:
 	var dims := _dimensions()
 	var total_shortening := dims.z * _progress * HEIGHT_SHORTENING_GAIN
 	var target := _baseline_lid_transform
-	# The generated cup shell shortens symmetrically around its center. The lid
-	# follows the top rim, which therefore moves downward by half the total loss.
 	target.origin.y -= total_shortening * 0.5
 	_lid.transform = target
 
