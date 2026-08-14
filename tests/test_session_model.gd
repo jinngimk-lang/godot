@@ -28,7 +28,7 @@ func run() -> Array[String]:
 	if float(first_crumple.get("max_compression", 0.0)) <= 0.0 or float(first_crumple.get("max_compression", 0.0)) >= 0.5:
 		failures.append("crumple profile should define a bounded physical compression range")
 	if String(first_contents.get("type", "")) != "none":
-		failures.append("current V5 baseline should expose future contents through explicit none profile")
+		failures.append("fresh warm_paper baseline should remain visually quiet with no contents")
 
 	if not model.has_method("record_ritual_complete"):
 		failures.append("RED: session progression must expose score-independent record_ritual_complete")
@@ -60,6 +60,38 @@ func run() -> Array[String]:
 	var unlock_three: Dictionary = model.record_ritual_complete()
 	if model.get_unlocked_count() != 3 or not bool(unlock_three.get("unlocked_new", false)):
 		failures.append("third tactile profile should unlock on fifth completed ritual")
+
+	# V6 sensory profile contract: each tactile cup must read as a distinct silhouette,
+	# and only the final unlocked profile may introduce a small contained ice layer.
+	var silhouette_signatures: Array[String] = []
+	for i in range(model.VARIANTS.size()):
+		var variant: Dictionary = model.VARIANTS[i]
+		var dims: Dictionary = variant.get("cup_dimensions", {})
+		var signature := "%.3f/%.3f/%.3f" % [
+			float(dims.get("top_radius", 0.0)),
+			float(dims.get("bottom_radius", 0.0)),
+			float(dims.get("height", 0.0))
+		]
+		if signature in silhouette_signatures:
+			failures.append("RED: tactile cup silhouettes must be materially distinct, duplicate=%s" % signature)
+		silhouette_signatures.append(signature)
+
+		var contents: Dictionary = variant.get("contents_profile", {})
+		if i < model.VARIANTS.size() - 1:
+			if String(contents.get("type", "")) != "none":
+				failures.append("only the final unlocked tactile cup should introduce contents")
+		else:
+			if String(contents.get("type", "")) != "ice":
+				failures.append("RED: final tactile cup should introduce bounded contained ice")
+			var count := int(contents.get("count", 0))
+			var cube_size := float(contents.get("cube_size", 0.0))
+			var motion_gain := float(contents.get("motion_gain", -1.0))
+			if count < 2 or count > 5:
+				failures.append("ice count should stay deliberately small (2..5), got %d" % count)
+			if cube_size < 0.07 or cube_size > 0.16:
+				failures.append("ice cube size should stay visually legible but contained, got %.3f" % cube_size)
+			if motion_gain < 0.0 or motion_gain > 1.0:
+				failures.append("ice motion gain must be bounded 0..1, got %.3f" % motion_gain)
 
 	# Every current tactile cup should take a short sequence of deliberate squeezes,
 	# not jump from fresh to complete on one representative 50 px inward drag.
