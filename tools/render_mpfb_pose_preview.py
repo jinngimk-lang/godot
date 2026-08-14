@@ -1,17 +1,17 @@
-"""Solve and render deterministic MPFB hero-hand contact candidates.
+"""Solve and render MPFB hero-hand contact candidates with three-axis thumb opposition.
 
-The preceding axis/pose spikes established two useful facts from real renders:
-(1) local +Z is the credible flexion direction for the four finger chains;
-(2) single-axis thumb guesses do not create actual opposition/contact.
+Evidence from prior spikes:
+- local +Z is the credible flexion axis for the four long finger chains;
+- single-axis thumb sweeps and an X/Z-only grid can reduce endpoint distance but
+  still produce visually wrong opposition and cannot close label pinch contact.
 
-This stage therefore keeps the validated finger flexion and searches a bounded,
-anatomically plausible thumb parameter family. It ranks candidates by real rig
-endpoint distance for two product requirements: thumb-to-index pinch contact and
-thumb-to-vessel-surface opposition. The top candidates are rendered for visual
-rejection/selection; numerical proximity is evidence, not final acceptance.
+This stage models the thumb as a coupled 3D chain. A bounded coordinate-descent
+solver explores local X/Y/Z on the proximal thumb and smaller multi-axis motion
+on the distal joints. The objective is physical endpoint contact, but all winners
+must still pass visual anatomy review before gameplay integration.
 """
 from __future__ import annotations
-import itertools, math, sys, traceback
+import math, sys, traceback
 from pathlib import Path
 import bpy
 from mathutils import Vector, Quaternion
@@ -73,17 +73,22 @@ def _clear_pose(arm):
         if o.name.startswith('PoseProxy_'): bpy.data.objects.remove(o,do_unlink=True)
     bpy.context.view_layer.update()
 
+def _axis_q(axis,degrees):
+    axes={'x':Vector((1,0,0)),'y':Vector((0,1,0)),'z':Vector((0,0,1))}
+    return Quaternion(axes[axis],math.radians(degrees))
+
 def _set_axis(arm,bone_name,axis,degrees):
     pb=arm.pose.bones.get(bone_name)
     if pb is None: raise RuntimeError(f'missing pose bone {bone_name}')
-    axes={'x':Vector((1,0,0)),'y':Vector((0,1,0)),'z':Vector((0,0,1))}
-    pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=Quaternion(axes[axis],math.radians(degrees))
+    pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=_axis_q(axis,degrees)
 
-def _set_xz(arm,bone_name,xdeg,zdeg):
+def _set_xyz(arm,bone_name,angles):
     pb=arm.pose.bones.get(bone_name)
     if pb is None: raise RuntimeError(f'missing pose bone {bone_name}')
-    qx=Quaternion(Vector((1,0,0)),math.radians(xdeg)); qz=Quaternion(Vector((0,0,1)),math.radians(zdeg))
-    pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=qx@qz
+    x,y,z=angles
+    pb.rotation_mode='QUATERNION'
+    # Stable local composition order. Bounds below keep this away from singular extremes.
+    pb.rotation_quaternion=_axis_q('x',x)@_axis_q('y',y)@_axis_q('z',z)
 
 def _curl_chain(arm,prefix,degrees):
     for index,deg in enumerate(degrees,1): _set_axis(arm,f'{prefix}_0{index}_r','z',deg)
@@ -92,55 +97,85 @@ def _support_fingers(arm):
     _curl_chain(arm,'index',(31,48,32)); _curl_chain(arm,'middle',(38,58,38)); _curl_chain(arm,'ring',(43,63,42)); _curl_chain(arm,'pinky',(47,67,45))
 
 def _pinch_fingers(arm):
-    _curl_chain(arm,'index',(25,39,24)); _curl_chain(arm,'middle',(16,23,14)); _curl_chain(arm,'ring',(20,28,18)); _curl_chain(arm,'pinky',(24,32,21))
+    _curl_chain(arm,'index',(25,39,24)); _curl_chain(arm,'middle',(14,20,12)); _curl_chain(arm,'ring',(18,25,16)); _curl_chain(arm,'pinky',(22,30,20))
 
 def _apply_thumb(arm,p):
-    x1,z1,z2,z3=p
-    _set_xz(arm,'thumb_01_r',x1,z1); _set_axis(arm,'thumb_02_r','z',z2); _set_axis(arm,'thumb_03_r','z',z3)
-    bpy.context.view_layer.update()
+    _set_xyz(arm,'thumb_01_r',p[0:3]); _set_xyz(arm,'thumb_02_r',p[3:6]); _set_xyz(arm,'thumb_03_r',p[6:9]); bpy.context.view_layer.update()
 
-def _thumb_grid():
-    # Bounded around plausible opposition/flexion; deliberately excludes 90°+
-    # joint rotations that made prior claw/twist artifacts.
-    return itertools.product((-45,-25,-5,15,35,55),(-55,-35,-15,5,25,45),(-45,-25,-5,15,35,55),(-35,-15,5,25,45))
+# Anatomically conservative bounds: proximal joint gets the largest ab/adduction
+# freedom; distal joints mostly flex but retain small transverse correction.
+BOUNDS=[(-55,55),(-60,60),(-60,60),(-20,20),(-25,25),(-55,55),(-15,15),(-15,15),(-45,45)]
 
-def _regularization(params):
-    # Tiny preference for lower total angular excursion; contact remains dominant.
-    return sum(abs(v) for v in params)/720.0*0.003
+def _clamp(v,lo,hi): return max(lo,min(hi,v))
+def _regularization(p): return sum(abs(v) for v in p)/900.0*0.0015
 
-def _rank_thumb(arm,base_pose,target_fn,limit=3):
-    ranked=[]
-    for params in _thumb_grid():
-        _clear_pose(arm); base_pose(arm); _apply_thumb(arm,params)
-        target=target_fn(arm)
-        tip=_world_pose(arm,'thumb_03_r',True)
-        distance=(tip-target).length
-        ranked.append((distance+_regularization(params),distance,params,target.copy(),tip.copy()))
-    ranked.sort(key=lambda row:row[0])
-    return ranked[:limit]
-
-def _vessel_geometry(arm):
-    hand=_world_rest(arm,'hand_r'); index=_world_rest(arm,'index_01_r'); mid=_world_rest(arm,'middle_02_r'); tip=_world_rest(arm,'middle_03_r',True)
-    center=mid.lerp(tip,.28); axis=(hand-index).normalized(); radius=.038
-    return center,axis,radius
+def _finger_centroid(arm):
+    pts=[_world_pose(arm,'index_02_r',True),_world_pose(arm,'middle_02_r',True),_world_pose(arm,'ring_02_r',True)]
+    return sum(pts,Vector((0,0,0)))/len(pts)
 
 def _support_target(arm):
-    center,axis,radius=_vessel_geometry(arm); rest_thumb=_world_rest(arm,'thumb_03_r',True)
-    radial=rest_thumb-center; radial=radial-axis*radial.dot(axis)
-    if radial.length<1e-6: radial=Vector((1,0,0))
-    return center+radial.normalized()*radius
+    # We want the thumb on the opposite side of a ~76 mm vessel gap from the
+    # curled finger contact centroid. Direction is seeded from natural thumb side.
+    fingers=_finger_centroid(arm); palm=_world_pose(arm,'hand_r'); rest_thumb=_world_rest(arm,'thumb_03_r',True)
+    side=rest_thumb-palm
+    if side.length<1e-6: side=Vector((1,0,0))
+    side.normalize()
+    return fingers+side*0.076
 
 def _pinch_target(arm): return _world_pose(arm,'index_03_r',True)
 
-def _add_cylinder_proxy(arm):
-    center,axis,radius=_vessel_geometry(arm)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=radius,depth=.19,location=center)
+def _score(arm,target_fn,p):
+    _apply_thumb(arm,p); goal=target_fn(arm); tip=_world_pose(arm,'thumb_03_r',True)
+    return (tip-goal).length+_regularization(p),(tip-goal).length,goal.copy(),tip.copy()
+
+def _solve_seed(arm,base_pose,target_fn,seed):
+    p=list(seed); _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
+    # Coarse-to-fine coordinate descent. Each stage touches at most 9*2 candidates,
+    # dramatically cheaper than the previous 1080-point brute-force grid.
+    for step in (24.0,12.0,6.0,3.0):
+        changed=True; passes=0
+        while changed and passes<3:
+            changed=False; passes+=1
+            for i,(lo,hi) in enumerate(BOUNDS):
+                local_best=best; local_p=p
+                for direction in (-1.0,1.0):
+                    q=p.copy(); q[i]=_clamp(q[i]+direction*step,lo,hi)
+                    if q[i]==p[i]: continue
+                    _clear_pose(arm); base_pose(arm); cand=_score(arm,target_fn,q)
+                    if cand[0]+1e-8<local_best[0]: local_best=cand; local_p=q
+                if local_p is not p:
+                    p=local_p; best=local_best; changed=True
+                else:
+                    _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
+    return best[0],best[1],tuple(round(v,3) for v in p),best[2],best[3]
+
+def _solve_multi(arm,base_pose,target_fn):
+    seeds=[
+        (0,0,0, 0,0,0, 0,0,0),
+        (25,25,15, 0,0,15, 0,0,10),
+        (25,-25,15, 0,0,15, 0,0,10),
+        (-20,30,-10, 0,0,20, 0,0,10),
+        (40,0,30, 0,0,-15, 0,0,5),
+    ]
+    ranked=[_solve_seed(arm,base_pose,target_fn,s) for s in seeds]
+    ranked.sort(key=lambda r:r[0])
+    # Deduplicate near-identical coordinate-descent endpoints.
+    unique=[]
+    for row in ranked:
+        if all(sum(abs(a-b) for a,b in zip(row[2],u[2]))>3.0 for u in unique): unique.append(row)
+    return unique[:3]
+
+def _support_proxy(arm):
+    fingers=_finger_centroid(arm); thumb=_world_pose(arm,'thumb_03_r',True); center=(fingers+thumb)*0.5
+    # Orient cylinder along the local hand/forearm direction; radius matches expected vessel scale.
+    axis=(_world_pose(arm,'hand_r')-_world_pose(arm,'lowerarm_r')).normalized()
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=.038,depth=.20,location=center)
     obj=bpy.context.object; obj.name='PoseProxy_Vessel'; obj.data.materials.append(_proxy_material('VesselProxy',(0.12,0.24,0.34,1),.38)); obj.rotation_euler=axis.to_track_quat('Z','Y').to_euler()
 
-def _add_flap_proxy(arm):
+def _pinch_proxy(arm):
     index_tip=_world_pose(arm,'index_03_r',True); thumb_tip=_world_pose(arm,'thumb_03_r',True); center=index_tip.lerp(thumb_tip,.5)
     bpy.ops.mesh.primitive_cube_add(size=1,location=center)
-    obj=bpy.context.object; obj.name='PoseProxy_Flap'; obj.scale=(.026,.004,.018); obj.data.materials.append(_proxy_material('FlapProxy',(0.74,0.62,0.38,1),.82))
+    obj=bpy.context.object; obj.name='PoseProxy_Flap'; obj.scale=(.024,.003,.016); obj.data.materials.append(_proxy_material('FlapProxy',(0.74,0.62,0.38,1),.82))
 
 def _render(cam,name,target,offset):
     cam.location=target+offset; _look(cam,target); bpy.context.scene.render.filepath=str(OUT/f'{name}.png'); bpy.ops.render.render(write_still=True)
@@ -148,19 +183,20 @@ def _render(cam,name,target,offset):
     if not p.is_file() or p.stat().st_size<=0: raise RuntimeError('render failed '+name)
     print('MPFB_POSE_FRAME',name,p.stat().st_size)
 
-def _render_ranked(arm,cam,target,camera_offset,prefix,base_pose,target_fn,proxy_fn):
-    ranked=_rank_thumb(arm,base_pose,target_fn,3)
-    for rank,(_,distance,params,goal,tip) in enumerate(ranked,1):
+def _render_solved(arm,cam,target,offset,prefix,base_pose,target_fn,proxy_fn):
+    ranked=_solve_multi(arm,base_pose,target_fn)
+    for rank,row in enumerate(ranked,1):
+        _,distance,params,goal,tip=row
         print('MPFB_POSE_SOLVE',prefix,'rank',rank,'distance',f'{distance:.6f}','params',params,'goal',tuple(round(v,5) for v in goal),'thumb_tip',tuple(round(v,5) for v in tip))
-        _clear_pose(arm); base_pose(arm); _apply_thumb(arm,params); proxy_fn(arm); bpy.context.view_layer.update(); _render(cam,f'{prefix}_{rank}',target,camera_offset)
+        _clear_pose(arm); base_pose(arm); _apply_thumb(arm,params); proxy_fn(arm); bpy.context.view_layer.update(); _render(cam,f'{prefix}_{rank}',target,offset)
     return ranked
 
 def _run():
     global INPUT,OUT; INPUT,OUT=_args(); OUT.mkdir(parents=True,exist_ok=True); mesh,arm,cam=_setup()
-    target=(_world_rest(arm,'hand_r')+_world_rest(arm,'middle_03_r',True))*0.5; camera_offset=Vector((-0.18,-0.28,0.10))
-    _clear_pose(arm); _render(cam,'pose_neutral',target,camera_offset)
-    support=_render_ranked(arm,cam,target,camera_offset,'support_solved',_support_fingers,_support_target,_add_cylinder_proxy)
-    pinch=_render_ranked(arm,cam,target,camera_offset,'pinch_solved',_pinch_fingers,_pinch_target,_add_flap_proxy)
+    target=(_world_rest(arm,'hand_r')+_world_rest(arm,'middle_03_r',True))*0.5; offset=Vector((-0.18,-0.28,0.10))
+    _clear_pose(arm); _render(cam,'pose_neutral',target,offset)
+    support=_render_solved(arm,cam,target,offset,'support_solved',_support_fingers,_support_target,_support_proxy)
+    pinch=_render_solved(arm,cam,target,offset,'pinch_solved',_pinch_fingers,_pinch_target,_pinch_proxy)
     print('MPFB_POSE_BEST support_distance',f'{support[0][1]:.6f}','pinch_distance',f'{pinch[0][1]:.6f}')
     print(SUCCESS)
 if __name__=='__main__':
