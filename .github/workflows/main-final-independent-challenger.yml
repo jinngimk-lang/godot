@@ -1,0 +1,112 @@
+name: Main Final Independent Challenger
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  challenge:
+    if: contains(github.event.head_commit.message, 'run final main independent challenger')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Build final-state adversarial packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "EXACT_MAIN_HEAD=${GITHUB_SHA}"
+            cat scripts/cup/cup_crumple_model.gd
+            cat scripts/ritual/ritual_flow.gd
+            cat scripts/peel/peel_model.gd
+            cat scripts/peel/peel_controller.gd
+            cat scripts/session/session_model.gd
+            cat scripts/inspection/inspection_controller.gd
+            cat scripts/peel_lab.gd
+            cat tests/test_cup_crumple_model.gd
+            cat tests/test_ritual_flow.gd
+            cat tests/test_peel_model.gd
+            cat tests/test_peel_controller.gd
+            cat tests/test_reference_profiles.gd
+            cat tests/smoke_reference_scene.gd
+            cat tests/smoke_ritual_loop.gd
+            cat tests/smoke_reset_loop.gd
+          } > /tmp/final-packet.txt
+          test "$(wc -c < /tmp/final-packet.txt)" -lt 80000
+
+      - name: Install local challenger runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for _ in {1..45}; do
+            ollama list >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/ollama.log
+          exit 1
+
+      - name: Pull independent code model
+        shell: bash
+        run: ollama pull qwen2.5-coder:3b
+
+      - name: Falsify final main state
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are an independent adversarial CHALLENGER reviewing the exact final main state of a Godot tactile peeling game. Do not praise or summarize. Try to falsify all claims below with concrete state/race/coordinate-space reasoning:
+          A. Crumple progress is sampling-rate independent around the gesture deadzone: splitting the same physical inward motion across more input samples cannot suppress progress.
+          B. Once a next-item transition consumes the current ritual, late crumple completion cannot award a stale reward to the consumed item.
+          C. Peel begins from any visible projected label region, not only a gold hotspot.
+          D. Adhesive load is damped; a brief spike cannot instantly detach, and hard/fast pull reduces integrity/increases residue.
+          E. RMB inspection cannot steal LMB/touch peel ownership; cup, label, product detail and residue stay in one inspection yaw space.
+          F. Q/E and 1/2/3 scene switching clears transient interaction safely without erasing earned progression.
+          G. Café paper product may optionally crumple; amber and clear glass products never enter paper crumple flow.
+          H. Duplicate detach/reset/pause transitions cannot double-count ritual progression.
+          I. Presentation residue/background/HUD layers do not become gameplay authority.
+
+          A defect must name exact function/state and a deterministic reproducer. Output exactly four lines:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: none
+          EVIDENCE: <concise strongest falsification attempts>
+          or VERDICT: NEEDS_FIX with concrete defect/test.
+
+          Exact packet follows:
+          PROMPT
+            cat /tmp/final-packet.txt
+          } > /tmp/final-prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/final-prompt.txt | tee /tmp/final-report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/final-report.txt
+          grep -Eq '^DEFECT:' /tmp/final-report.txt
+          grep -Eq '^MIN_TEST:' /tmp/final-report.txt
+          grep -Eq '^EVIDENCE:' /tmp/final-report.txt
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/final-report.txt
+
+      - name: Persist final VERIFIED marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch main
+          git pull --ff-only origin main
+          mkdir -p .agents/verdicts
+          cp /tmp/final-report.txt .agents/verdicts/main-final-verified.txt
+          printf '\nEXACT_MAIN_HEAD: %s\nRUN_ID: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" >> .agents/verdicts/main-final-verified.txt
+          git config user.name 'peel-local-challenger'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .agents/verdicts/main-final-verified.txt
+          git commit -m 'ci: record final main independent verified verdict'
+          git push origin main
