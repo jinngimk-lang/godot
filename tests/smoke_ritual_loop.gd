@@ -19,6 +19,7 @@ func _run() -> void:
 	var crumple = scene.get("_crumple")
 	var session = scene.get("_session")
 	var pointer := scene.get_node_or_null("PointerAdapter") as PointerAdapter
+	var audio := scene.get_node_or_null("PeelAudio")
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
 	var reward := scene.get_node_or_null("HUD/Reward") as Label
 	var presentation := scene.get_node_or_null("CupCrumplePresentation")
@@ -26,8 +27,8 @@ func _run() -> void:
 		failures.append("RITUAL_RED: PeelLab must own RitualFlow")
 	if crumple == null:
 		failures.append("RITUAL_RED: PeelLab must own CupCrumpleModel")
-	if session == null or pointer == null or hud == null or reward == null or presentation == null:
-		failures.append("RITUAL_RED: real scene missing ritual/session/pointer/HUD/presentation contract")
+	if session == null or pointer == null or audio == null or hud == null or reward == null or presentation == null:
+		failures.append("RITUAL_RED: real scene missing ritual/session/pointer/audio/HUD/presentation contract")
 	if not failures.is_empty():
 		_finish(scene, failures)
 		return
@@ -35,6 +36,12 @@ func _run() -> void:
 		failures.append("RITUAL_RED: PeelLab missing production crumple pointer router")
 		_finish(scene, failures)
 		return
+	if not audio.has_signal("crumple_pulse_played"):
+		failures.append("RITUAL_RED: real crumple needs a machine-observable Foley pulse signal")
+		_finish(scene, failures)
+		return
+	var crumple_audio_events := [0]
+	audio.connect("crumple_pulse_played", func(_strength): crumple_audio_events[0] += 1)
 
 	# Simulate a physically held peel input at detach. Entering the post-peel
 	# phase must quarantine it so that the same held press cannot become a cup
@@ -80,6 +87,14 @@ func _run() -> void:
 		failures.append("RITUAL_RED: optional cup squeezing must not duplicate base progression")
 	if presentation.has_method("get_progress") and float(presentation.call("get_progress")) <= 0.0:
 		failures.append("RITUAL_RED: crumple pointer route must drive visible presentation progress")
+	if crumple_audio_events[0] <= 0:
+		failures.append("RITUAL_RED: real inward squeeze must route a crumple Foley pulse")
+	var audio_before_stationary: int = int(crumple_audio_events[0])
+	var stationary := PointerState.new()
+	stationary.set_frame(true, Vector2(470, 360), Vector2.ZERO, Vector2.ZERO, false)
+	scene.call("_process_crumple_pointer", stationary)
+	if int(crumple_audio_events[0]) != audio_before_stationary:
+		failures.append("RITUAL_RED: stationary crumple hold must not retrigger Foley")
 
 	# Finish enough bounded squeezes to trigger descriptive crumple feedback once.
 	for _i in range(20):
@@ -120,7 +135,7 @@ func _run() -> void:
 
 func _finish(scene: Node, failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("PASS: detach -> no-timer settle -> optional crumple -> calm reward -> deliberate next")
+		print("PASS: detach -> no-timer settle -> optional crumple/Foley -> calm reward -> deliberate next")
 		scene.queue_free()
 		await process_frame
 		quit(0)
