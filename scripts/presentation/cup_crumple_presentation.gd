@@ -12,6 +12,7 @@ var _cup: MeshInstance3D
 var _lid: MeshInstance3D
 var _shell: MeshInstance3D
 var _profile: Dictionary = {}
+var _enabled := true
 var _progress := 0.0
 var _side := -1
 var _pulse := 0.0
@@ -27,18 +28,29 @@ func _process(_delta: float) -> void:
 		_bind_cup()
 	if _cup != null and _shell != null:
 		_shell.transform = global_transform.affine_inverse()*_cup.global_transform
-		_sync_material()
+		if _enabled:
+			_sync_material()
 
 func set_profile(profile: Dictionary) -> void:
 	_profile = profile.duplicate(true)
+	_enabled = String(_profile.get("post_peel_action","crumple")) == "crumple" and String(_profile.get("cup_shell","paper")) == "paper"
 	if _cup == null:
 		_bind_cup()
 	_capture_lid_baseline()
+	_progress = 0.0
+	_pulse = 0.0
 	_last_signature.x = -1.0
-	_rebuild_shell()
-	_apply_lid_follow()
+	if _enabled:
+		_rebuild_shell()
+		_apply_lid_follow()
+	elif _shell != null:
+		_shell.visible = false
+	# Important: disabled glass profiles deliberately do not touch _cup.visible.
+	# ProductPresentation owns whether the hidden interaction cylinder is shown.
 
 func set_crumple(progress: float, side: int, pulse: float) -> void:
+	if not _enabled:
+		return
 	_progress = clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
 	_side = -1 if side<0 else 1
 	_pulse = clampf(pulse if is_finite(pulse) else 0.0,0.0,1.0)
@@ -51,13 +63,20 @@ func reset_visual() -> void:
 	_progress = 0.0
 	_pulse = 0.0
 	_last_signature.x = -1.0
-	_rebuild_shell()
-	_apply_visibility()
-	_restore_lid_baseline()
+	if _enabled:
+		_rebuild_shell()
+		_apply_visibility()
+		_restore_lid_baseline()
+	else:
+		if _shell != null:
+			_shell.visible = false
 	crumple_changed.emit(0.0)
 
 func get_progress() -> float:
 	return _progress
+
+func is_enabled_for_profile() -> bool:
+	return _enabled
 
 func _bind_cup() -> void:
 	if _cup != null:
@@ -78,8 +97,9 @@ func _bind_cup() -> void:
 	_shell.transform = global_transform.affine_inverse()*_cup.global_transform
 	_sync_material()
 	_capture_lid_baseline()
-	_rebuild_shell()
-	_apply_visibility()
+	if _enabled:
+		_rebuild_shell()
+		_apply_visibility()
 
 func _capture_lid_baseline() -> void:
 	if _lid == null:
@@ -93,7 +113,7 @@ func _capture_lid_baseline() -> void:
 	_has_lid_baseline = true
 
 func _apply_lid_follow() -> void:
-	if _lid == null or not _has_lid_baseline:
+	if not _enabled or _lid == null or not _has_lid_baseline:
 		return
 	var dims := _dimensions()
 	var total_shortening := dims.z*_progress*HEIGHT_SHORTENING_GAIN
@@ -102,11 +122,11 @@ func _apply_lid_follow() -> void:
 	_lid.transform = target
 
 func _restore_lid_baseline() -> void:
-	if _lid != null and _has_lid_baseline:
+	if _enabled and _lid != null and _has_lid_baseline:
 		_lid.transform = _baseline_lid_transform
 
 func _apply_visibility() -> void:
-	if _cup == null or _shell == null:
+	if not _enabled or _cup == null or _shell == null:
 		return
 	var crumpled := _progress>0.001
 	_shell.visible = crumpled
@@ -114,6 +134,8 @@ func _apply_visibility() -> void:
 	_set_cafe_details_visible(not crumpled)
 
 func _set_cafe_details_visible(value: bool) -> void:
+	if not _enabled:
+		return
 	var parent := get_parent()
 	if parent == null:
 		return
@@ -137,6 +159,8 @@ func _sync_material() -> void:
 		_shell.material_override = material
 
 func _rebuild_shell() -> void:
+	if not _enabled:
+		return
 	if _cup == null:
 		_bind_cup()
 	if _cup == null or _shell == null:
