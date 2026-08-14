@@ -16,4 +16,5 @@ func run() -> Array[String]:
 	residue.set_residue(0.0, 0.0, 1.0)
 	if residue.get_residue_amount() != 0.0:
 		failures.append("residue visual should clear at reset")
+	residue.free()
 	return failures
