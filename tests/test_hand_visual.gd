@@ -25,6 +25,15 @@ func run() -> Array[String]:
 		if hand.find_child(required_node, true, false) == null:
 			failures.append("HandVisual missing pinch anchor %s" % required_node)
 
+	# Owner playtest showed the fully open dynamic rest pose reads as a deformed
+	# two-finger claw in the game camera. The authored Pinch Up pose keeps the
+	# hand relaxed while visually preparing thumb/index around the peel edge.
+	var dynamic_player := _find_animation_player(hand)
+	if dynamic_player == null:
+		failures.append("authored dynamic hand must expose AnimationPlayer")
+	elif dynamic_player.current_animation != "Pinch Up":
+		failures.append("RED: relaxed dynamic authored hand must use Pinch Up, got %s" % dynamic_player.current_animation)
+
 	# Real-render diagnostics proved the authored GLBs end directly at their
 	# root Wrist_L/Wrist_R plane. Normal close-up presentation must therefore
 	# cover that open wrist end instead of exposing a cropped skin cylinder.
@@ -45,6 +54,30 @@ func run() -> Array[String]:
 
 	hand.set_pinch_amount(1.0)
 	hand.set_grip_target(Vector3(1.0, 0.5, 0.8))
-	hand.tick(0.016)
+	hand.tick(0.1)
+	if dynamic_player != null and dynamic_player.current_animation != "Pinch Tight":
+		failures.append("active authored hand must close to Pinch Tight")
 	hand.free()
+
+	# The upstream Cup pose has strong multi-finger flexion and owner playtest
+	# shows it reading as twisted anatomy from the current support-hand camera
+	# angle. A neutral open hand pressed to the cup reads as calm support without
+	# skin collapse; cup holding is conveyed by placement/forearm direction.
+	var support = hand_script.new()
+	support.setup(false)
+	var support_player := _find_animation_player(support)
+	if support_player == null:
+		failures.append("authored support hand must expose AnimationPlayer")
+	elif support_player.current_animation != "Default pose":
+		failures.append("RED: authored support hand must use neutral Default pose, got %s" % support_player.current_animation)
+	support.free()
 	return failures
+
+func _find_animation_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var found := _find_animation_player(child)
+		if found != null:
+			return found
+	return null
