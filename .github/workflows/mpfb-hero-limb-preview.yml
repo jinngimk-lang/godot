@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v8
+      - spike/mpfb-hero-limb-pose-v9
   workflow_dispatch:
 
 permissions:
@@ -80,7 +80,7 @@ jobs:
             2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
           grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
           grep -Fq "MPFB_POSE_BEST" artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_PRIOR anatomy_regularized_v8" artifacts/mpfb_limb/logs/pose-preview.log
+          grep -Fq "MPFB_POSE_PRIOR contact_specific_v9" artifacts/mpfb_limb/logs/pose-preview.log
           for frame in pose_neutral support_solved_1 support_solved_2 support_solved_3 pinch_solved_1 pinch_solved_2 pinch_solved_3; do
             test -s "artifacts/mpfb_limb/previews/${frame}.png"
           done
@@ -90,7 +90,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v8
+          name: mpfb-hero-limb-pose-v9
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
