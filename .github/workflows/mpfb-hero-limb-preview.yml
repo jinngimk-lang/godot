@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Surface Servo v26
+name: MPFB Hero Limb Pinch Tight v27
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-surface-servo-v26
+      - spike/mpfb-hero-limb-pinch-tight-v27
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  surface-servo:
+  pinch-tight:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -54,19 +54,19 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render direct visible-surface servo candidate
+      - name: Render Pinch Tight surface-servo candidate
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_surface_servo_v26.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/surface-servo-v26.log
-          grep -Fq "MPFB_SURFACE_SERVO_V26_SUCCESS" artifacts/mpfb_limb/logs/surface-servo-v26.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_pinch_tight_v27.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/pinch-tight-v27.log
+          grep -Fq "MPFB_PINCH_TIGHT_V27_SUCCESS" artifacts/mpfb_limb/logs/pinch-tight-v27.log
           test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
-          test -s artifacts/mpfb_limb/previews/surface_v26_pinch.png
-      - name: Upload direct surface-servo evidence
+          test -s artifacts/mpfb_limb/previews/surface_v27_pinch_tight.png
+      - name: Upload Pinch Tight evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-surface-servo-v26
+          name: mpfb-hero-limb-pinch-tight-v27
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
