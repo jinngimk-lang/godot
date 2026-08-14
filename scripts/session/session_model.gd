@@ -79,7 +79,7 @@ const VARIANTS := [
 		"scene_profile":{"id":"market_coldcase","table_color":Color(0.75,0.75,0.72),"table_roughness":0.40,"ambient_color":Color(0.60,0.67,0.72),"accent_color":Color(0.70,0.90,1.0),"light_energy":1.02},
 		"post_peel_action":"inspect",
 		"crumple_profile":{"rigidity":0.055,"dent_gain":0.0035,"max_compression":0.18},
-		"contents_profile":{"type":"none"},
+		"contents_profile":{"type":"ice","count":3,"cube_size":0.145,"motion_gain":0.55},
 		"reward_theme":"crisp",
 		"hint":"cool glass • inspect residue from every angle"
 	}
