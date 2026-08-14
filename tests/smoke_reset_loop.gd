@@ -16,11 +16,20 @@ func _run() -> void:
 	var right_hand := scene.get_node_or_null("RightHand") as Node3D
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
+	var contents: Node = scene.get_node_or_null("CupContentsPresentation")
 	var session = scene.get("_session")
 	var ritual = scene.get("_ritual")
 	var crumple = scene.get("_crumple")
-	if right_hand == null or label == null or hud == null or session == null or ritual == null or crumple == null:
-		push_error("RESET_SMOKE: runtime hand/label/HUD/session/ritual/crumple contract missing")
+	if right_hand == null or label == null or hud == null or contents == null or session == null or ritual == null or crumple == null:
+		push_error("RESET_SMOKE: runtime hand/label/HUD/contents/session/ritual/crumple contract missing")
+		quit(1)
+		return
+	if scene.get("_contents_presentation") != contents:
+		push_error("RED: runtime must keep the production CupContentsPresentation reference")
+		quit(1)
+		return
+	if not contents.has_method("get_content_count") or int(contents.call("get_content_count")) != 0:
+		push_error("RED: fresh warm_paper reset must start with zero cup contents")
 		quit(1)
 		return
 	if not right_hand.has_method("get_pinch_world_position") or not right_hand.has_method("snap_to"):
@@ -38,7 +47,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Current-label reset keeps the visible pinch aligned to the fresh edge.
 	var expected_grip_local := label.get_front_position(0.0)
 	var expected_grip_world := label.to_global(expected_grip_local)
 	var displaced := right_hand.position + Vector3(0.82, 0.31, 0.47)
@@ -72,8 +80,6 @@ func _run() -> void:
 	escape.pressed = true
 	escape.keycode = KEY_ESCAPE
 
-	# First detach: duplicate callback is exact-once, score is no longer progression,
-	# and no automatic next timer is scheduled.
 	scene.set("_pending_score", 100)
 	scene.call("_handle_detached_label")
 	scene.call("_handle_detached_label")
@@ -90,7 +96,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Pause freezes ritual settle itself rather than a hidden next timer.
 	scene.call("_unhandled_key_input", escape)
 	if not bool(scene.get("_paused")) or not hud.text.contains("PAUSED"):
 		push_error("RESET_SMOKE: Esc must enter visible pause state")
@@ -107,8 +112,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# R may skip the calm settle immediately. With one profile unlocked it cycles
-	# to the same tactile object, but it must return authority to a fresh PEEL.
 	scene.call("_unhandled_key_input", reset_key)
 	if session.get_clean_peels() != 1 or session.get_total_score() != 0:
 		push_error("RESET_SMOKE: immediate post-peel R must preserve earned progression")
@@ -119,7 +122,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Ordinary R during an active fresh peel only resets that label and preserves run.
 	var before_active_reset := String(session.current_variant().get("id", ""))
 	scene.call("_unhandled_key_input", reset_key)
 	if session.get_clean_peels() != 1 or String(session.current_variant().get("id", "")) != before_active_reset:
@@ -127,8 +129,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Four more rituals: each explicitly waits through settle then uses R. This
-	# proves there is no elapsed-time auto-next while keeping unlock cadence.
 	for ritual_number in range(2, 6):
 		scene.set("_pending_score", 100 - ritual_number)
 		scene.call("_handle_detached_label")
@@ -166,14 +166,50 @@ func _run() -> void:
 		push_error("RESET_SMOKE: fifth deliberate next should rotate to newly unlocked crisp_seal")
 		quit(1)
 		return
+	if int(contents.call("get_content_count")) != 3:
+		push_error("RED: unlocked crisp_seal must materialize exactly three contained ice cubes")
+		quit(1)
+		return
 
-	# A sixth detached cup is left in post-peel state; Shift+R must clear it and
-	# no stale transition may fire later because V5 has no auto-next timer.
+	var ice_container: Node = contents.get_node_or_null("IceContents")
+	if ice_container == null or ice_container.get_child_count() != 3:
+		push_error("RED: crisp_seal contents must expose deterministic IceContents children")
+		quit(1)
+		return
+	var first_ice := ice_container.get_child(0) as MeshInstance3D
+	if first_ice == null:
+		push_error("RESET_SMOKE: first crisp ice child must be renderable")
+		quit(1)
+		return
+	var ice_before_crumple := first_ice.transform
+
+	# Sixth ritual uses the newly unlocked iced cup. A real inward squeeze must
+	# forward the same crumple pulse/progress into the contents presentation.
 	scene.call("_handle_detached_label")
 	if session.get_clean_peels() != 6 or ritual.get_phase_name() != "PEEL_SETTLE":
 		push_error("RESET_SMOKE: sixth ritual fixture must enter post-peel settle")
 		quit(1)
 		return
+	ritual.update(0.46)
+	if ritual.get_phase_name() != "CRUMPLE_READY":
+		push_error("RESET_SMOKE: iced sixth ritual must reach CRUMPLE_READY")
+		quit(1)
+		return
+	var press := PointerState.new()
+	press.set_frame(true, Vector2(420, 360), Vector2.ZERO, Vector2.ZERO, false)
+	scene.call("_process_crumple_pointer", press)
+	var drag := PointerState.new()
+	drag.set_frame(true, Vector2(470, 360), Vector2(50, 0), Vector2(120, 0), false)
+	scene.call("_process_crumple_pointer", drag)
+	if crumple.get_progress() <= 0.0:
+		push_error("RESET_SMOKE: iced cup squeeze fixture must create crumple progress")
+		quit(1)
+		return
+	if first_ice.transform.is_equal_approx(ice_before_crumple):
+		push_error("RED: production crumple pointer route must forward bounded motion into contained ice")
+		quit(1)
+		return
+
 	var restart := InputEventKey.new()
 	restart.pressed = true
 	restart.keycode = KEY_R
@@ -191,6 +227,10 @@ func _run() -> void:
 		push_error("RED: Shift+R must clear ritual/crumple transient state")
 		quit(1)
 		return
+	if int(contents.call("get_content_count")) != 0:
+		push_error("RED: full restart must remove unlocked ice and restore quiet warm_paper contents")
+		quit(1)
+		return
 	if float(scene.get("_reset_timer")) >= 0.0 or bool(scene.get("_advance_after_reset")):
 		push_error("RED: V5 restart must leave no stale automatic next transition")
 		quit(1)
@@ -201,7 +241,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	print("PASS: exact-once ritual -> pause freeze -> deliberate R next -> repeated unlock -> full restart")
+	print("PASS: exact-once ritual -> deliberate unlock -> iced crumple motion -> full quiet restart")
 	scene.queue_free()
 	await process_frame
 	quit(0)
