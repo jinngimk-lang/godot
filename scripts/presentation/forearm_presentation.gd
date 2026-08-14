@@ -32,9 +32,6 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var fabric := legacy_sleeve.material_override
 	legacy_sleeve.visible = false
 	var side := -1.0 if dynamic_hand else 1.0
-	# Reference framing shows a substantial sleeve entering from the frame edge,
-	# but it should leave the hero product dominant. Shorter curves and a broader
-	# oval section avoid the previous hose/rod silhouette.
 	var start_authored := Vector3(0.0, 0.0, 0.020)
 	var control_authored := Vector3(0.055 * side, -0.004, 0.165 if dynamic_hand else 0.175)
 	var end_authored := Vector3(0.145 * side, -0.015, 0.405 if dynamic_hand else 0.425)
@@ -70,7 +67,7 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.76, 0.84, smoothstep(0.0, 1.0, t))
+		var oval_height := lerpf(0.82, 0.92, smoothstep(0.0, 1.0, t))
 		for side_index in range(RING_SIDES):
 			var angle := TAU * float(side_index) / float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -104,9 +101,9 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 
 func _radius_profile(t: float) -> float:
 	var clamped := clampf(t, 0.0, 1.0)
-	if clamped <= 0.58:
-		return lerpf(0.071, 0.116, smoothstep(0.0, 0.58, clamped))
-	return lerpf(0.116, 0.099, smoothstep(0.58, 1.0, clamped))
+	if clamped <= 0.55:
+		return lerpf(0.075, 0.145, smoothstep(0.0, 0.55, clamped))
+	return lerpf(0.145, 0.225, smoothstep(0.55, 1.0, clamped))
 
 func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
 	var one_minus := 1.0 - t
