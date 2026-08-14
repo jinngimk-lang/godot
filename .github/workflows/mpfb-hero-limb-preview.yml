@@ -1,9 +1,9 @@
-name: MPFB Hero Limb Contact IK v23
+name: MPFB Hero Limb Contact IK v24
 
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-contact-ik-v23
+      - spike/mpfb-hero-limb-contact-ik-v24
   workflow_dispatch:
 
 permissions:
@@ -54,19 +54,19 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-      - name: Render morphology-preserving fixed contact IK candidates
+      - name: Render strict fixed-contact IK candidate
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_contact_ik_v23.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/contact-v23.log
-          grep -Fq "MPFB_CONTACT_IK_V23_SUCCESS" artifacts/mpfb_limb/logs/contact-v23.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_contact_ik_v24.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/contact-v24.log
+          grep -Fq "MPFB_CONTACT_IK_V24_SUCCESS" artifacts/mpfb_limb/logs/contact-v24.log
           test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
           test -s artifacts/mpfb_limb/previews/contact_v23_pinch_ik.png
-      - name: Upload fixed-contact IK evidence
+      - name: Upload strict fixed-contact IK evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-contact-ik-v23
+          name: mpfb-hero-limb-contact-ik-v24
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
