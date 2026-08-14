@@ -27,9 +27,6 @@ func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionar
 		return
 	var kind := String(profile.get("kind","paper_cup"))
 	var paper := kind == "paper_cup"
-	# Glass rendering is owned by the continuous lathed presentation mesh. The
-	# simple CylinderMesh remains hidden as a deterministic interaction surface
-	# for label projection, residue, inspection yaw and V6 contents bounds.
 	body.visible = paper
 	if paper:
 		var mat := StandardMaterial3D.new()
@@ -54,38 +51,38 @@ func _build_paper(profile: Dictionary) -> void:
 	root.name = "CupPaperDetails"
 	add_child(root)
 	var body_color := Color(profile.get("body_color",Color(0.89,0.84,0.74)))
-	_add_ring(root,"PaperBaseFold",Vector3(0,-0.655,0),0.457,0.020,body_color.darkened(0.055),0.93)
-	_add_ring(root,"PaperLip",Vector3(0,0.735,0),0.556,0.025,body_color.lightened(0.025),0.74)
+	_add_ring(root,"PaperBaseFold",Vector3(0,-0.655,0),0.445,0.020,body_color.darkened(0.055),0.93)
+	_add_ring(root,"PaperLip",Vector3(0,0.735,0),0.535,0.025,body_color.lightened(0.025),0.74)
 	var seam := MeshInstance3D.new()
 	seam.name = "PaperSeam"
 	var seam_mesh := BoxMesh.new()
-	seam_mesh.size = Vector3(0.012,1.15,0.008)
+	seam_mesh.size = Vector3(0.010,1.12,0.007)
 	seam.mesh = seam_mesh
-	seam.position = Vector3(0.0,0.02,-0.548)
+	seam.position = Vector3(0.0,0.02,-0.526)
 	seam.material_override = _mat(body_color.darkened(0.055),0.96)
 	root.add_child(seam)
 
 func _build_bottle(profile: Dictionary, amber: bool) -> void:
-	var body_color := Color(profile.get("body_color",Color(0.45,0.16,0.035) if amber else Color(0.92,0.98,0.97)))
-	var neck_radius := float(profile.get("neck_radius",0.18))
-	var source_alpha := float(profile.get("glass_alpha",0.30 if amber else 0.18))
-	var roughness := float(profile.get("roughness",0.05))
+	var body_color := Color(profile.get("body_color",Color(0.38,0.11,0.024) if amber else Color(0.94,0.985,0.98)))
+	var neck_radius := float(profile.get("neck_radius",0.175 if amber else 0.17))
+	var source_alpha := float(profile.get("glass_alpha",0.36 if amber else 0.16))
+	var roughness := float(profile.get("roughness",0.048 if amber else 0.040))
 	var outer_profile := _bottle_profile(neck_radius,amber)
 
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
 	outer.mesh = _build_lathe_mesh(outer_profile,false,true)
-	outer.material_override = _glass_mat(body_color,source_alpha*(0.56 if amber else 0.52),roughness)
+	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.46),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
 
 	var inner_profile: Array[Vector2] = []
 	for sample in outer_profile:
-		inner_profile.append(Vector2(sample.x,maxf(sample.y-0.024,0.035)))
+		inner_profile.append(Vector2(sample.x,maxf(sample.y-0.021,0.035)))
 	var inner := MeshInstance3D.new()
 	inner.name = "BottleInnerGlass"
 	inner.mesh = _build_lathe_mesh(inner_profile,false,true)
-	inner.material_override = _glass_mat(body_color.lightened(0.12),source_alpha*0.12,0.025)
+	inner.material_override = _glass_mat(body_color.lightened(0.16),source_alpha*0.10,0.023)
 	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(inner)
 
@@ -93,43 +90,44 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	liquid.name = "BottleLiquid"
 	liquid.mesh = _build_lathe_mesh(_liquid_profile(amber),true,true)
 	var liquid_mat := StandardMaterial3D.new()
-	liquid_mat.albedo_color = Color(0.74,0.31,0.06,0.32) if amber else Color(profile.get("liquid_color",Color(0.90,0.93,0.66,0.56)))
-	liquid_mat.albedo_color.a = 0.32 if amber else 0.56
+	liquid_mat.albedo_color = Color(0.52,0.17,0.025,0.22) if amber else Color(profile.get("liquid_color",Color(0.91,0.93,0.70,0.40)))
+	liquid_mat.albedo_color.a = 0.22 if amber else 0.40
 	liquid_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	liquid_mat.roughness = 0.10
+	liquid_mat.roughness = 0.08
 	liquid_mat.metallic_specular = 0.56
-	liquid.material_override = liquid_mat
 	liquid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	liquid.material_override = liquid_mat
 	add_child(liquid)
 
-	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.365 if amber else 0.350,0.022,body_color.lightened(0.08),0.055,minf(source_alpha*0.65+0.12,0.52))
-	_add_ring(self,"BottleLip",Vector3(0,1.485,0),neck_radius+0.030,0.034,body_color.lightened(0.18),0.045,minf(source_alpha*0.72+0.12,0.55))
+	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.334 if amber else 0.322,0.020,body_color.lightened(0.08),0.050,minf(source_alpha*0.58+0.10,0.45))
+	_add_ring(self,"BottleLip",Vector3(0,1.485,0),neck_radius+0.026,0.032,body_color.lightened(0.20),0.040,minf(source_alpha*0.64+0.10,0.48))
 
 	if not amber:
 		_add_condensation()
 
 func _bottle_profile(neck_radius: float, amber: bool) -> Array[Vector2]:
-	var body := 0.382 if amber else 0.368
+	var body := 0.342 if amber else 0.330
 	return [
 		Vector2(-0.67,body*0.88),
 		Vector2(-0.64,body*0.97),
 		Vector2(-0.57,body),
-		Vector2(0.54,body),
-		Vector2(0.64,body*0.99),
-		Vector2(0.72,body*0.94),
-		Vector2(0.80,body*0.84),
-		Vector2(0.88,body*0.68),
-		Vector2(0.96,neck_radius*1.18),
-		Vector2(1.04,neck_radius),
+		Vector2(0.52,body),
+		Vector2(0.61,body*0.995),
+		Vector2(0.69,body*0.96),
+		Vector2(0.77,body*0.88),
+		Vector2(0.84,body*0.76),
+		Vector2(0.91,body*0.60),
+		Vector2(0.98,neck_radius*1.16),
+		Vector2(1.05,neck_radius),
 		Vector2(1.38,neck_radius),
-		Vector2(1.43,neck_radius*1.07),
-		Vector2(1.47,neck_radius*1.14),
-		Vector2(1.50,neck_radius*1.10)
+		Vector2(1.43,neck_radius*1.06),
+		Vector2(1.47,neck_radius*1.13),
+		Vector2(1.50,neck_radius*1.08)
 	]
 
 func _liquid_profile(amber: bool) -> Array[Vector2]:
-	var radius := 0.326 if amber else 0.318
-	var top_y := 0.21 if amber else 0.48
+	var radius := 0.291 if amber else 0.281
+	var top_y := 0.19 if amber else 0.46
 	return [
 		Vector2(-0.60,radius*0.90),
 		Vector2(-0.57,radius*0.98),
@@ -202,19 +200,19 @@ func _add_lathe_cap(vertices: PackedVector3Array, normals: PackedVector3Array, u
 			indices.append(center_index); indices.append(start+side_index+1); indices.append(start+side_index)
 
 func _add_condensation() -> void:
-	for i in range(18):
-		var angle := TAU*float((i*7)%18)/18.0
-		var y := -0.44+float((i*11)%18)/18.0*1.20
+	for i in range(20):
+		var angle := TAU*float((i*7)%20)/20.0
+		var y := -0.44+float((i*11)%20)/20.0*1.20
 		var bead := MeshInstance3D.new()
 		bead.name = "Condensation"
 		var sm := SphereMesh.new()
-		sm.radius = 0.008+0.002*float(i%3)
+		sm.radius = 0.007+0.002*float(i%3)
 		sm.height = sm.radius*2.0
 		sm.radial_segments = 10
 		sm.rings = 5
 		bead.mesh = sm
-		bead.position = Vector3(sin(angle)*0.368,y,cos(angle)*0.368)
-		bead.material_override = _glass_mat(Color(0.94,0.99,1.0),0.24,0.022)
+		bead.position = Vector3(sin(angle)*0.334,y,cos(angle)*0.334)
+		bead.material_override = _glass_mat(Color(0.96,1.0,1.0),0.20,0.020)
 		add_child(bead)
 
 func _add_ring(root: Node3D, node_name: String, at: Vector3, radius: float, height: float, color: Color, roughness: float, alpha := 1.0) -> void:
@@ -232,8 +230,8 @@ func _add_ring(root: Node3D, node_name: String, at: Vector3, radius: float, heig
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.albedo_color.a = clampf(alpha,0.08,0.96)
 		mat.rim_enabled = true
-		mat.rim = 0.52
-		mat.rim_tint = 0.36
+		mat.rim = 0.55
+		mat.rim_tint = 0.38
 	ring.material_override = mat
 	root.add_child(ring)
 
@@ -246,16 +244,16 @@ func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 func _glass_mat(color: Color, alpha: float, roughness: float) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
-	mat.albedo_color.a = clampf(alpha,0.045,0.70)
+	mat.albedo_color.a = clampf(alpha,0.04,0.60)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = clampf(roughness,0.02,0.25)
+	mat.roughness = clampf(roughness,0.018,0.22)
 	mat.metallic = 0.0
-	mat.metallic_specular = 0.84
+	mat.metallic_specular = 0.86
 	mat.rim_enabled = true
-	mat.rim = 0.76
-	mat.rim_tint = 0.42
+	mat.rim = 0.80
+	mat.rim_tint = 0.46
 	mat.clearcoat_enabled = true
-	mat.clearcoat = 0.78
-	mat.clearcoat_roughness = 0.06
+	mat.clearcoat = 0.82
+	mat.clearcoat_roughness = 0.055
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
