@@ -7,13 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
   staging-import:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -54,6 +55,8 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/render_mpfb_precision_v30.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/precision-v30.log
           grep -Fq "MPFB_PRECISION_V30_SUCCESS" artifacts/mpfb_limb/logs/precision-v30.log
+          test -s artifacts/mpfb_limb/previews/contact_v23_cup_ik.png
+          test -s artifacts/mpfb_limb/previews/surface_v29_root_align.png
       - name: Export rigged support and pinch staging GLBs
         shell: bash
         run: |
@@ -85,6 +88,21 @@ jobs:
           fi
           ./godot --headless --path . --script res://tests/inspect_mpfb_staging_candidate.gd 2>&1 | tee artifacts/mpfb_limb/logs/godot-inspect-v31.log
           grep -Fq "MPFB_GODOT_STAGING_IMPORT_V31_SUCCESS" artifacts/mpfb_limb/logs/godot-inspect-v31.log
+      - name: Persist selected visual/import evidence to branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=docs/superpowers/evidence/mpfb-v31
+          mkdir -p "$evidence"
+          cp artifacts/mpfb_limb/previews/contact_v23_cup_ik.png "$evidence/support-wrap.png"
+          cp artifacts/mpfb_limb/previews/surface_v29_root_align.png "$evidence/label-pinch.png"
+          cp artifacts/mpfb_limb/reports/pose-candidates-v31.json "$evidence/pose-candidates-v31.json"
+          cp artifacts/mpfb_limb/logs/godot-inspect-v31.log "$evidence/godot-inspect-v31.log"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$evidence"
+          git commit -m "docs: persist MPFB v31 visual evidence [skip ci]"
+          git push origin HEAD:spike/mpfb-hero-limb-godot-import-v31
       - name: Upload staging evidence
         if: always()
         uses: actions/upload-artifact@v4
