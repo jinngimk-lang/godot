@@ -106,6 +106,24 @@ func _run() -> void:
 	if int(crumple_audio_events[0]) != audio_before_stationary:
 		failures.append("RITUAL_RED: stationary crumple hold must not retrigger Foley")
 
+	# The cup remains a tactile toy after the first squeeze. Releasing and making
+	# a fresh second press must reacquire gesture ownership while preserving the
+	# accumulated dent, then a second inward drag must add more deformation.
+	var before_regrab: float = float(crumple.get_progress())
+	var release := PointerState.new()
+	release.set_frame(false, Vector2(470, 360), Vector2.ZERO, Vector2.ZERO, true)
+	scene.call("_process_crumple_pointer", release)
+	if not is_equal_approx(float(crumple.get_progress()), before_regrab):
+		failures.append("RITUAL_RED: releasing a squeeze must preserve accumulated cup deformation")
+	var press_again := PointerState.new()
+	press_again.set_frame(true, Vector2(420, 360), Vector2.ZERO, Vector2.ZERO, false)
+	scene.call("_process_crumple_pointer", press_again)
+	var regrab_drag := PointerState.new()
+	regrab_drag.set_frame(true, Vector2(470, 360), Vector2(50, 0), Vector2(120, 0), false)
+	scene.call("_process_crumple_pointer", regrab_drag)
+	if float(crumple.get_progress()) <= before_regrab + 0.01:
+		failures.append("RITUAL_RED: fresh press after release must reacquire crumple ownership and add another squeeze")
+
 	# Finish enough bounded squeezes to trigger descriptive crumple feedback once.
 	for _i in range(20):
 		scene.call("_process_crumple_pointer", drag)
@@ -147,7 +165,7 @@ func _run() -> void:
 
 func _finish(scene: Node, failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("PASS: detach -> no-timer settle -> optional hand-driven crumple/Foley -> calm reward -> deliberate next")
+		print("PASS: detach -> no-timer settle -> repeated hand-driven crumple/Foley -> calm reward -> deliberate next")
 		scene.queue_free()
 		await process_frame
 		quit(0)
