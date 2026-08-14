@@ -12,11 +12,11 @@ func run() -> Array[String]:
 	inspection.tick(0.016)
 	if inspection.get_yaw() <= 0.0:
 		failures.append("inspection drag should rotate product yaw")
-	var active_yaw: float = inspection.get_yaw()
+	var target_before_release: float = inspection.get_target_yaw()
 	inspection.end()
 	inspection.drag(60.0, 0.016)
 	inspection.tick(0.016)
-	if inspection.get_target_yaw() > active_yaw + 0.01:
+	if not is_equal_approx(inspection.get_target_yaw(), target_before_release):
 		failures.append("inspection drag must be ignored after RMB ownership ends")
 	inspection.reset()
 	if not is_equal_approx(inspection.get_yaw(), 0.0) or not is_equal_approx(inspection.get_target_yaw(), 0.0):
