@@ -1,0 +1,67 @@
+name: Reference Look V7 Capture
+
+on:
+  push:
+    branches:
+      - assist/reference-look-v7
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install X11/OpenGL capture dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Fresh import
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee godot-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|ERROR: Failed to load script" godot-import.log; then
+            exit 1
+          fi
+
+      - name: Capture real reference-look frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reference-v7
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 45s \
+            ./godot --path . --display-driver x11 --rendering-method gl_compatibility \
+            --script res://tests/capture_reference_look_v7.gd 2>&1 | tee reference-v7-capture.log
+          test -f artifacts/reference-v7/01_warm_actual_ui.png
+          test -f artifacts/reference-v7/02_warm_clean_scene.png
+          test -f artifacts/reference-v7/03_crisp_ice_actual_ui.png
+          test -f artifacts/reference-v7/04_crisp_ice_clean_scene.png
+
+      - name: Upload reference-look frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-look-v7-audit
+          path: |
+            artifacts/reference-v7/*.png
+            reference-v7-capture.log
+          if-no-files-found: error
