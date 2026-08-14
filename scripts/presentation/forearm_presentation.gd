@@ -60,12 +60,16 @@ func _update_support_hand(delta: float) -> void:
 	if _active_venue_id() == "cafe_window":
 		return
 	var yaw := _cup.rotation.y
-	var target := Vector3(0.71+sin(yaw)*0.11,0.15,0.43+cos(yaw)*0.055)
+	# The glass references read as an actual stabilizing grip: the support palm
+	# sits close to the vessel and the fingers disappear behind its silhouette.
+	# Keep the root inward and slightly deeper than the old hovering pose while
+	# preserving bounded yaw follow during inspection.
+	var target := Vector3(0.60+sin(yaw)*0.075,0.15,0.36+cos(yaw)*0.045)
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
 	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
 	_support_hand.position = _support_hand.position.lerp(target,weight)
-	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(34.0)+yaw*0.36,weight)
-	_support_hand.rotation.z = lerp_angle(_support_hand.rotation.z,deg_to_rad(32.0),weight)
+	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(44.0)+yaw*0.34,weight)
+	_support_hand.rotation.z = lerp_angle(_support_hand.rotation.z,deg_to_rad(30.0),weight)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
