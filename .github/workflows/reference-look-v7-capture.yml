@@ -3,7 +3,7 @@ name: Reference Look V7 Capture
 on:
   push:
     branches:
-      - assist/reference-look-v7
+      - assist/reference-look-v7-main
   workflow_dispatch:
 
 permissions:
