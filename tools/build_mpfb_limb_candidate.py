@@ -21,6 +21,7 @@ import traceback
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 SUCCESS_MARKER = "MPFB_LIMB_BUILD_SUCCESS"
 ERROR_MARKER = "MPFB_LIMB_BUILD_ERROR"
@@ -61,7 +62,10 @@ def _mesh_stats(obj: bpy.types.Object) -> dict:
     mesh = obj.data
     if obj.type != "MESH" or mesh is None:
         return {}
-    bounds = [obj.matrix_world @ corner for corner in obj.bound_box]
+    # Blender exposes bound_box corners as bpy_prop_array values. Convert each
+    # corner to mathutils.Vector before world-space matrix multiplication so the
+    # diagnostic path works consistently in headless Blender 4.2.
+    bounds = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
     xs = [point.x for point in bounds]
     ys = [point.y for point in bounds]
     zs = [point.z for point in bounds]
