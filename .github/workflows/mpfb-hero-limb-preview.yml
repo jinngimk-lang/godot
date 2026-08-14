@@ -1,0 +1,74 @@
+name: MPFB Hero Limb Preview
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  render-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses,previews}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo "92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz" | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          cp .preview-tools/mpfb2-2.0.17/LICENSE.ASSETS.md artifacts/mpfb_limb/licenses/
+          cp .preview-tools/mpfb2-2.0.17/LICENSE.CODE.md artifacts/mpfb_limb/licenses/
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name "MPFB CI" --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_limb/assets/mpfb-human-source.glb \
+            artifacts/mpfb_limb/reports/mpfb-human-source.json \
+            2>&1 | tee artifacts/mpfb_limb/logs/build.log
+          grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
+          test -s artifacts/mpfb_limb/assets/mpfb-human-source.glb
+
+      - name: Render fixed-camera anatomy previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/render_mpfb_limb_preview.py -- \
+            artifacts/mpfb_limb/assets/mpfb-human-source.glb \
+            artifacts/mpfb_limb/previews \
+            2>&1 | tee artifacts/mpfb_limb/logs/preview.log
+          grep -Fq "MPFB_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/preview.log
+          for frame in right_hand_front right_hand_oblique right_forearm_oblique; do
+            test -s "artifacts/mpfb_limb/previews/${frame}.png"
+          done
+          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/preview.log
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-hero-limb-preview
+          path: artifacts/mpfb_limb/
+          if-no-files-found: error
+          retention-days: 14
