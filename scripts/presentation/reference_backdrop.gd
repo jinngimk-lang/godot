@@ -12,8 +12,10 @@ var _active_id := ""
 func _ready() -> void:
 	name = "ReferenceBackdrop"
 	centered = true
-	pixel_size = 0.012
-	position = Vector3(0.0,0.76,-3.15)
+	# The plate sits just behind the tabletop/product so it masks prototype block
+	# scenery while real-time hands, vessel, label and shadows remain in front.
+	pixel_size = 0.0098
+	position = Vector3(0.0,0.72,-1.43)
 	shaded = false
 	double_sided = true
 	alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -37,5 +39,11 @@ func _apply(profile_id: String) -> void:
 	var loaded := load(String(TEXTURES[profile_id])) as Texture2D
 	if loaded != null:
 		texture = loaded
-	# Keep the plate present but subordinate to real-time product/hand geometry.
-	modulate = Color(0.88,0.88,0.88,1.0) if profile_id == "market_coldcase" else Color(0.82,0.82,0.82,1.0)
+	# Preserve enough contrast for the hero object while keeping the approved
+	# café/bar/market color script obvious without reading the HUD.
+	if profile_id == "market_coldcase":
+		modulate = Color(0.96,0.96,0.96,1.0)
+	elif profile_id == "night_bar":
+		modulate = Color(0.82,0.77,0.72,1.0)
+	else:
+		modulate = Color(0.91,0.88,0.84,1.0)
