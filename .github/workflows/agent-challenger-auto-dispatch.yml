@@ -1,0 +1,45 @@
+name: Peel Challenger Auto Dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.issue.pull_request &&
+      github.actor == github.repository_owner &&
+      startsWith(github.event.comment.body, 'TYPE: DISPATCH_CHALLENGER_AUTO')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve current PR head and dispatch challengers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          value() { printf '%s\n' "$COMMENT_BODY" | sed -n "s/^$1:[[:space:]]*//p" | head -n1; }
+          TASK_ID="$(value TASK_ID)"
+          PR_NUMBER="$(value PR_NUMBER)"
+          ROUND="$(value ROUND)"
+          test "$PR_NUMBER" = "${{ github.event.issue.number }}"
+          [[ "$TASK_ID" =~ ^[0-9]+$ ]]
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          [[ "$ROUND" =~ ^[0-9]+$ ]]
+          HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q .headRefOid)"
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "Resolved exact PR head: $HEAD_SHA"
+          gh workflow run agent-challenger.yml --repo "$REPO" \
+            -f task_id="$TASK_ID" -f pr_number="$PR_NUMBER" \
+            -f expected_head_sha="$HEAD_SHA" -f round="$ROUND"
+          gh workflow run agent-challenger-local.yml --repo "$REPO" \
+            -f task_id="$TASK_ID" -f pr_number="$PR_NUMBER" \
+            -f expected_head_sha="$HEAD_SHA" -f round="$ROUND"
