@@ -2,8 +2,8 @@ extends SceneTree
 
 const MIN_FOREARM_LENGTH := 1.35
 const MAX_FOREARM_LENGTH := 3.20
-const MAX_FOREARM_RADIUS := 0.18
-const MIN_AUTHORED_HAND_SCALE := 3.45
+const MAX_FOREARM_RADIUS := 0.23
+const MIN_AUTHORED_HAND_SCALE := 3.60
 
 func _init() -> void:
 	call_deferred("_run")
@@ -24,8 +24,6 @@ func _run() -> void:
 		_fail("missing ForearmPresentation runtime layer",scene)
 		return
 
-	# Radius is the geometry's actual cross-section invariant. AABB axes are not:
-	# the arms curve through rotated local coordinates on purpose to reach the frame edges.
 	for sample in [0.0,0.25,0.5,0.75,1.0]:
 		var radius := float(presentation.call("_radius_profile",sample))
 		if radius <= 0.0 or radius > MAX_FOREARM_RADIUS:
