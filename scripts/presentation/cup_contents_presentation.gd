@@ -109,7 +109,12 @@ func _base_transform_for(index: int, count: int) -> Transform3D:
 	var angle := 0.35 + (TAU * float(index) / maxf(float(count), 1.0))
 	var radius_scale := 0.24 + 0.12 * float(index % 2)
 	var radius := inner_radius * radius_scale
-	var position := Vector3(cos(angle) * radius, -dims.z * 0.09 + float(index) * _cube_size * 0.42, sin(angle) * radius)
+	# Keep the small ice payload near the open rim where it can read as a sensory
+	# reward. It remains well below the rim and is still clamped by the cup bounds.
+	var half_height := maxf(dims.z * 0.5 - _cube_size * 0.75, 0.01)
+	var vertical_stagger := _cube_size * 0.16 * float(index % 2)
+	var upper_y := half_height - _cube_size * 0.42 - vertical_stagger
+	var position := Vector3(cos(angle) * radius, upper_y, sin(angle) * radius)
 	position = _clamp_position(position, dims)
 	var rotation := Vector3(0.12 * float(index + 1), angle * 0.22, -0.08 * float(index))
 	return Transform3D(Basis.from_euler(rotation), position)
