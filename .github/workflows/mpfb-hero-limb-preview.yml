@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-retarget-v20
+      - spike/mpfb-hero-limb-retarget-v21
   workflow_dispatch:
 
 permissions:
@@ -54,21 +54,20 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
-          test -s artifacts/mpfb_limb/reports/xr-mpfb-retarget.json
-      - name: Compare bounded thumb mappings
+      - name: Render normalized-direction pose transfer
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_retarget_preview_v20.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/retarget-v20.log
-          grep -Fq "MPFB_RETARGET_V20_SUCCESS" artifacts/mpfb_limb/logs/retarget-v20.log
-          test -s artifacts/mpfb_limb/previews/retarget_v20_pinch_half_half.png
-          test -s artifacts/mpfb_limb/previews/retarget_v20_pinch_full_both.png
-          test -s artifacts/mpfb_limb/previews/retarget_v20_cup_half_half.png
-      - name: Upload retarget evidence
+          .preview-tools/blender/blender --background --python tools/render_mpfb_direction_pose_v21.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/direction-v21.log
+          grep -Fq "MPFB_DIRECTION_V21_SUCCESS" artifacts/mpfb_limb/logs/direction-v21.log
+          test -s artifacts/mpfb_limb/previews/direction_v21_cup.png
+          test -s artifacts/mpfb_limb/previews/direction_v21_pinch_up.png
+          test -s artifacts/mpfb_limb/previews/direction_v21_pinch_tight.png
+      - name: Upload direction-transfer evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-retarget-v20
+          name: mpfb-hero-limb-retarget-v21
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
