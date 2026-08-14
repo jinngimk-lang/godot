@@ -197,7 +197,10 @@ func _build_mesh(bottom_radius: float, top_radius: float, height: float, progres
 			var b := ring * SEGMENTS + next_segment
 			var c := (ring + 1) * SEGMENTS + segment
 			var d := (ring + 1) * SEGMENTS + next_segment
-			indices.append_array(PackedInt32Array([a, b, c, b, d, c]))
+			# Godot treats clockwise winding as visible/front-facing. Reverse the
+			# conventional CCW quad triangles so outward authored normals and the
+			# rendered front face describe the same side of the paper cup.
+			indices.append_array(PackedInt32Array([a, c, b, b, c, d]))
 
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
