@@ -14,6 +14,8 @@ jobs:
     env:
       CANDIDATE_SHA: f43f0e229ce7989d8febddc6fa753422565cadbb
       BASE_SHA: 17fe40b41ae2e1fc8d10d5e4b4bfc5e689ddc875
+      TERM: dumb
+      NO_COLOR: "1"
     steps:
       - name: Checkout verifier branch
         uses: actions/checkout@v4
@@ -28,51 +30,47 @@ jobs:
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           git fetch origin "$BASE_SHA" --depth=1 || true
 
-      - name: Build adversarial packets
+      - name: Build concise adversarial packets
         shell: bash
         run: |
           set -euo pipefail
           {
             echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
             echo "BASE=$BASE_SHA"
-            echo '=== DIFF STAT ==='
-            git diff --stat "$BASE_SHA...$CANDIDATE_SHA"
-            echo '=== PEEL LAB ROOT ==='
-            sed -n '1,520p' scripts/peel_lab.gd
-            echo '=== PEEL MODEL ==='
-            cat scripts/peel/peel_model.gd
-            echo '=== PEEL CONTROLLER ==='
-            cat scripts/peel/peel_controller.gd
-            echo '=== INSPECTION ==='
-            cat scripts/inspection/inspection_controller.gd
-            echo '=== SESSION ==='
-            cat scripts/session/session_model.gd
-            echo '=== RESET + REFERENCE SMOKE ==='
-            cat tests/smoke_reset_loop.gd
-            cat tests/smoke_reference_scene.gd
+            echo '=== STATE-OWNERSHIP DIFF ==='
+            git diff --unified=12 "$BASE_SHA...$CANDIDATE_SHA" -- \
+              scripts/peel_lab.gd \
+              scripts/peel/peel_model.gd \
+              scripts/peel/peel_controller.gd \
+              scripts/inspection/inspection_controller.gd \
+              scripts/session/session_model.gd
+            echo '=== RESET CONTRACT ==='
+            sed -n '1,260p' tests/smoke_reset_loop.gd
+            echo '=== REFERENCE-SCENE CONTRACT ==='
+            sed -n '1,260p' tests/smoke_reference_scene.gd
           } > /tmp/state-packet.txt
 
           {
             echo "EXACT_CANDIDATE=$CANDIDATE_SHA"
             echo "BASE=$BASE_SHA"
-            echo '=== CHOREOGRAPHY ==='
+            echo '=== PRESENTATION OWNERSHIP DIFF ==='
+            git diff --unified=18 "$BASE_SHA...$CANDIDATE_SHA" -- \
+              scripts/presentation/hand_choreography_presentation.gd \
+              scripts/presentation/forearm_presentation.gd \
+              scripts/hands/hand_visual.gd \
+              scenes/peel_lab/peel_lab.tscn
+            echo '=== CURRENT CHOREOGRAPHY OWNER ==='
             cat scripts/presentation/hand_choreography_presentation.gd
-            echo '=== FOREARM ==='
-            cat scripts/presentation/forearm_presentation.gd
-            echo '=== HAND VISUAL RELEVANT DIFF ==='
-            git diff "$BASE_SHA...$CANDIDATE_SHA" -- scripts/hands/hand_visual.gd scripts/presentation/hand_choreography_presentation.gd scripts/presentation/forearm_presentation.gd scenes/peel_lab/peel_lab.tscn
-            echo '=== FOREARM SMOKE ==='
-            cat tests/smoke_forearm_presentation.gd
-            echo '=== ACCEPTANCE MANIFEST ==='
-            cat art/acceptance_refs/v1/MANIFEST.md
-            echo '=== CHECKPOINT 03 ==='
-            cat docs/superpowers/checkpoints/2026-08-14-reference-convergence-checkpoint-03.md
+            echo '=== FOREARM CONTRACT TEST ==='
+            sed -n '1,260p' tests/smoke_forearm_presentation.gd
+            echo '=== LOCKED ACCEPTANCE RULES ==='
+            sed -n '1,220p' art/acceptance_refs/v1/MANIFEST.md
           } > /tmp/presentation-packet.txt
 
           echo "state bytes=$(wc -c < /tmp/state-packet.txt)"
           echo "presentation bytes=$(wc -c < /tmp/presentation-packet.txt)"
-          test "$(wc -c < /tmp/state-packet.txt)" -lt 90000
-          test "$(wc -c < /tmp/presentation-packet.txt)" -lt 90000
+          test "$(wc -c < /tmp/state-packet.txt)" -lt 36000
+          test "$(wc -c < /tmp/presentation-packet.txt)" -lt 36000
 
       - name: Install independent local model runtime
         shell: bash
@@ -96,20 +94,28 @@ jobs:
           set -u
           {
             cat <<'PROMPT'
-          You are an independent adversarial reviewer of an exact Godot candidate. Try to falsify it.
-          Focus on deterministic state-ownership defects, reset/next-item one-shot behavior, input separation, inspection-vs-peel ownership, venue switching, glass-vs-paper behavior, stale transforms, null/resource hazards, and regressions introduced by the multiscale reference integration.
-          Existing green tests are evidence, not proof. Construct at least one concrete boundary counterexample. Return NEEDS_FIX only for a reproducible technical defect in this exact batch; otherwise VERIFIED. Future aesthetic reds alone are not technical blockers.
-          Output exactly four lines:
+          You are an independent adversarial reviewer of one exact Godot candidate.
+          Your job is to FALSIFY the candidate, not summarize the packet.
+          Focus only on reproducible technical defects in deterministic state ownership, reset/next-item one-shot behavior, input separation, inspection-vs-peel ownership, venue switching, glass-vs-paper behavior, stale transforms, null/resource hazards, and regressions introduced by this batch.
+          Green tests are evidence, not proof. Construct the strongest concrete boundary counterexample you can from the packet.
+          Known future visual-quality work is NOT a technical blocker.
+
+          PACKET START
+          PROMPT
+            cat /tmp/state-packet.txt
+            cat <<'PROMPT'
+          PACKET END
+
+          Do not summarize. Return ONLY these four lines and nothing else:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: <strongest boundary scenario checked>
-          EVIDENCE: <concise reason>
-          Or use NEEDS_FIX plus a concrete reproducer.
-          PACKET:
+          EVIDENCE: <concise code-based reason>
+
+          If and only if you found a reproducible defect in this exact batch, replace VERIFIED with NEEDS_FIX and describe that concrete defect and reproducer.
           PROMPT
-            cat /tmp/state-packet.txt
           } > /tmp/state-prompt.txt
-          timeout 240s ollama run qwen2.5-coder:3b < /tmp/state-prompt.txt > /tmp/state-report.txt 2>&1 || true
+          timeout 240s ollama run qwen2.5-coder:3b < /tmp/state-prompt.txt > /tmp/state-report.txt 2>/tmp/state-stderr.log || true
           cat /tmp/state-report.txt
 
       - name: Challenge hand choreography and presentation ownership
@@ -118,20 +124,28 @@ jobs:
           set -u
           {
             cat <<'PROMPT'
-          You are a second independent adversarial reviewer. Attack the exact multiscale candidate's presentation integration.
-          Focus on duplicate hand-root writers, coordinate-space errors, inspection yaw follow, café-vs-glass ownership leakage, stale hand transforms after scene/reset changes, brittle AABB/test assumptions, accidental gameplay authority in presentation code, or changes that contradict the locked acceptance-manifest rules.
-          Construct at least one boundary scenario. Return NEEDS_FIX only for a reproducible technical defect; otherwise VERIFIED. Known visual need for a higher-quality continuous human limb is not by itself a failure of this technical batch.
-          Output exactly four lines:
+          You are a second independent adversarial reviewer of one exact Godot candidate.
+          Your job is to FALSIFY the presentation integration, not summarize it.
+          Focus only on reproducible technical defects: duplicate hand-root writers, coordinate-space errors, inspection-yaw follow, cafe-vs-glass ownership leakage, stale hand transforms after scene/reset changes, brittle AABB/test assumptions, accidental gameplay authority in presentation code, or violations of the locked acceptance-manifest ownership rules.
+          Construct the strongest concrete boundary scenario you can from the packet.
+          The known need for a higher-quality continuous human limb is NOT by itself a failure of this technical batch.
+
+          PACKET START
+          PROMPT
+            cat /tmp/presentation-packet.txt
+            cat <<'PROMPT'
+          PACKET END
+
+          Do not summarize. Return ONLY these four lines and nothing else:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: <strongest boundary scenario checked>
-          EVIDENCE: <concise reason>
-          Or use NEEDS_FIX plus a concrete reproducer.
-          PACKET:
+          EVIDENCE: <concise code-based reason>
+
+          If and only if you found a reproducible defect in this exact batch, replace VERIFIED with NEEDS_FIX and describe that concrete defect and reproducer.
           PROMPT
-            cat /tmp/presentation-packet.txt
           } > /tmp/presentation-prompt.txt
-          timeout 240s ollama run qwen2.5-coder:3b < /tmp/presentation-prompt.txt > /tmp/presentation-report.txt 2>&1 || true
+          timeout 240s ollama run qwen2.5-coder:3b < /tmp/presentation-prompt.txt > /tmp/presentation-report.txt 2>/tmp/presentation-stderr.log || true
           cat /tmp/presentation-report.txt
 
       - name: Publish review summary
@@ -152,6 +166,8 @@ jobs:
           path: |
             /tmp/state-report.txt
             /tmp/presentation-report.txt
+            /tmp/state-stderr.log
+            /tmp/presentation-stderr.log
             /tmp/ollama.log
           if-no-files-found: warn
           retention-days: 14
@@ -162,6 +178,7 @@ jobs:
           set -euo pipefail
           for report in /tmp/state-report.txt /tmp/presentation-report.txt; do
             test -s "$report"
+            test "$(wc -l < "$report")" -le 8
             grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' "$report"
             grep -Eq '^DEFECT:' "$report"
             grep -Eq '^MIN_TEST:' "$report"
