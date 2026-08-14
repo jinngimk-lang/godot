@@ -15,7 +15,7 @@ const VARIANTS := [
 		"cup_color": Color(0.89, 0.84, 0.74),
 		"cup_shell": "paper",
 		"cup_dimensions": {"top_radius": 0.54, "bottom_radius": 0.45, "height": 1.48},
-		"crumple_profile": {"rigidity": 0.04, "dent_gain": 0.018, "max_compression": 0.22},
+		"crumple_profile": {"rigidity": 0.04, "dent_gain": 0.0042, "max_compression": 0.22},
 		"contents_profile": {"type": "none"},
 		"reward_theme": "warm",
 		"hint": "soft paper • balanced adhesive"
@@ -33,7 +33,7 @@ const VARIANTS := [
 		"cup_color": Color(0.80, 0.86, 0.82),
 		"cup_shell": "paper",
 		"cup_dimensions": {"top_radius": 0.52, "bottom_radius": 0.44, "height": 1.52},
-		"crumple_profile": {"rigidity": 0.025, "dent_gain": 0.024, "max_compression": 0.28},
+		"crumple_profile": {"rigidity": 0.025, "dent_gain": 0.0052, "max_compression": 0.28},
 		"contents_profile": {"type": "none"},
 		"reward_theme": "silky",
 		"hint": "long peel • lighter glue"
@@ -51,7 +51,7 @@ const VARIANTS := [
 		"cup_color": Color(0.86, 0.78, 0.70),
 		"cup_shell": "paper",
 		"cup_dimensions": {"top_radius": 0.55, "bottom_radius": 0.46, "height": 1.42},
-		"crumple_profile": {"rigidity": 0.055, "dent_gain": 0.014, "max_compression": 0.18},
+		"crumple_profile": {"rigidity": 0.055, "dent_gain": 0.0035, "max_compression": 0.18},
 		"contents_profile": {"type": "none"},
 		"reward_theme": "crisp",
 		"hint": "firmer catch • crisp releases"
