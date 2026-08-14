@@ -22,10 +22,10 @@ func run() -> Array[String]:
 	var left_inward: Dictionary = model.apply_drag(25.0)
 	if not bool(left_inward.get("changed", false)) or float(left_inward.get("delta", 0.0)) <= 0.0:
 		failures.append("left-side inward drag should add bounded crumple progress")
-	var after_left := model.get_progress()
+	var after_left: float = float(model.get_progress())
 	if after_left <= 0.0:
 		failures.append("real inward squeeze should persist crumple progress")
-	var event_strength := model.consume_crumple_event()
+	var event_strength: float = float(model.consume_crumple_event())
 	if event_strength <= 0.0 or event_strength > 1.0:
 		failures.append("real inward squeeze should emit one bounded crumple event")
 	if model.consume_crumple_event() != 0.0:
@@ -33,7 +33,7 @@ func run() -> Array[String]:
 
 	model.end_gesture()
 	var after_end: Dictionary = model.apply_drag(80.0)
-	if bool(after_end.get("changed", true)) or not is_equal_approx(model.get_progress(), after_left):
+	if bool(after_end.get("changed", true)) or not is_equal_approx(float(model.get_progress()), after_left):
 		failures.append("ended gesture must require a fresh begin before more deformation")
 
 	model.begin_gesture(100.0, 0.0)
@@ -41,22 +41,22 @@ func run() -> Array[String]:
 	if bool(right_outward.get("changed", true)):
 		failures.append("right-side outward drag must not dent the cup")
 	var right_inward: Dictionary = model.apply_drag(-25.0)
-	if not bool(right_inward.get("changed", false)) or model.get_progress() <= after_left:
+	if not bool(right_inward.get("changed", false)) or float(model.get_progress()) <= after_left:
 		failures.append("right-side inward drag should add progress without erasing prior dents")
-	var after_right := model.get_progress()
+	var after_right: float = float(model.get_progress())
 	model.apply_drag(0.0)
 	model.apply_drag(NAN)
 	model.apply_drag(INF)
-	if not is_equal_approx(model.get_progress(), after_right):
+	if not is_equal_approx(float(model.get_progress()), after_right):
 		failures.append("stationary/non-finite input must not change crumple progress")
 
 	for _i in range(20):
 		model.apply_drag(-100.0)
-	if model.get_progress() < 0.999 or model.get_progress() > 1.0:
+	if float(model.get_progress()) < 0.999 or float(model.get_progress()) > 1.0:
 		failures.append("repeated squeeze should accumulate monotonically to bounded full progress")
 	if not model.is_complete():
 		failures.append("crumple should become complete after crossing its completion threshold")
-	var compression := model.get_compression()
+	var compression: float = float(model.get_compression())
 	if compression < 0.0 or compression > 0.2201:
 		failures.append("cup compression must remain bounded by profile max_compression")
 
