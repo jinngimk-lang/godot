@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-retarget-v18
+      - spike/mpfb-hero-limb-retarget-v19
   workflow_dispatch:
 
 permissions:
@@ -55,20 +55,20 @@ jobs:
           .preview-tools/blender/blender --background --python tools/diagnose_xr_mpfb_retarget.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/reports/xr-mpfb-retarget.json 2>&1 | tee artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           grep -Fq "XR_MPFB_RETARGET_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/xr-mpfb-retarget.log
           test -s artifacts/mpfb_limb/reports/xr-mpfb-retarget.json
-      - name: Render semantic pose retarget
+      - name: Render metacarpal-aware semantic retarget
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_retarget_preview_v18.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/retarget-v18.log
-          grep -Fq "MPFB_RETARGET_V18_SUCCESS" artifacts/mpfb_limb/logs/retarget-v18.log
-          test -s artifacts/mpfb_limb/previews/retarget_cup.png
-          test -s artifacts/mpfb_limb/previews/retarget_pinch_up.png
-          test -s artifacts/mpfb_limb/previews/retarget_pinch_tight.png
+          .preview-tools/blender/blender --background --python tools/render_mpfb_retarget_preview_v19.py -- assets/models/hands/hand_right.glb artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb artifacts/mpfb_limb/previews 2>&1 | tee artifacts/mpfb_limb/logs/retarget-v19.log
+          grep -Fq "MPFB_RETARGET_V19_SUCCESS" artifacts/mpfb_limb/logs/retarget-v19.log
+          test -s artifacts/mpfb_limb/previews/retarget_v19_cup.png
+          test -s artifacts/mpfb_limb/previews/retarget_v19_pinch_up.png
+          test -s artifacts/mpfb_limb/previews/retarget_v19_pinch_tight.png
       - name: Upload retarget evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-retarget-v18
+          name: mpfb-hero-limb-retarget-v19
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
