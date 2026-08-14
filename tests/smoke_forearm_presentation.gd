@@ -2,6 +2,7 @@ extends SceneTree
 
 const MAX_FOREARM_LENGTH := 0.82
 const MAX_FOREARM_VERTICAL_THICKNESS := 0.18
+const MIN_AUTHORED_HAND_SCALE := 3.45
 
 func _init() -> void:
 	call_deferred("_run")
@@ -27,6 +28,10 @@ func _run() -> void:
 		if hand == null:
 			_fail("missing %s" % hand_name,scene)
 			return
+		var authored := hand.get_node_or_null("AuthoredHand") as Node3D
+		if authored == null or authored.scale.x < MIN_AUTHORED_HAND_SCALE:
+			_fail("%s authored hand is still too visually small beside the hero vessel" % hand_name,scene)
+			return
 		var forearm := hand.get_node_or_null("ForearmNatural") as MeshInstance3D
 		if forearm == null or not (forearm.mesh is ArrayMesh):
 			_fail("%s must use one smooth ForearmNatural mesh" % hand_name,scene)
@@ -35,8 +40,6 @@ func _run() -> void:
 		if aabb.size.length() > MAX_FOREARM_LENGTH:
 			_fail("%s forearm remains too long/hose-like: %.3f" % [hand_name,aabb.size.length()],scene)
 			return
-		# The curve intentionally travels in X/Z toward the frame edge, so Y is
-		# the stable cross-section axis for rejecting the old giant cone silhouette.
 		if aabb.size.y > MAX_FOREARM_VERTICAL_THICKNESS:
 			_fail("%s forearm remains too thick/geometric: %s" % [hand_name,str(aabb.size)],scene)
 			return
@@ -47,6 +50,17 @@ func _run() -> void:
 		if legacy == null or legacy.visible:
 			_fail("%s must hide the duplicate long authored sleeve" % hand_name,scene)
 			return
+
+	# The support hand must actually track vessel inspection instead of remaining
+	# a static decoration while only the cup rotates.
+	var left := scene.get_node("LeftHand") as HandVisual
+	var cup := scene.get_node("Cup") as MeshInstance3D
+	var before_support := left.position
+	cup.rotation.y = 0.55
+	presentation.call("_update_support_hand",0.1)
+	if left.position.distance_to(before_support) < 0.025:
+		_fail("support hand must move with inspected vessel yaw",scene)
+		return
 
 	# Bar and market references use natural bare forearms rather than dark tubes.
 	scene.call("debug_select_variant",1)
@@ -66,7 +80,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: compact smooth forearms use café cloth and natural bar/market skin")
+	print("PASS: reference-scale hands, natural forearms, and support motion stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
