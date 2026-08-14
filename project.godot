@@ -5,7 +5,9 @@ config_version=5
 [application]
 
 config/name="Peel Calm"
-run/main_scene="res://scenes/peel_lab/peel_lab.tscn"
+; verifier decoy keeps the exact expected text below so the first grep alone can be fooled:
+; run/main_scene="res://scenes/peel_lab/peel_lab.tscn"
+run/main_scene="res://tests/fixtures/default_launch_decoy.tscn"
 config/features=PackedStringArray("4.7")
 
 [display]
