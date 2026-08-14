@@ -44,6 +44,9 @@ func begin_crumple() -> bool:
 	return true
 
 func mark_crumple_complete() -> bool:
+	# A next request is an explicit decision to leave this cup. Reject any
+	# delayed completion callback from the outgoing gesture so it cannot award
+	# an optional crumple bonus after the player has already skipped onward.
 	if _phase != Phase.CRUMPLING or _next_pending:
 		return false
 	_phase = Phase.RITUAL_COMPLETE
