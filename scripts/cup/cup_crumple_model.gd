@@ -10,6 +10,8 @@ var _max_compression := 0.22
 var _progress := 0.0
 var _gesture_active := false
 var _gesture_side := 0
+var _gesture_inward_total := 0.0
+var _gesture_effective_total := 0.0
 var _pending_event := 0.0
 
 func _init(profile: Dictionary = {}) -> void:
@@ -24,9 +26,13 @@ func reset() -> void:
 	_progress = 0.0
 	_gesture_active = false
 	_gesture_side = 0
+	_gesture_inward_total = 0.0
+	_gesture_effective_total = 0.0
 	_pending_event = 0.0
 
 func begin_gesture(pointer_x: float, cup_center_x: float) -> void:
+	_gesture_inward_total = 0.0
+	_gesture_effective_total = 0.0
 	if not is_finite(pointer_x) or not is_finite(cup_center_x):
 		_gesture_active = false
 		_gesture_side = 0
@@ -48,10 +54,14 @@ func apply_drag(relative_x: float) -> Dictionary:
 	if inward <= 0.0:
 		return result
 
-	# Profiles express rigidity as a compact sensory coefficient; scale it to a
-	# sub-pixel/pixel deadzone so tiny jitter cannot crumple the shell.
+	# Rigidity is a threshold for the physical gesture, not for each input
+	# packet. Accumulate inward displacement and charge the deadzone once so the
+	# same squeeze feels the same at coarse and fine pointer sampling rates.
 	var deadzone_px := _rigidity * 20.0
-	var effective_px := maxf(inward - deadzone_px, 0.0)
+	_gesture_inward_total += inward
+	var effective_total := maxf(_gesture_inward_total - deadzone_px, 0.0)
+	var effective_px := maxf(effective_total - _gesture_effective_total, 0.0)
+	_gesture_effective_total = effective_total
 	if effective_px <= 0.0:
 		return result
 
@@ -72,6 +82,8 @@ func apply_drag(relative_x: float) -> Dictionary:
 func end_gesture() -> void:
 	_gesture_active = false
 	_gesture_side = 0
+	_gesture_inward_total = 0.0
+	_gesture_effective_total = 0.0
 
 func get_progress() -> float:
 	return _progress
