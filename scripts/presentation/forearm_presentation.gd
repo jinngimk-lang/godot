@@ -1,9 +1,9 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 34
-const RING_SIDES := 30
-const AUTHORED_HAND_SCALE := 3.75
+const CURVE_RINGS := 36
+const RING_SIDES := 32
+const AUTHORED_HAND_SCALE := 4.15
 const SUPPORT_FOLLOW_RATE := 8.5
 
 var _applied := false
@@ -60,11 +60,12 @@ func _update_support_hand(delta: float) -> void:
 	if _active_venue_id() == "cafe_window":
 		return
 	var yaw := _cup.rotation.y
-	var target := Vector3(0.73+sin(yaw)*0.105,0.16,0.46+cos(yaw)*0.05)
+	var target := Vector3(0.71+sin(yaw)*0.11,0.15,0.43+cos(yaw)*0.055)
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
 	var weight := 1.0-exp(-SUPPORT_FOLLOW_RATE*safe_delta)
 	_support_hand.position = _support_hand.position.lerp(target,weight)
-	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(38.0)+yaw*0.34,weight)
+	_support_hand.rotation.y = lerp_angle(_support_hand.rotation.y,deg_to_rad(34.0)+yaw*0.36,weight)
+	_support_hand.rotation.z = lerp_angle(_support_hand.rotation.z,deg_to_rad(32.0),weight)
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
@@ -89,23 +90,30 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	if skin == null:
 		var fallback_skin := StandardMaterial3D.new()
 		fallback_skin.resource_name = "HandSkin"
-		fallback_skin.albedo_color = Color(0.66,0.43,0.31,1.0)
-		fallback_skin.roughness = 0.76
+		fallback_skin.albedo_color = Color(0.64,0.41,0.30,1.0)
+		fallback_skin.roughness = 0.80
 		skin = fallback_skin
+	elif skin is StandardMaterial3D:
+		# Re-use the actual imported hand material so the forearm/hand join stays
+		# continuous, but calibrate the XR asset away from the prototype pink read.
+		var skin_mat := skin as StandardMaterial3D
+		skin_mat.albedo_color = Color(0.66,0.43,0.31,1.0)
+		skin_mat.roughness = 0.78
+		skin_mat.metallic = 0.0
+		skin_mat.metallic_specular = 0.46
 
 	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
 	if not _finite_vector(start):
 		return
 	var start_world := hand.to_global(start)
 	var cup_world := _cup.global_position if _cup != null else Vector3.ZERO
-	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
-	if absf(start_world.x-cup_world.x) < 0.05:
+	var outward_sign := -1.0 if start_world.x<cup_world.x else 1.0
+	if absf(start_world.x-cup_world.x)<0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
-	# The photographed references never expose an arm tip. Route the forearm
-	# through a soft elbow arc and continue well beyond the viewport before it is
-	# capped, so camera cropping creates the natural frame-entry silhouette.
-	var control_world := start_world+Vector3(outward_sign*0.92,-0.34,0.10)
-	var end_world := start_world+Vector3(outward_sign*5.20,-1.02,0.58)
+	# Reference hands enter from the lower corners with a visible elbow arc and
+	# broaden toward the viewer, rather than forming straight tubes across table.
+	var control_world := start_world+Vector3(outward_sign*0.78,-0.36,0.14)
+	var end_world := start_world+Vector3(outward_sign*4.90,-1.28,0.66)
 	var control := hand.to_local(control_world)
 	var end := hand.to_local(end_world)
 
@@ -122,8 +130,8 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 func _make_cafe_cloth() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.resource_name = "SleeveFabric"
-	material.albedo_color = Color(0.34,0.33,0.32,1.0)
-	material.roughness = 0.96
+	material.albedo_color = Color(0.16,0.155,0.15,1.0)
+	material.roughness = 0.97
 	return material
 
 func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayMesh:
@@ -134,15 +142,15 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 		var t := float(ring_index)/float(CURVE_RINGS-1)
 		var point := _quadratic_point(start,control,end,t)
 		var tangent := _quadratic_tangent(start,control,end,t).normalized()
-		if tangent.length_squared() <= 0.000001:
+		if tangent.length_squared()<=0.000001:
 			tangent = Vector3.FORWARD
 		var helper := Vector3.UP
-		if absf(tangent.dot(helper)) > 0.94:
+		if absf(tangent.dot(helper))>0.94:
 			helper = Vector3.RIGHT
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.68,0.77,t)
+		var oval_height := lerpf(0.66,0.76,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -161,7 +169,6 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
-	# End caps remain, but the distal cap is now outside every product camera.
 	var start_center := vertices.size()
 	vertices.append(start)
 	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
@@ -184,10 +191,8 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 
 func _radius_profile(t: float) -> float:
 	var p := clampf(t,0.0,1.0)
-	# Wrist -> muscular forearm -> gently broader frame-edge section. The small
-	# sinusoidal fullness removes the manufactured straight-cylinder read.
-	var base := lerpf(0.135,0.225,smoothstep(0.0,1.0,p))
-	return base*(1.0+0.055*sin(p*PI))
+	var base := lerpf(0.155,0.285,smoothstep(0.0,1.0,p))
+	return base*(1.0+0.065*sin(p*PI))
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
