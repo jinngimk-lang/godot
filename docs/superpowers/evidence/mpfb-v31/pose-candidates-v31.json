@@ -1,0 +1,30 @@
+{
+  "candidates": {
+    "pinch": {
+      "action": "LabelPinchV31",
+      "armature": "MPFB_Armature",
+      "bone_count": 53,
+      "bytes": 1532952,
+      "mesh_count": 1,
+      "path": "artifacts/mpfb_limb/assets/mpfb-right-label-pinch-v31.glb",
+      "vertex_count": 3184
+    },
+    "support": {
+      "action": "SupportWrapV31",
+      "armature": "MPFB_Armature",
+      "bone_count": 53,
+      "bytes": 1532864,
+      "mesh_count": 1,
+      "path": "artifacts/mpfb_limb/assets/mpfb-right-support-wrap-v31.glb",
+      "vertex_count": 3184
+    }
+  },
+  "schema_version": 1,
+  "source": "mpfb-v30-precision",
+  "support_contact_errors_m": [
+    0.024679107195655713,
+    0.007888189100169021,
+    0.00545716612549279,
+    0.013881733896352682
+  ]
+}
