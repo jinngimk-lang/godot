@@ -64,4 +64,23 @@ func run() -> Array[String]:
 	if model.get_progress() != 0.0 or model.get_compression() != 0.0 or model.is_complete() or model.consume_crumple_event() != 0.0:
 		failures.append("reset should clear crumple progress, completion and pending events")
 
+	# CHALLENGER counterexample: a physical squeeze must not depend strongly on
+	# how the OS splits one continuous gesture into motion events. With the same
+	# 20 px inward displacement, a low-rate mouse may report one 20 px event
+	# while a high-rate touch device reports twenty 1 px events. Rigidity is a
+	# gesture threshold, not a tax that should be charged once per input packet.
+	var coarse = load(required).new({"rigidity": 0.10, "dent_gain": 0.02, "max_compression": 0.22})
+	coarse.begin_gesture(-100.0, 0.0)
+	coarse.apply_drag(20.0)
+	var coarse_progress := coarse.get_progress()
+
+	var fine = load(required).new({"rigidity": 0.10, "dent_gain": 0.02, "max_compression": 0.22})
+	fine.begin_gesture(-100.0, 0.0)
+	for _i in range(20):
+		fine.apply_drag(1.0)
+	var fine_progress := fine.get_progress()
+
+	if absf(coarse_progress - fine_progress) > 0.02:
+		failures.append("RED: equivalent 20px squeeze depends on input sampling: coarse=%.4f fine=%.4f" % [coarse_progress, fine_progress])
+
 	return failures
