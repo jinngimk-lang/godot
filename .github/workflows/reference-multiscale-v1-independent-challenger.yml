@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      CANDIDATE_SHA: 55ea65db8cae29adc25432e82768f3528aed7fa5
+      CANDIDATE_SHA: f43f0e229ce7989d8febddc6fa753422565cadbb
       BASE_SHA: 17fe40b41ae2e1fc8d10d5e4b4bfc5e689ddc875
     steps:
       - name: Checkout verifier branch
@@ -143,6 +143,18 @@ jobs:
           echo '=== PRESENTATION CHALLENGER ==='
           cat /tmp/presentation-report.txt 2>/dev/null || true
           echo "REVIEWED_EXACT_HEAD=$CANDIDATE_SHA"
+
+      - name: Persist challenger reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-multiscale-challenger-reports
+          path: |
+            /tmp/state-report.txt
+            /tmp/presentation-report.txt
+            /tmp/ollama.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Gate exact candidate
         shell: bash
