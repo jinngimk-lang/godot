@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f tests/test_runner.gd
-          ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee godot-unit.log
+          timeout 30s ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee godot-unit.log
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-unit.log; then
             echo "Godot emitted engine/script errors during an otherwise-successful unit run."
             exit 1
@@ -98,6 +98,13 @@ jobs:
           set -euo pipefail
           test -f tests/smoke_cafe_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_cafe_presentation.gd
+
+      - name: Cup crumple presentation smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_cup_crumple_presentation.gd
+          ./godot --headless --path . --script res://tests/smoke_cup_crumple_presentation.gd
 
       - name: Forearm presentation smoke
         shell: bash
