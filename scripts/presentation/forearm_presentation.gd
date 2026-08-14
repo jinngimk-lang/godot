@@ -1,14 +1,12 @@
 extends Node3D
 class_name ForearmPresentation
 
-const CURVE_RINGS := 16
-const RING_SIDES := 12
+const CURVE_RINGS := 18
+const RING_SIDES := 18
 
 var _applied := false
 
 func _ready() -> void:
-	# PeelLab constructs authored hands in its own _ready(). Defer once so the
-	# imported hand mesh, wrist cover and shared SleeveFabric material exist.
 	call_deferred("_apply")
 
 func _apply() -> void:
@@ -28,36 +26,29 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var authored := hand.get_node_or_null("AuthoredHand") as Node3D
 	if authored == null:
 		return
-
 	var legacy_sleeve := authored.find_child("WristSleeve", true, false) as MeshInstance3D
 	if legacy_sleeve == null or legacy_sleeve.material_override == null:
 		return
 	var fabric := legacy_sleeve.material_override
 	legacy_sleeve.visible = false
-
 	var side := -1.0 if dynamic_hand else 1.0
-	# Real-render axis diagnostics established that authored +Z heads down/out
-	# from each wrist and authored +/-X heads toward the correct side of frame.
-	# Keep the visible curve deliberately compact: the hand and cup are the
-	# subject, while the forearm should leave the frame quickly instead of
-	# becoming a long hose-like graphic element.
+	# Reference framing shows a substantial sleeve entering from the frame edge,
+	# but it should leave the hero product dominant. Shorter curves and a broader
+	# oval section avoid the previous hose/rod silhouette.
 	var start_authored := Vector3(0.0, 0.0, 0.020)
-	var control_authored := Vector3(0.045 * side, 0.0, 0.205 if dynamic_hand else 0.220)
-	var end_authored := Vector3(0.165 * side, 0.0, 0.515 if dynamic_hand else 0.545)
-
+	var control_authored := Vector3(0.055 * side, -0.004, 0.165 if dynamic_hand else 0.175)
+	var end_authored := Vector3(0.145 * side, -0.015, 0.405 if dynamic_hand else 0.425)
 	var start: Vector3 = _descendant_point_to_ancestor(authored, hand, start_authored)
 	var control: Vector3 = _descendant_point_to_ancestor(authored, hand, control_authored)
 	var end: Vector3 = _descendant_point_to_ancestor(authored, hand, end_authored)
 	if not _finite_vector(start) or not _finite_vector(control) or not _finite_vector(end):
 		legacy_sleeve.visible = true
 		return
-
 	var forearm := MeshInstance3D.new()
 	forearm.name = "ForearmSleeve"
 	forearm.mesh = _build_curve_mesh(start, control, end)
 	forearm.material_override = fabric
 	hand.add_child(forearm)
-
 	var exit_marker := Node3D.new()
 	exit_marker.name = "ForearmExit"
 	exit_marker.position = end
@@ -67,25 +58,19 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
-
 	for ring_index in range(CURVE_RINGS):
 		var t := float(ring_index) / float(CURVE_RINGS - 1)
 		var point := _quadratic_point(start, control, end, t)
 		var tangent := _quadratic_tangent(start, control, end, t).normalized()
 		if tangent.length_squared() <= 0.000001:
 			tangent = Vector3.FORWARD
-
 		var helper := Vector3.UP
 		if absf(tangent.dot(helper)) > 0.94:
 			helper = Vector3.RIGHT
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
-
-		# Anatomical-cloth silhouette rather than a uniform pipe: narrow wrist,
-		# gradual forearm fullness around the middle, then a slight taper as the
-		# geometry exits the frame. The oval section keeps it soft and non-tubular.
 		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.72, 0.80, smoothstep(0.0, 1.0, t))
+		var oval_height := lerpf(0.76, 0.84, smoothstep(0.0, 1.0, t))
 		for side_index in range(RING_SIDES):
 			var angle := TAU * float(side_index) / float(RING_SIDES)
 			var cos_a := cos(angle)
@@ -93,7 +78,6 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			var radial := ring_x * cos_a * radius + ring_y * sin_a * radius * oval_height
 			vertices.append(point + radial)
 			normals.append((ring_x * cos_a + ring_y * sin_a / oval_height).normalized())
-
 	for ring_index in range(CURVE_RINGS - 1):
 		var current := ring_index * RING_SIDES
 		var next := (ring_index + 1) * RING_SIDES
@@ -109,7 +93,6 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			indices.append(a)
 			indices.append(c)
 			indices.append(d)
-
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -121,9 +104,9 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 
 func _radius_profile(t: float) -> float:
 	var clamped := clampf(t, 0.0, 1.0)
-	if clamped <= 0.60:
-		return lerpf(0.057, 0.094, smoothstep(0.0, 0.60, clamped))
-	return lerpf(0.094, 0.084, smoothstep(0.60, 1.0, clamped))
+	if clamped <= 0.58:
+		return lerpf(0.071, 0.116, smoothstep(0.0, 0.58, clamped))
+	return lerpf(0.116, 0.099, smoothstep(0.58, 1.0, clamped))
 
 func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
 	var one_minus := 1.0 - t
