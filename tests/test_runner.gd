@@ -7,6 +7,12 @@ func _init() -> void:
 		quit(1)
 		return
 
+	var crumple_required := "res://scripts/cup/cup_crumple_model.gd"
+	if ResourceLoader.exists("res://tests/test_cup_crumple_model.gd") and not ResourceLoader.exists(crumple_required):
+		push_error("RED: missing deterministic cup crumple model: %s" % crumple_required)
+		quit(1)
+		return
+
 	var failures: Array[String] = []
 	for suite_path in [
 		"res://tests/test_peel_model.gd",
@@ -21,7 +27,9 @@ func _init() -> void:
 		"res://tests/test_hand_visual.gd",
 		"res://tests/test_authored_hand_asset.gd",
 		"res://tests/test_peel_foley_router.gd",
-		"res://tests/test_session_model.gd"
+		"res://tests/test_session_model.gd",
+		"res://tests/test_ritual_flow.gd",
+		"res://tests/test_cup_crumple_model.gd"
 	]:
 		if ResourceLoader.exists(suite_path):
 			var suite = load(suite_path).new()

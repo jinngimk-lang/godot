@@ -1,6 +1,8 @@
 extends Node
 class_name PeelAudio
 
+signal crumple_pulse_played(strength: float)
+
 const SLOW_PATH := "res://assets/audio/peel/adhesive_slow.wav"
 const FAST_PATH := "res://assets/audio/peel/adhesive_fast.wav"
 const PAPER_PATH := "res://assets/audio/peel/paper_flex.wav"
@@ -53,6 +55,17 @@ func set_feedback(
 			"final_release":
 				_play_one_shot(_final, 0.97, 1.04, -1.0, 1.0)
 
+func trigger_crumple(strength: float) -> void:
+	var safe_strength := clampf(strength if is_finite(strength) else 0.0, 0.0, 1.0)
+	if safe_strength <= 0.0 or _paper == null or _paper.stream == null:
+		return
+	# Reuse the already-audited paper Foley but shift it lower/softer so a cup
+	# fold is distinct from the lighter paper-flex ticks during peeling.
+	_paper.pitch_scale = randf_range(0.78, 0.92) + safe_strength * 0.06
+	_paper.volume_db = lerpf(-28.0, -20.0, safe_strength) + randf_range(-1.2, 1.2)
+	_paper.play()
+	crumple_pulse_played.emit(safe_strength)
+
 func reset_feedback() -> void:
 	_router.reset()
 	_slow_target_db = -80.0
@@ -68,6 +81,8 @@ func set_peel_feedback(speed: float, tension: float, released: float) -> void:
 	set_feedback(true, speed, tension, released, false, get_process_delta_time())
 
 func quiet() -> void:
+	# Fade/stop adhesive loops without killing a crumple one-shot that may have
+	# started earlier in the same frame.
 	_slow_target_db = -80.0
 	_fast_target_db = -80.0
 
