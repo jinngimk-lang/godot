@@ -344,7 +344,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_reset_session()
 			return
 		var ritual_phase := _ritual.get_phase_name() if _ritual != null else "PEEL"
-		if ritual_phase in ["CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
+		if ritual_phase in ["PEEL_SETTLE", "CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
 			if _crumple != null:
 				_crumple.end_gesture()
 			if _ritual.request_next():
