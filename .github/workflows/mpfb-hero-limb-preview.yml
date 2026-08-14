@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v12
+      - spike/mpfb-hero-limb-pose-v13
   workflow_dispatch:
 
 permissions:
@@ -70,11 +70,11 @@ jobs:
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
           test -s artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb
 
-      - name: Solve and render target-driven pinch candidates
+      - name: Solve and render distal-chain pinch candidates
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v12.py -- \
+          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v13.py -- \
             artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb \
             artifacts/mpfb_limb/previews \
             2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
@@ -89,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v12
+          name: mpfb-hero-limb-pose-v13
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
