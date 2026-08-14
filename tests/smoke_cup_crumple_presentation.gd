@@ -20,9 +20,12 @@ func _run() -> void:
 
 	var failures: Array[String] = []
 	var cup := scene.get_node_or_null("Cup") as MeshInstance3D
+	var lid := scene.get_node_or_null("Lid") as MeshInstance3D
 	var presentation := scene.get_node_or_null("CupCrumplePresentation") as Node3D
 	if cup == null or not (cup.mesh is CylinderMesh):
 		failures.append("CRUMPLE_PRESENTATION_RED: production Cup must remain tapered CylinderMesh authority before crumple")
+	if lid == null:
+		failures.append("CRUMPLE_PRESENTATION_RED: real Lid required for cup-shortening presentation contract")
 	if presentation == null:
 		failures.append("CRUMPLE_PRESENTATION_RED: missing CupCrumplePresentation")
 	else:
@@ -46,6 +49,7 @@ func _run() -> void:
 					failures.append("CRUMPLE_PRESENTATION_RED: zero-progress state must keep production Cup visible")
 				var baseline := shell.mesh.get_aabb()
 				var baseline_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
+				var baseline_lid_transform := lid.transform if lid != null else Transform3D.IDENTITY
 				presentation.set_crumple(0.60, -1, 0.7)
 				await process_frame
 				var deformed := shell.mesh.get_aabb()
@@ -61,6 +65,8 @@ func _run() -> void:
 					failures.append("CRUMPLE_PRESENTATION_RED: bounded crumple must not numerically collapse/invert cup shell")
 				if not is_finite(deformed.size.x) or not is_finite(deformed.size.y) or not is_finite(deformed.size.z):
 					failures.append("CRUMPLE_PRESENTATION_RED: deformed cup bounds must stay finite")
+				if lid != null and lid.position.y >= baseline_lid_transform.origin.y - 0.005:
+					failures.append("CRUMPLE_PRESENTATION_RED: lid must follow cup shortening downward instead of floating above crumpled shell")
 				presentation.set_crumple(1.0, 1, 1.0)
 				await process_frame
 				var full := shell.mesh.get_aabb()
@@ -70,9 +76,11 @@ func _run() -> void:
 				await process_frame
 				if shell.visible or (cup != null and not cup.visible):
 					failures.append("CRUMPLE_PRESENTATION_RED: reset must restore production Cup visibility")
+				if lid != null and not lid.transform.is_equal_approx(baseline_lid_transform):
+					failures.append("CRUMPLE_PRESENTATION_RED: reset must restore exact baseline Lid transform")
 
 	if failures.is_empty():
-		print("PASS: cup crumple presentation is bounded, resettable and presentation-only")
+		print("PASS: cup crumple presentation is bounded, lid-following, resettable and presentation-only")
 		scene.queue_free()
 		await process_frame
 		quit(0)
