@@ -3,7 +3,7 @@ name: MPFB Hero Limb Preview
 on:
   push:
     branches:
-      - spike/mpfb-hero-limb-pose-v14
+      - spike/mpfb-hero-limb-pose-v15
   workflow_dispatch:
 
 permissions:
@@ -13,13 +13,13 @@ env:
   HOME: ${{ github.workspace }}/.preview-home
 
 jobs:
-  render-preview:
+  diagnose-hand-axes:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install headless render runtime
+      - name: Install headless runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses,previews}
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_limb/{assets,reports,logs,licenses}
           curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
           echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
           tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
@@ -56,7 +56,6 @@ jobs:
             artifacts/mpfb_limb/reports/mpfb-human-source.json \
             2>&1 | tee artifacts/mpfb_limb/logs/build.log
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
-          test -s artifacts/mpfb_limb/assets/mpfb-human-source.glb
 
       - name: Extract right hero limb
         shell: bash
@@ -68,28 +67,23 @@ jobs:
             artifacts/mpfb_limb/reports/mpfb-right-hero-limb.json \
             2>&1 | tee artifacts/mpfb_limb/logs/extract-right.log
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_limb/logs/extract-right.log
-          test -s artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb
 
-      - name: Solve and render anatomically constrained pinch candidates
+      - name: Measure hand joint axes
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_pose_preview_v14.py -- \
+          .preview-tools/blender/blender --background --python tools/diagnose_mpfb_hand_axes.py -- \
             artifacts/mpfb_limb/assets/mpfb-right-hero-limb.glb \
-            artifacts/mpfb_limb/previews \
-            2>&1 | tee artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_PREVIEW_SUCCESS" artifacts/mpfb_limb/logs/pose-preview.log
-          grep -Fq "MPFB_POSE_PRIOR target_ik_v12" artifacts/mpfb_limb/logs/pose-preview.log
-          for frame in pose_neutral support_solved_1 support_solved_2 support_solved_3 pinch_solved_1 pinch_solved_2 pinch_solved_3; do
-            test -s "artifacts/mpfb_limb/previews/${frame}.png"
-          done
-          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/pose-preview.log
+            artifacts/mpfb_limb/reports/hand-axis-diagnostic.json \
+            2>&1 | tee artifacts/mpfb_limb/logs/hand-axis-diagnostic.log
+          grep -Fq "MPFB_AXIS_DIAGNOSTIC_SUCCESS" artifacts/mpfb_limb/logs/hand-axis-diagnostic.log
+          test -s artifacts/mpfb_limb/reports/hand-axis-diagnostic.json
 
-      - name: Upload visual evidence
+      - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mpfb-hero-limb-pose-v14
+          name: mpfb-hero-limb-pose-v15-axis-diagnostic
           path: artifacts/mpfb_limb/
           if-no-files-found: error
           retention-days: 14
