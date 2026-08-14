@@ -20,6 +20,7 @@ func _run() -> void:
 	var session = scene.get("_session")
 	var pointer := scene.get_node_or_null("PointerAdapter") as PointerAdapter
 	var audio := scene.get_node_or_null("PeelAudio")
+	var support_hand := scene.get_node_or_null("LeftHand") as Node3D
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
 	var reward := scene.get_node_or_null("HUD/Reward") as Label
 	var presentation := scene.get_node_or_null("CupCrumplePresentation")
@@ -27,8 +28,8 @@ func _run() -> void:
 		failures.append("RITUAL_RED: PeelLab must own RitualFlow")
 	if crumple == null:
 		failures.append("RITUAL_RED: PeelLab must own CupCrumpleModel")
-	if session == null or pointer == null or audio == null or hud == null or reward == null or presentation == null:
-		failures.append("RITUAL_RED: real scene missing ritual/session/pointer/audio/HUD/presentation contract")
+	if session == null or pointer == null or audio == null or support_hand == null or hud == null or reward == null or presentation == null:
+		failures.append("RITUAL_RED: real scene missing ritual/session/pointer/audio/support-hand/HUD/presentation contract")
 	if not failures.is_empty():
 		_finish(scene, failures)
 		return
@@ -42,6 +43,7 @@ func _run() -> void:
 		return
 	var crumple_audio_events := [0]
 	audio.connect("crumple_pulse_played", func(_strength): crumple_audio_events[0] += 1)
+	var support_home := support_hand.position
 
 	# Simulate a physically held peel input at detach. Entering the post-peel
 	# phase must quarantine it so that the same held press cannot become a cup
@@ -89,6 +91,14 @@ func _run() -> void:
 		failures.append("RITUAL_RED: crumple pointer route must drive visible presentation progress")
 	if crumple_audio_events[0] <= 0:
 		failures.append("RITUAL_RED: real inward squeeze must route a crumple Foley pulse")
+	# The already-visible support hand should participate in the squeeze without
+	# changing its authored skeleton/pose family. It starts on +X and therefore
+	# moves a small bounded distance toward the cup center as the shell dents.
+	var support_after_squeeze := support_hand.position
+	if support_after_squeeze.x >= support_home.x - 0.02:
+		failures.append("RITUAL_RED: support hand must visibly press inward with cup crumple progress")
+	if support_after_squeeze.distance_to(support_home) > 0.13:
+		failures.append("RITUAL_RED: support-hand staging must remain a restrained presentation offset")
 	var audio_before_stationary: int = int(crumple_audio_events[0])
 	var stationary := PointerState.new()
 	stationary.set_frame(true, Vector2(470, 360), Vector2.ZERO, Vector2.ZERO, false)
@@ -116,7 +126,7 @@ func _run() -> void:
 		failures.append("RITUAL_RED: post-peel HUD should communicate soft ritual/tactile progression")
 
 	# R is the deliberate transition. It must not change already-earned progress
-	# and must clear all cup deformation before the next fresh item.
+	# and must clear all cup deformation/staging before the next fresh item.
 	var before_id := String(session.current_variant().get("id", ""))
 	var next_key := InputEventKey.new()
 	next_key.pressed = true
@@ -130,12 +140,14 @@ func _run() -> void:
 		failures.append("RITUAL_RED: next item must return ritual authority to PEEL")
 	if String(session.current_variant().get("id", "")) != before_id:
 		failures.append("RITUAL_RED: with one tactile profile unlocked, next should cycle calmly to the same profile")
+	if support_hand.position.distance_to(support_home) > 0.001:
+		failures.append("RITUAL_RED: next item must restore exact support-hand staging baseline")
 
 	_finish(scene, failures)
 
 func _finish(scene: Node, failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("PASS: detach -> no-timer settle -> optional crumple/Foley -> calm reward -> deliberate next")
+		print("PASS: detach -> no-timer settle -> optional hand-driven crumple/Foley -> calm reward -> deliberate next")
 		scene.queue_free()
 		await process_frame
 		quit(0)
