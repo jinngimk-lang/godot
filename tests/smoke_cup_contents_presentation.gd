@@ -53,14 +53,18 @@ func _run() -> void:
 		if _has_physics_descendant(container):
 			failures.append("contained ice must stay presentation-only without RigidBody3D/SoftBody3D")
 		var base_transforms: Array[Transform3D] = []
+		var dims: Dictionary = ice_profile.get("cup_dimensions", {})
+		var visible_floor := float(dims.get("height", 0.0)) * 0.24
 		for child in container.get_children():
 			if not (child is MeshInstance3D):
 				failures.append("ice contents should contain only mesh presentation children")
 				continue
 			var cube := child as MeshInstance3D
 			base_transforms.append(cube.transform)
-			if not _inside_cup(cube.position, 0.115, ice_profile.get("cup_dimensions", {})):
+			if not _inside_cup(cube.position, 0.115, dims):
 				failures.append("ice base position escaped configured cup bounds: %s" % cube.position)
+			if cube.position.y < visible_floor:
+				failures.append("RED: contained ice must sit in the upper visible cup layer; y=%.3f floor=%.3f" % [cube.position.y, visible_floor])
 
 		presentation.set_crumple(1.0, -1, 1.0)
 		for child in container.get_children():
@@ -68,7 +72,7 @@ func _run() -> void:
 				var cube := child as MeshInstance3D
 				if not _is_finite_vec3(cube.position):
 					failures.append("max crumple pulse produced non-finite ice position")
-				if not _inside_cup(cube.position, 0.115, ice_profile.get("cup_dimensions", {})):
+				if not _inside_cup(cube.position, 0.115, dims):
 					failures.append("max crumple pulse pushed ice outside configured cup bounds: %s" % cube.position)
 
 		presentation.set_crumple(0.72, 1, 0.9)
@@ -82,7 +86,7 @@ func _run() -> void:
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: contained ice presentation is deterministic, finite, bounded and physics-free")
+		print("PASS: contained ice presentation is deterministic, upper-layer visible, finite, bounded and physics-free")
 		quit(0)
 		return
 	for failure in failures:
