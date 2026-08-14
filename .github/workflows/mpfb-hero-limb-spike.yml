@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  HOME: ${{ github.workspace }}/.spike-home
+
 jobs:
   build-source:
     runs-on: ubuntu-24.04
@@ -21,11 +24,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .spike-tools artifacts/mpfb_limb/{assets,reports,logs,licenses}
+          mkdir -p "$HOME" .spike-tools artifacts/mpfb_limb/{assets,reports,logs,licenses}
 
           curl -L --fail --retry 3 \
             -o .spike-tools/blender.tar.xz \
             https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .spike-tools/blender.tar.xz" | sha256sum -c -
           sha256sum .spike-tools/blender.tar.xz | tee artifacts/mpfb_limb/logs/blender-download.sha256
           tar -xJf .spike-tools/blender.tar.xz -C .spike-tools
           mv .spike-tools/blender-4.2.0-linux-x64 .spike-tools/blender
@@ -34,33 +38,69 @@ jobs:
           curl -L --fail --retry 3 \
             -o .spike-tools/mpfb-v2.0.17.tar.gz \
             https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo "92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .spike-tools/mpfb-v2.0.17.tar.gz" | sha256sum -c -
           sha256sum .spike-tools/mpfb-v2.0.17.tar.gz | tee artifacts/mpfb_limb/logs/mpfb-download.sha256
           tar -xzf .spike-tools/mpfb-v2.0.17.tar.gz -C .spike-tools
-          test -f .spike-tools/mpfb2-2.0.17/src/mpfb/__init__.py
+          test -f .spike-tools/mpfb2-2.0.17/src/mpfb/blender_manifest.toml
           cp .spike-tools/mpfb2-2.0.17/LICENSE.ASSETS.md artifacts/mpfb_limb/licenses/
           cp .spike-tools/mpfb2-2.0.17/LICENSE.CODE.md artifacts/mpfb_limb/licenses/
+
+      - name: Build and install MPFB extension package
+        shell: bash
+        run: |
+          set -euo pipefail
+          .spike-tools/blender/blender --command extension validate \
+            --valid-tags="" \
+            .spike-tools/mpfb2-2.0.17/src/mpfb \
+            2>&1 | tee artifacts/mpfb_limb/logs/extension-validate.log
+          ! grep -Fq "Error:" artifacts/mpfb_limb/logs/extension-validate.log
+
+          .spike-tools/blender/blender --command extension build \
+            --source-dir .spike-tools/mpfb2-2.0.17/src/mpfb \
+            --output-filepath .spike-tools/mpfb-2.0.17.zip \
+            --valid-tags="" \
+            2>&1 | tee artifacts/mpfb_limb/logs/extension-build.log
+          test -s .spike-tools/mpfb-2.0.17.zip
+
+          mkdir -p .spike-tools/extensions
+          .spike-tools/blender/blender --command extension repo-add mpfb_ci \
+            --name "MPFB CI" \
+            --directory "$PWD/.spike-tools/extensions" \
+            --clear-all \
+            2>&1 | tee artifacts/mpfb_limb/logs/repo-add.log
+          .spike-tools/blender/blender --command extension install-file \
+            -r mpfb_ci -e .spike-tools/mpfb-2.0.17.zip \
+            2>&1 | tee artifacts/mpfb_limb/logs/extension-install.log
+          .spike-tools/blender/blender --command extension list \
+            2>&1 | tee artifacts/mpfb_limb/logs/extension-list.log
+          grep -Fqi "mpfb" artifacts/mpfb_limb/logs/extension-list.log
 
       - name: Build MPFB human and GameEngine rig source
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           .spike-tools/blender/blender --background \
             --python tools/build_mpfb_limb_candidate.py -- \
-            .spike-tools/mpfb2-2.0.17/src \
+            bl_ext.mpfb_ci.mpfb \
             artifacts/mpfb_limb/assets/mpfb-human-source.glb \
             artifacts/mpfb_limb/reports/mpfb-human-source.json \
             2>&1 | tee artifacts/mpfb_limb/logs/build.log
-          status=${PIPESTATUS[0]}
-          printf 'build_status=%s\n' "$status" | tee artifacts/mpfb_limb/logs/status.txt
-          exit "$status"
+
+          test -s artifacts/mpfb_limb/assets/mpfb-human-source.glb
+          test -s artifacts/mpfb_limb/reports/mpfb-human-source.json
+          grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_limb/logs/build.log
+          ! grep -Fq "MPFB_LIMB_BUILD_ERROR" artifacts/mpfb_limb/logs/build.log
+          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/build.log
+          printf 'validated_output=1\n' | tee artifacts/mpfb_limb/logs/status.txt
 
       - name: Re-import exported GLB in clean Blender process
-        if: success()
         shell: bash
         run: |
           set -euo pipefail
-          .spike-tools/blender/blender --background --python-expr "import bpy, json; bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False); bpy.ops.import_scene.gltf(filepath='artifacts/mpfb_limb/assets/mpfb-human-source.glb'); meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']; arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']; print('REIMPORT meshes',[(o.name,len(o.data.vertices),len(o.data.polygons)) for o in meshes]); print('REIMPORT armatures',[(o.name,len(o.data.bones)) for o in arms]); assert meshes and arms" \
+          .spike-tools/blender/blender --background --python-expr "import bpy; bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False); bpy.ops.import_scene.gltf(filepath='artifacts/mpfb_limb/assets/mpfb-human-source.glb'); meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']; arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']; print('REIMPORT meshes',[(o.name,len(o.data.vertices),len(o.data.polygons)) for o in meshes]); print('REIMPORT armatures',[(o.name,len(o.data.bones)) for o in arms]); assert meshes and arms; print('MPFB_REIMPORT_SUCCESS')" \
             2>&1 | tee artifacts/mpfb_limb/logs/reimport.log
+          grep -Fq "MPFB_REIMPORT_SUCCESS" artifacts/mpfb_limb/logs/reimport.log
+          ! grep -Fq "Traceback (most recent call last)" artifacts/mpfb_limb/logs/reimport.log
 
       - name: Upload MPFB source candidate evidence
         if: always()
