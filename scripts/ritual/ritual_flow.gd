@@ -15,12 +15,14 @@ var _phase := Phase.PEEL
 var _settle_elapsed := 0.0
 var _reward_pending := false
 var _next_pending := false
+var _leaving_current := false
 
 func reset() -> void:
 	_phase = Phase.PEEL
 	_settle_elapsed = 0.0
 	_reward_pending = false
 	_next_pending = false
+	_leaving_current = false
 
 func on_label_detached() -> bool:
 	if _phase != Phase.PEEL:
@@ -38,16 +40,15 @@ func update(delta: float) -> void:
 		_phase = Phase.CRUMPLE_READY
 
 func begin_crumple() -> bool:
-	if _phase != Phase.CRUMPLE_READY or _next_pending:
+	if _phase != Phase.CRUMPLE_READY or _leaving_current:
 		return false
 	_phase = Phase.CRUMPLING
 	return true
 
 func mark_crumple_complete() -> bool:
-	# A next request is an explicit decision to leave this cup. Reject any
-	# delayed completion callback from the outgoing gesture so it cannot award
-	# an optional crumple bonus after the player has already skipped onward.
-	if _phase != Phase.CRUMPLING or _next_pending:
+	# Once next is accepted, this outgoing cup remains reward-ineligible even
+	# after the one-shot next event is consumed. Reset/new item clears the latch.
+	if _phase != Phase.CRUMPLING or _leaving_current:
 		return false
 	_phase = Phase.RITUAL_COMPLETE
 	_reward_pending = true
@@ -59,8 +60,9 @@ func request_next() -> bool:
 	# optional crumple phase at their own pace.
 	if _phase not in [Phase.PEEL_SETTLE, Phase.CRUMPLE_READY, Phase.CRUMPLING, Phase.RITUAL_COMPLETE]:
 		return false
-	if _next_pending:
+	if _leaving_current:
 		return false
+	_leaving_current = true
 	_next_pending = true
 	return true
 
