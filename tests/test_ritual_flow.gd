@@ -68,6 +68,19 @@ func run() -> Array[String]:
 	if skip_flow.consume_reward_event():
 		failures.append("skipping crumple should not fabricate a crumple reward event")
 
+	# Independent CHALLENGER counterexample: a next request during an active
+	# squeeze cancels optional crumple-bonus eligibility. A stale completion
+	# callback from the outgoing cup must not award that bonus afterward.
+	var mid_skip = load(required).new()
+	mid_skip.on_label_detached()
+	mid_skip.update(1.0)
+	if not mid_skip.begin_crumple():
+		failures.append("mid-crumple skip fixture must enter CRUMPLING")
+	if not mid_skip.request_next():
+		failures.append("CRUMPLING should allow pressure-free next request")
+	if mid_skip.mark_crumple_complete() and mid_skip.consume_reward_event():
+		failures.append("RED: next requested during CRUMPLING must cancel optional crumple reward eligibility")
+
 	var safe_flow = load(required).new()
 	safe_flow.on_label_detached()
 	safe_flow.update(NAN)
