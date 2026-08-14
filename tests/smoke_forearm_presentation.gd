@@ -1,8 +1,8 @@
 extends SceneTree
 
-const MIN_FOREARM_LENGTH := 1.35
-const MAX_FOREARM_LENGTH := 3.20
-const MAX_FOREARM_RADIUS := 0.23
+const MIN_FOREARM_LENGTH := 3.20
+const MAX_FOREARM_LENGTH := 6.80
+const MAX_FOREARM_RADIUS := 0.245
 const MIN_AUTHORED_HAND_SCALE := 3.60
 
 func _init() -> void:
@@ -45,7 +45,7 @@ func _run() -> void:
 			return
 		var reach := (forearm.mesh as ArrayMesh).get_aabb().size.length()
 		if reach < MIN_FOREARM_LENGTH or reach > MAX_FOREARM_LENGTH:
-			_fail("%s forearm must reach toward the frame edge without runaway geometry: %.3f" % [hand_name,reach],scene)
+			_fail("%s forearm must continue beyond the frame without runaway geometry: %.3f" % [hand_name,reach],scene)
 			return
 		if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
 			_fail("café forearm should start with soft SleeveFabric",scene)
@@ -85,7 +85,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands and sealed frame-edge forearms stay coherent")
+	print("PASS: reference-scale hands and offscreen-continuing forearms stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
