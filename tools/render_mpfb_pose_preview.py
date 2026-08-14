@@ -1,14 +1,16 @@
-"""Solve and render MPFB hero-hand contact candidates with three-axis thumb opposition.
+"""Solve and render MPFB hero-hand contact candidates with anatomy-aware opposition.
 
 Evidence from prior spikes:
 - local +Z is the credible flexion axis for the four long finger chains;
-- single-axis thumb sweeps and an X/Z-only grid can reduce endpoint distance but
-  still produce visually wrong opposition and cannot close label pinch contact.
+- unconstrained endpoint minimization can produce a numerically close thumb while
+  creating a visually unusable hook/claw silhouette;
+- v7 proved continuous MPFB anatomy is promising, but its support pose over-curled
+  the long fingers and its pinch pose hid a looped thumb behind a three-finger claw.
 
-This stage models the thumb as a coupled 3D chain. A bounded coordinate-descent
-solver explores local X/Y/Z on the proximal thumb and smaller multi-axis motion
-on the distal joints. The objective is physical endpoint contact, but all winners
-must still pass visual anatomy review before gameplay integration.
+This stage keeps physical endpoint contact while adding a meaningful pose prior:
+long-finger curls are reduced to photographic ranges, thumb joint bounds are
+narrowed, and a normalized squared-motion penalty prevents a distal-contact win
+from overwhelming anatomy. Winners still require visual review before gameplay.
 """
 from __future__ import annotations
 import math, sys, traceback
@@ -87,40 +89,49 @@ def _set_xyz(arm,bone_name,angles):
     if pb is None: raise RuntimeError(f'missing pose bone {bone_name}')
     x,y,z=angles
     pb.rotation_mode='QUATERNION'
-    # Stable local composition order. Bounds below keep this away from singular extremes.
     pb.rotation_quaternion=_axis_q('x',x)@_axis_q('y',y)@_axis_q('z',z)
 
 def _curl_chain(arm,prefix,degrees):
     for index,deg in enumerate(degrees,1): _set_axis(arm,f'{prefix}_0{index}_r','z',deg)
 
 def _support_fingers(arm):
-    _curl_chain(arm,'index',(31,48,32)); _curl_chain(arm,'middle',(38,58,38)); _curl_chain(arm,'ring',(43,63,42)); _curl_chain(arm,'pinky',(47,67,45))
+    # v7's 31..67 degree chains made a visible C-shaped claw around the proxy.
+    # Use a graded but substantially softer wrap so knuckles remain hand-like.
+    _curl_chain(arm,'index',(18,30,20)); _curl_chain(arm,'middle',(23,36,24)); _curl_chain(arm,'ring',(27,42,29)); _curl_chain(arm,'pinky',(31,47,33))
 
 def _pinch_fingers(arm):
-    _curl_chain(arm,'index',(25,39,24)); _curl_chain(arm,'middle',(14,20,12)); _curl_chain(arm,'ring',(18,25,16)); _curl_chain(arm,'pinky',(22,30,20))
+    # Index participates in the pinch while the other fingers stay softly curled,
+    # rather than presenting three parallel claws to the camera.
+    _curl_chain(arm,'index',(16,27,17)); _curl_chain(arm,'middle',(9,14,8)); _curl_chain(arm,'ring',(13,19,11)); _curl_chain(arm,'pinky',(17,24,14))
 
 def _apply_thumb(arm,p):
     _set_xyz(arm,'thumb_01_r',p[0:3]); _set_xyz(arm,'thumb_02_r',p[3:6]); _set_xyz(arm,'thumb_03_r',p[6:9]); bpy.context.view_layer.update()
 
-# Anatomically conservative bounds: proximal joint gets the largest ab/adduction
-# freedom; distal joints mostly flex but retain small transverse correction.
-BOUNDS=[(-55,55),(-60,60),(-60,60),(-20,20),(-25,25),(-55,55),(-15,15),(-15,15),(-45,45)]
+# Conservative joint-space envelope. v7 allowed 55/60-degree proximal sweeps and
+# 55-degree distal rotation, which could win endpoint distance with a looped thumb.
+BOUNDS=[(-38,38),(-40,40),(-42,42),(-14,14),(-18,18),(-36,36),(-10,10),(-10,10),(-28,28)]
 
 def _clamp(v,lo,hi): return max(lo,min(hi,v))
-def _regularization(p): return sum(abs(v) for v in p)/900.0*0.0015
+
+def _regularization(p):
+    # Normalize every joint by its own range, then penalize squared displacement.
+    # This keeps small coordinated opposition cheaper than one extreme joint.
+    energy=0.0
+    for value,(lo,hi) in zip(p,BOUNDS):
+        span=max(abs(lo),abs(hi),1.0)
+        energy+=(value/span)**2
+    return energy*0.0045
 
 def _finger_centroid(arm):
     pts=[_world_pose(arm,'index_02_r',True),_world_pose(arm,'middle_02_r',True),_world_pose(arm,'ring_02_r',True)]
     return sum(pts,Vector((0,0,0)))/len(pts)
 
 def _support_target(arm):
-    # We want the thumb on the opposite side of a ~76 mm vessel gap from the
-    # curled finger contact centroid. Direction is seeded from natural thumb side.
     fingers=_finger_centroid(arm); palm=_world_pose(arm,'hand_r'); rest_thumb=_world_rest(arm,'thumb_03_r',True)
     side=rest_thumb-palm
     if side.length<1e-6: side=Vector((1,0,0))
     side.normalize()
-    return fingers+side*0.076
+    return fingers+side*0.070
 
 def _pinch_target(arm): return _world_pose(arm,'index_03_r',True)
 
@@ -129,10 +140,8 @@ def _score(arm,target_fn,p):
     return (tip-goal).length+_regularization(p),(tip-goal).length,goal.copy(),tip.copy()
 
 def _solve_seed(arm,base_pose,target_fn,seed):
-    p=list(seed); _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
-    # Coarse-to-fine coordinate descent. Each stage touches at most 9*2 candidates,
-    # dramatically cheaper than the previous 1080-point brute-force grid.
-    for step in (24.0,12.0,6.0,3.0):
+    p=[_clamp(v,*BOUNDS[i]) for i,v in enumerate(seed)]; _clear_pose(arm); base_pose(arm); best=_score(arm,target_fn,p)
+    for step in (18.0,9.0,4.5,2.25):
         changed=True; passes=0
         while changed and passes<3:
             changed=False; passes+=1
@@ -152,14 +161,13 @@ def _solve_seed(arm,base_pose,target_fn,seed):
 def _solve_multi(arm,base_pose,target_fn):
     seeds=[
         (0,0,0, 0,0,0, 0,0,0),
-        (25,25,15, 0,0,15, 0,0,10),
-        (25,-25,15, 0,0,15, 0,0,10),
-        (-20,30,-10, 0,0,20, 0,0,10),
-        (40,0,30, 0,0,-15, 0,0,5),
+        (18,18,12, 0,0,12, 0,0,8),
+        (18,-18,12, 0,0,12, 0,0,8),
+        (-15,22,-8, 0,0,14, 0,0,8),
+        (28,0,22, 0,0,-10, 0,0,4),
     ]
     ranked=[_solve_seed(arm,base_pose,target_fn,s) for s in seeds]
     ranked.sort(key=lambda r:r[0])
-    # Deduplicate near-identical coordinate-descent endpoints.
     unique=[]
     for row in ranked:
         if all(sum(abs(a-b) for a,b in zip(row[2],u[2]))>3.0 for u in unique): unique.append(row)
@@ -167,9 +175,8 @@ def _solve_multi(arm,base_pose,target_fn):
 
 def _support_proxy(arm):
     fingers=_finger_centroid(arm); thumb=_world_pose(arm,'thumb_03_r',True); center=(fingers+thumb)*0.5
-    # Orient cylinder along the local hand/forearm direction; radius matches expected vessel scale.
     axis=(_world_pose(arm,'hand_r')-_world_pose(arm,'lowerarm_r')).normalized()
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=.038,depth=.20,location=center)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=.036,depth=.20,location=center)
     obj=bpy.context.object; obj.name='PoseProxy_Vessel'; obj.data.materials.append(_proxy_material('VesselProxy',(0.12,0.24,0.34,1),.38)); obj.rotation_euler=axis.to_track_quat('Z','Y').to_euler()
 
 def _pinch_proxy(arm):
@@ -198,6 +205,7 @@ def _run():
     support=_render_solved(arm,cam,target,offset,'support_solved',_support_fingers,_support_target,_support_proxy)
     pinch=_render_solved(arm,cam,target,offset,'pinch_solved',_pinch_fingers,_pinch_target,_pinch_proxy)
     print('MPFB_POSE_BEST support_distance',f'{support[0][1]:.6f}','pinch_distance',f'{pinch[0][1]:.6f}')
+    print('MPFB_POSE_PRIOR anatomy_regularized_v8')
     print(SUCCESS)
 if __name__=='__main__':
     try:_run()
