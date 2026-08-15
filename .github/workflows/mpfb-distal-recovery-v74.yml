@@ -1,0 +1,118 @@
+name: MPFB Distal Recovery v74
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-distal-recovery-v74
+    paths:
+      - 'tools/author_mpfb_distal_recovery_v74.py'
+      - '.github/workflows/mpfb-distal-recovery-v74.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  distal-recovery:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-distal-recovery-v74
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v74/{renders,reports,logs,poses} docs/superpowers/evidence/mpfb-v74
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Author and render the single v74 recovery candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_distal_recovery_v74.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v74/renders \
+            artifacts/mpfb_v74/reports/distal-recovery-v74.json \
+            2>&1 | tee artifacts/mpfb_v74/logs/author.log
+          grep -Fq 'MPFB_DISTAL_RECOVERY_V74_SUCCESS' artifacts/mpfb_v74/logs/author.log
+          cp artifacts/mpfb_v74/renders/support-wrap-v74-canonical-pose.json artifacts/mpfb_v74/poses/
+
+      - name: Enforce frozen-v72 and frame-recovery contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/mpfb_v74/reports/distal-recovery-v74.json')
+          r=json.load(p.open())
+          assert r['staging_only'] is True and r['production_candidate'] is False, r
+          assert r['base_pose']=='rejected v72 over pristine v65-B', r
+          assert r['reference_set']==['bar_v1','market_v1'], r
+          assert r['one_shot_candidate'] is True, r
+          assert r['only_thumb_proximal_distal_changed'] is True, r
+          assert r['thumb_root_changed_from_v72'] is False, r
+          assert r['wrist_changed_from_v72'] is False and r['non_thumb_fingers_changed_from_v72'] is False, r
+          assert r['palm_vessel_relationship_changed'] is False and r['camera_changed'] is False and r['crop_changed'] is False, r
+          assert r['ccd_used'] is False and r['endpoint_optimizer_used'] is False, r
+          assert r['parameter_sweep_used'] is False and r['iterative_solver_used'] is False, r
+          assert r['frozen_matrix_max_delta'] <= 1e-8, r['frozen_matrix_max_delta']
+          assert r['editable_matrix_max_delta'] > 1e-5, r['editable_matrix_max_delta']
+          e=r['render_space_evaluation']
+          assert set(e['segment_signed_side_px'])=={'thumb_root','thumb_proximal','thumb_distal'}, e
+          for name in ['thumb-segments-v74-192x108.png','thumb-segments-v74-anatomy-192x108.png','support-wrap-v74-canonical-pose.json']:
+              q=Path('artifacts/mpfb_v74/renders')/name
+              assert q.is_file() and q.stat().st_size>0, q
+          print('MPFB_DISTAL_RECOVERY_V74_CONTRACT_PASS')
+          print(json.dumps({
+            'segment_sides':e['segment_signed_side_px'],
+            'distal_bbox':e['masks']['thumb_distal']['bbox_px'],
+            'proximal_bbox':e['masks']['thumb_proximal']['bbox_px'],
+            'gate':e['frame_recovery_gate'],
+            'frozen_matrix_max_delta':r['frozen_matrix_max_delta'],
+          },indent=2))
+          PY
+
+      - name: Persist v74 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v74/reports/distal-recovery-v74.json docs/superpowers/evidence/mpfb-v74/
+          cp artifacts/mpfb_v74/renders/*.png docs/superpowers/evidence/mpfb-v74/
+          cp artifacts/mpfb_v74/renders/support-wrap-v74-canonical-pose.json docs/superpowers/evidence/mpfb-v74/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v74
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist distal-thumb recovery v74'
+            git pull --rebase origin spike/mpfb-hero-limb-distal-recovery-v74
+            git push origin HEAD:spike/mpfb-hero-limb-distal-recovery-v74
+          fi
+
+      - name: Upload v74 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-distal-recovery-v74
+          path: artifacts/mpfb_v74/
+          if-no-files-found: error
+          retention-days: 14
