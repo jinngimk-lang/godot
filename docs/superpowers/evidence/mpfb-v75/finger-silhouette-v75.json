@@ -1,0 +1,133 @@
+{
+  "base_pose": "exact reconstructed v74 on pristine v65-B",
+  "ccd_used": false,
+  "contact_servo_used": false,
+  "diagnostic_only": true,
+  "digits_2_to_5_changed_from_v65_b": false,
+  "endpoint_optimizer_used": false,
+  "finger_screen_metrics": {
+    "index": {
+      "bbox": {
+        "center_px": [
+          130.3799057006836,
+          60.20658391714096
+        ],
+        "height_px": 32.025527358055115,
+        "max": [
+          151.37920761108398,
+          76.21934759616852
+        ],
+        "min": [
+          109.3806037902832,
+          44.1938202381134
+        ],
+        "projected_point_count": 313,
+        "width_px": 41.99860382080078
+      },
+      "center_x_px": 130.3799057006836,
+      "high_weight_vertex_count": 313,
+      "inside_vessel_x_fraction": 0.9648562300319489,
+      "left_outside_px": 0.0,
+      "right_outside_px": 4.419879913330078
+    },
+    "middle": {
+      "bbox": {
+        "center_px": [
+          103.7611141204834,
+          71.87661918997765
+        ],
+        "height_px": 38.24251717329025,
+        "max": [
+          122.30314636230469,
+          90.99787777662277
+        ],
+        "min": [
+          85.21908187866211,
+          52.75536060333252
+        ],
+        "projected_point_count": 310,
+        "width_px": 37.08406448364258
+      },
+      "center_x_px": 103.7611141204834,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 1.0,
+      "left_outside_px": 0.0,
+      "right_outside_px": 0.0
+    },
+    "pinky": {
+      "bbox": {
+        "center_px": [
+          74.91670989990234,
+          71.65504887700081
+        ],
+        "height_px": 27.726357758045197,
+        "max": [
+          100.19974136352539,
+          85.5182277560234
+        ],
+        "min": [
+          49.6336784362793,
+          57.79186999797821
+        ],
+        "projected_point_count": 309,
+        "width_px": 50.566062927246094
+      },
+      "center_x_px": 74.91670989990234,
+      "high_weight_vertex_count": 309,
+      "inside_vessel_x_fraction": 0.42718446601941745,
+      "left_outside_px": 26.92987632751465,
+      "right_outside_px": 0.0
+    },
+    "ring": {
+      "bbox": {
+        "center_px": [
+          81.14968585968018,
+          72.29371449351311
+        ],
+        "height_px": 39.764842450618744,
+        "max": [
+          97.89526748657227,
+          92.17613571882248
+        ],
+        "min": [
+          64.40410423278809,
+          52.411293268203735
+        ],
+        "projected_point_count": 310,
+        "width_px": 33.49116325378418
+      },
+      "center_x_px": 81.14968585968018,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 0.867741935483871,
+      "left_outside_px": 12.15945053100586,
+      "right_outside_px": 0.0
+    }
+  },
+  "interpretation_gate": "At 192x108, use the four digit ID colors plus the vessel-occluded view to decide which finger chains fail to disappear around the vessel far side. Do not tune another thumb angle. The next authoring step may change only the specific non-thumb chain(s) shown by this diagnostic to break the fist-like near-side silhouette.",
+  "marked_faces_before_crop": {
+    "index": 326,
+    "middle": 318,
+    "pinky": 319,
+    "ring": 317
+  },
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "parameter_sweep_used": false,
+  "pose_authoring_in_v75": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "staging_only": true,
+  "thumb_distal_outside_vessel_px": 12.05306625366211,
+  "thumb_pose_from_v74_frozen": true,
+  "vessel_diameter_px": 70.39577293395996,
+  "vessel_x_px": [
+    76.56355476379395,
+    146.9593276977539
+  ]
+}
