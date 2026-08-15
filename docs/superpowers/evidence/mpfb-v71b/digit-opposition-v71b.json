@@ -1,0 +1,131 @@
+{
+  "base_pose": "pristine v65-B",
+  "bone_projection_used": false,
+  "diagnostic_only": true,
+  "digit_signed_side_px": {
+    "index": -15.101292527144864,
+    "middle": -39.096145883981634,
+    "pinky": -63.11711397278145,
+    "ring": -63.24540167272525,
+    "thumb": -35.55463874974383
+  },
+  "face_weight_threshold": 0.25,
+  "interpretation": "This is a frozen-pose diagnostic. If it fails, the next authoring pass may change only the thumb chain and must reverse/create the rendered opposition sign without changing the proven v65-B wrist/palm/vessel/four-finger grasp. If the thumb is clipped, camera-space placement must be considered before any extra curl.",
+  "masks": {
+    "index": {
+      "bbox_px": [
+        72,
+        38,
+        146,
+        90
+      ],
+      "centroid_px": [
+        120.98743718592965,
+        56.949748743718594
+      ],
+      "count": 1194,
+      "touches_top": false
+    },
+    "middle": {
+      "bbox_px": [
+        74,
+        50,
+        119,
+        89
+      ],
+      "centroid_px": [
+        98.48829039812647,
+        70.85245901639344
+      ],
+      "count": 854,
+      "touches_top": false
+    },
+    "pinky": {
+      "bbox_px": [
+        48,
+        3,
+        117,
+        85
+      ],
+      "centroid_px": [
+        72.85714285714286,
+        55.885714285714286
+      ],
+      "count": 35,
+      "touches_top": false
+    },
+    "ring": {
+      "bbox_px": [
+        55,
+        68,
+        94,
+        90
+      ],
+      "centroid_px": [
+        75.24603174603175,
+        79.28306878306879
+      ],
+      "count": 378,
+      "touches_top": false
+    },
+    "thumb": {
+      "bbox_px": [
+        48,
+        0,
+        122,
+        84
+      ],
+      "centroid_px": [
+        96.2639405204461,
+        17.25836431226766
+      ],
+      "count": 1076,
+      "touches_top": true
+    },
+    "vessel": {
+      "bbox_px": [
+        85,
+        0,
+        178,
+        107
+      ],
+      "centroid_px": [
+        134.77938718662952,
+        73.36991643454039
+      ],
+      "count": 3590,
+      "touches_top": true
+    }
+  },
+  "median_four_finger_side_px": -51.106629928381544,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "pose_authored_in_v71b": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "render_space_only": true,
+  "screen": {
+    "height": 108,
+    "width": 192
+  },
+  "screen_space_opposition_gate": {
+    "intent": "thumb and median four-finger mass must occupy opposite rendered sides of the vessel centerline with readable clearance at 192x108",
+    "min_side_clearance_px": 4.0,
+    "pass": false,
+    "thumb_must_not_touch_top_frame": true
+  },
+  "thumb_and_fingers_have_opposite_sign": false,
+  "thumb_side_px": -35.55463874974383,
+  "vessel_centerline": {
+    "a_x_per_y": 0.10758381205521737,
+    "b_x": 129.96185864763845,
+    "mean_abs_residual_px": 6.898588880432378,
+    "row_count": 108
+  }
+}
