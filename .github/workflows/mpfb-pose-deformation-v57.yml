@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- bl_ext.mpfb_ci.mpfb artifacts/mpfb_pose_deformation_v57/assets/mpfb-human-source.glb artifacts/mpfb_pose_deformation_v57/reports/mpfb-human-source.json 2>&1 | tee artifacts/mpfb_pose_deformation_v57/logs/build.log
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_pose_deformation_v57/logs/build.log
-      - name: Compare matrix-basis and pose-space deformation paths
+      - name: Compare direct basis durable reload and pose-space deformation paths
         shell: bash
         run: |
           set -euo pipefail
@@ -62,13 +62,15 @@ jobs:
           assert r['production_candidate'] is False, r
           assert r['matrix_deltas']['basis_write_matrix_basis_max_abs'] > 0.05, r
           assert r['matrix_deltas']['pose_write_pose_matrix_max_abs'] > 0.05, r
-          # Diagnostic contract: at least one known pose-write representation must visibly
-          # deform the evaluated skinned mesh. We intentionally do not require matrix_basis
-          # to pass; discovering that it fails is the purpose of this run.
+          # This turns deformation itself into the regression gate. A serialized matrix
+          # round-trip is insufficient unless evaluated skin changes and the reload retains
+          # the same deformation.
+          assert r['diagnostic_contract']['matrix_basis_write_visibly_deforms'] is True, r
+          assert r['diagnostic_contract']['matrix_basis_reload_preserves_deformation'] is True, r
           assert r['diagnostic_contract']['pose_space_write_visibly_deforms'] is True, r
           print('POSE_DEFORMATION_V57_CONTRACT_PASS', r['diagnostic_contract'])
           PY
-          for f in baseline matrix_basis_delta pose_space_delta; do
+          for f in baseline matrix_basis_delta matrix_basis_reloaded pose_space_delta; do
             test -s "artifacts/mpfb_pose_deformation_v57/previews/${f}.png"
           done
       - name: Upload deformation evidence
