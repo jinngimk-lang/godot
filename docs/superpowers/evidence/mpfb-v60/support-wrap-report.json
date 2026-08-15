@@ -1,0 +1,162 @@
+{
+  "automatic_retarget": false,
+  "bend_toward_center_used": false,
+  "blind_local_euler_table_used": false,
+  "camera_focus_preserves_pose": true,
+  "finger_controls": {
+    "index": {
+      "joints": [
+        {
+          "bone": "index_01_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            18.0
+          ]
+        },
+        {
+          "bone": "index_02_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            28.0
+          ]
+        },
+        {
+          "bone": "index_03_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            18.0
+          ]
+        }
+      ],
+      "semantic": "fixed artist-authored local FK; no solver/search"
+    },
+    "middle": {
+      "joints": [
+        {
+          "bone": "middle_01_r",
+          "xyz_deg": [
+            -2.0,
+            0.0,
+            26.0
+          ]
+        },
+        {
+          "bone": "middle_02_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            40.0
+          ]
+        },
+        {
+          "bone": "middle_03_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            30.0
+          ]
+        }
+      ],
+      "semantic": "fixed artist-authored local FK; no solver/search"
+    },
+    "pinky": {
+      "joints": [
+        {
+          "bone": "pinky_01_r",
+          "xyz_deg": [
+            -7.0,
+            0.0,
+            32.0
+          ]
+        },
+        {
+          "bone": "pinky_02_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            54.0
+          ]
+        },
+        {
+          "bone": "pinky_03_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            42.0
+          ]
+        }
+      ],
+      "semantic": "fixed artist-authored local FK; no solver/search"
+    },
+    "ring": {
+      "joints": [
+        {
+          "bone": "ring_01_r",
+          "xyz_deg": [
+            -4.0,
+            0.0,
+            30.0
+          ]
+        },
+        {
+          "bone": "ring_02_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            50.0
+          ]
+        },
+        {
+          "bone": "ring_03_r",
+          "xyz_deg": [
+            0.0,
+            0.0,
+            38.0
+          ]
+        }
+      ],
+      "semantic": "fixed artist-authored local FK; no solver/search"
+    }
+  },
+  "max_reload_matrix_error": 1.7881393432617188e-07,
+  "pose_bone_count": 17,
+  "production_candidate": false,
+  "retarget_source_transforms_used": false,
+  "root_shift": 0.020900907709769184,
+  "staging_only": true,
+  "target_solver_used": false,
+  "thumb_controls": {
+    "joints": [
+      {
+        "bone": "thumb_01_r",
+        "xyz_deg": [
+          18.0,
+          -34.0,
+          18.0
+        ]
+      },
+      {
+        "bone": "thumb_02_r",
+        "xyz_deg": [
+          10.0,
+          -16.0,
+          24.0
+        ]
+      },
+      {
+        "bone": "thumb_03_r",
+        "xyz_deg": [
+          6.0,
+          -8.0,
+          20.0
+        ]
+      }
+    ],
+    "semantic": "fixed artist-authored independent thumb opposition"
+  },
+  "visual_gate": "192x108 must immediately read as human vessel wrap with opposed thumb and fingers progressively disappearing behind far contour.",
+  "whole_rotation_deg": 64.47574267049143
+}
