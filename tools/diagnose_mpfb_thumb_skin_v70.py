@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """v70 diagnostic: prove whether canonical thumb pose changes reach the visible MPFB skin.
 
-This is deliberately NOT a new pose candidate.  It reconstructs pristine v65-B, captures the
+This is deliberately NOT a new pose candidate. It reconstructs pristine v65-B, captures the
 baseline evaluated mesh, applies the exact rejected v69 thumb opposition arc, captures the same
-mesh again, and measures deformation only.  The goal is to distinguish a skin-weight/bone-mapping
+mesh again, and measures deformation only. The goal is to distinguish a skin-weight/bone-mapping
 failure from a silhouette/occlusion failure before any more authoring work.
+
+MPFB's helper masks change evaluated topology, so for this diagnostic only we temporarily disable
+all non-Armature modifiers. That preserves the source vertex indices/weights while retaining the
+actual armature deformation being measured. Production rendering/import behavior is untouched.
 """
 from __future__ import annotations
 
@@ -15,7 +19,6 @@ import traceback
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
 
 BASE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location("mpfb_v69_for_v70", BASE / "author_mpfb_thumb_arc_v69.py")
@@ -44,6 +47,28 @@ def _reset():
     bpy.ops.object.delete(use_global=False)
 
 
+def _is_armature_modifier(modifier) -> bool:
+    return modifier.type == "ARMATURE"
+
+
+def _disable_non_armature_modifiers(obj):
+    states = []
+    for modifier in obj.modifiers:
+        states.append((modifier, bool(modifier.show_viewport), bool(modifier.show_render)))
+        if not _is_armature_modifier(modifier):
+            modifier.show_viewport = False
+            modifier.show_render = False
+    bpy.context.view_layer.update()
+    return states
+
+
+def _restore_modifiers(states):
+    for modifier, show_viewport, show_render in states:
+        modifier.show_viewport = show_viewport
+        modifier.show_render = show_render
+    bpy.context.view_layer.update()
+
+
 def _evaluated_world_vertices(obj):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     bpy.context.view_layer.update()
@@ -51,7 +76,7 @@ def _evaluated_world_vertices(obj):
     mesh = evaluated.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
     try:
         if len(mesh.vertices) != len(obj.data.vertices):
-            raise RuntimeError(f"evaluated vertex count changed {len(obj.data.vertices)} -> {len(mesh.vertices)}")
+            raise RuntimeError(f"armature-only evaluated vertex count changed {len(obj.data.vertices)} -> {len(mesh.vertices)}")
         world = evaluated.matrix_world
         return [world @ v.co for v in mesh.vertices]
     finally:
@@ -123,15 +148,20 @@ def run():
     if arm is None or arm.type != "ARMATURE":
         raise RuntimeError("MPFB canonical default rig creation failed")
 
-    vessel_center, vessel_radius, palm_center, longitudinal, span, palmar = v68._ORIGINAL_AUTHOR(arm, -1.0)
-    baseline_vertices = _evaluated_world_vertices(basemesh)
-    baseline_heads_tails = {
-        name: {"head": v65._wp(arm, name).copy(), "tail": v65._wp(arm, name, True).copy()}
-        for name in THUMB_BONES
-    }
-    weights, per_bone_counts = _thumb_weights(basemesh)
-    targets = _apply_v69_arc_only(arm, vessel_center, vessel_radius, palm_center, longitudinal, span)
-    candidate_vertices = _evaluated_world_vertices(basemesh)
+    disabled_states = _disable_non_armature_modifiers(basemesh)
+    disabled_names = [m.name for m, show_v, show_r in disabled_states if not _is_armature_modifier(m)]
+    try:
+        vessel_center, vessel_radius, palm_center, longitudinal, span, palmar = v68._ORIGINAL_AUTHOR(arm, -1.0)
+        baseline_vertices = _evaluated_world_vertices(basemesh)
+        baseline_heads_tails = {
+            name: {"head": v65._wp(arm, name).copy(), "tail": v65._wp(arm, name, True).copy()}
+            for name in THUMB_BONES
+        }
+        weights, per_bone_counts = _thumb_weights(basemesh)
+        targets = _apply_v69_arc_only(arm, vessel_center, vessel_radius, palm_center, longitudinal, span)
+        candidate_vertices = _evaluated_world_vertices(basemesh)
+    finally:
+        _restore_modifiers(disabled_states)
 
     displacements = [(b-a).length for a,b in zip(baseline_vertices, candidate_vertices)]
     by_threshold = {}
@@ -152,6 +182,9 @@ def run():
         "production_candidate": False,
         "base_pose": "pristine v65-B",
         "tested_change": "exact rejected v69 thumb opposition arc",
+        "modifier_isolation": "non-Armature modifiers disabled only while measuring indexed deformation",
+        "disabled_modifier_names": disabled_names,
+        "source_vertex_count": len(basemesh.data.vertices),
         "mpfb_version": list(mpfb.VERSION),
         "thumb_bones": THUMB_BONES,
         "thumb_vertex_group_counts_weight_gt_0_01": per_bone_counts,
