@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   HOME: ${{ github.workspace }}/.preview-home
@@ -53,6 +53,21 @@ jobs:
           .preview-tools/blender/blender --background --python tools/render_mpfb_authored_support_v47.py -- assets/models/hands/hand_right.glb artifacts/mpfb_authored_support_v47/assets/mpfb-right-hero-limb.glb artifacts/mpfb_authored_support_v47/previews 2>&1 | tee artifacts/mpfb_authored_support_v47/logs/authored-support-v47.log
           grep -Fq "MPFB_AUTHORED_SUPPORT_V47_SUCCESS" artifacts/mpfb_authored_support_v47/logs/authored-support-v47.log
           test "$(find artifacts/mpfb_authored_support_v47/previews -name 'authored_support_v47_*.png' | wc -l)" -eq 2
+      - name: Persist visual evidence on the staging branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/superpowers/evidence/mpfb-v47
+          cp artifacts/mpfb_authored_support_v47/previews/authored_support_v47_full.png docs/superpowers/evidence/mpfb-v47/authored-support-full.png
+          cp artifacts/mpfb_authored_support_v47/previews/authored_support_v47_thumbnail.png docs/superpowers/evidence/mpfb-v47/authored-support-thumbnail.png
+          cp artifacts/mpfb_authored_support_v47/logs/authored-support-v47.log docs/superpowers/evidence/mpfb-v47/authored-support-v47.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/superpowers/evidence/mpfb-v47
+          if ! git diff --cached --quiet; then
+            git commit -m "art: persist v47 authored support evidence"
+            git push
+          fi
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4
