@@ -1,0 +1,122 @@
+{
+  "basis_sign_disambiguation_only": true,
+  "candidate_count": 2,
+  "candidates": [
+    {
+      "baked_polygons": 1735,
+      "baked_vertices": 1747,
+      "diagnostics": {
+        "far_side_finger_count": 0,
+        "finger_tips": {
+          "2": {
+            "palm_side_dot": 0.32442615181207657,
+            "world": [
+              -0.5229577422142029,
+              -0.3026570677757263,
+              0.1854921579360962
+            ]
+          },
+          "3": {
+            "palm_side_dot": 0.11605615168809891,
+            "world": [
+              -0.5382906794548035,
+              -0.2888185381889343,
+              0.18928301334381104
+            ]
+          },
+          "4": {
+            "palm_side_dot": 0.5242456719279289,
+            "world": [
+              -0.543070912361145,
+              -0.24122655391693115,
+              0.18291185796260834
+            ]
+          },
+          "5": {
+            "palm_side_dot": 0.7832757756114006,
+            "world": [
+              -0.5285094380378723,
+              -0.2223227471113205,
+              0.16336020827293396
+            ]
+          }
+        },
+        "thumb_palm_side_dot": 0.5121088065207005
+      },
+      "glb": "/home/runner/work/godot/godot/artifacts/mpfb_v65/previews/right-support-wrap-v65-A-static.glb",
+      "glb_bytes": 85564,
+      "min_segment_vertex_coverage": 67,
+      "palm_vertex_coverage": 1297,
+      "palmar_sign": 1.0,
+      "suffix": "A",
+      "vessel_radius": 0.04
+    },
+    {
+      "baked_polygons": 1735,
+      "baked_vertices": 1747,
+      "diagnostics": {
+        "far_side_finger_count": 1,
+        "finger_tips": {
+          "2": {
+            "palm_side_dot": 0.056894637644290924,
+            "world": [
+              -0.42860984802246094,
+              -0.28143730759620667,
+              0.130266472697258
+            ]
+          },
+          "3": {
+            "palm_side_dot": -0.42242059111595154,
+            "world": [
+              -0.43099445104599,
+              -0.25165578722953796,
+              0.11404555290937424
+            ]
+          },
+          "4": {
+            "palm_side_dot": 0.48444967716932297,
+            "world": [
+              -0.44056928157806396,
+              -0.22815589606761932,
+              0.11375235766172409
+            ]
+          },
+          "5": {
+            "palm_side_dot": 0.960315365344286,
+            "world": [
+              -0.45782753825187683,
+              -0.24090251326560974,
+              0.12272441387176514
+            ]
+          }
+        },
+        "thumb_palm_side_dot": -0.46975482255220413
+      },
+      "glb": "/home/runner/work/godot/godot/artifacts/mpfb_v65/previews/right-support-wrap-v65-B-static.glb",
+      "glb_bytes": 85560,
+      "min_segment_vertex_coverage": 61,
+      "palm_vertex_coverage": 1442,
+      "palmar_sign": -1.0,
+      "suffix": "B",
+      "vessel_radius": 0.04
+    }
+  ],
+  "ccd_used": false,
+  "endpoint_optimizer_used": false,
+  "external_pose_source_used": false,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "parameter_sweep_used": false,
+  "pose_source": "reference-derived deterministic native canonical grasp",
+  "production_candidate": false,
+  "production_gameengine_rig_touched": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "staging_only": true,
+  "visual_gate": "Choose neither unless the 192x108 with-vessel thumbnail clearly reads as palm-on-near-side + digits enclosing far contour + opposing thumb; then require continuous non-self-intersecting anatomy in oblique evidence."
+}
