@@ -50,15 +50,38 @@ Observed defects:
 
 Do not promote v55 into Godot product-camera staging or production.
 
+## Historical candidate audit — source-direction v55 also REJECTED
+
+To avoid re-opening an older branch later, the existing source-direction candidate was audited in this same loop.
+
+- Branch: `spike/mpfb-hero-limb-source-direction-v55`
+- Exact head: `f2330501c3e9b0bb3a6d58588204569977f0f68d`
+- MPFB Source Direction v55: run `31880122528` — PASS
+- Godot Check: run `31880122554` — PASS
+- Visual artifact: `9245816588` (`mpfb-source-direction-v55`)
+- Artifact digest: `sha256:938cf20c3ad1a8243e7baaf5fa72f9938862fb276cae3a8caa54962c683b0e9b`
+
+That route deliberately avoided unsafe BVH transform copying: it reduced the CC0 holding-wine-glass source pose to phalanx direction coefficients in a source palm frame and reconstructed those directions in the target GameEngine palm frame. The safety boundary was technically sound, but the real 192×108 frame is an even clearer visual failure than artist-FK v55: the visible fingers extend horizontally across the bottle face, with essentially no vessel enclosure and no readable opposed thumb. Therefore **source phalanx-direction transfer is also closed as an R1 solution**.
+
+Do not resurrect this branch simply because it uses a human-authored source pose; direction-only mapping loses the coupled palm, metacarpal, joint-roll and depth relationships that make the original grasp believable.
+
 ## Important falsification
 
 Checkpoint 23 required a genuinely artist-authored durable pose rather than another procedural solver. v55 removed the solver, but the implementation still encoded the pose as guessed local XYZ Euler deltas in code. The real-frame result shows that **"fixed hand-written Euler numbers" is not equivalent to an artist-authored visual pose** when the GameEngine rig's per-bone local axes are not visually intuitive.
 
-Therefore do not create v56 as another table of guessed local XYZ values or a broad axis/angle sweep. That would recreate the same search abstraction checkpoint 23 was meant to close.
+The source-direction audit closes the adjacent abstraction as well: **a safe human pose prior is not enough if it is reduced to independent phalanx directions**. A successful route must preserve the visual whole-hand relationship while keeping the production GameEngine rig's own rest/roll data intact.
+
+Therefore do not create v56 as another table of guessed local XYZ values, direction-only transfer, or broad axis/angle sweep. That would recreate the same search abstraction checkpoint 23 was meant to close.
+
+## Current MPFB safety finding
+
+Current MPFB source code was re-checked before choosing the next route. `AnimationService.import_bvh_file_as_pose()` explicitly describes itself as destructive and copies source BVH edit-bone roll values into the destination rig before copying rotations. Its source warns that this will ruin destination bone roll values. Therefore it must **not** be applied directly to the production GameEngine hero rig. A BVH may still be loaded into a sacrificial duplicate/reference rig for visual anatomy guidance.
+
+The verified safe persistence boundary remains the repository's same-rig v49 partial pose format (or an equivalent same-rig MPFB/Blender pose asset authored directly on the GameEngine rig) because it stores the final pose without rewriting edit-bone roll/rest structure.
 
 ## Highest-impact reds
 
-R1 — **Visual pose authoring source:** obtain one genuinely believable support-wrap pose on the continuous MPFB hand/wrist/forearm using a pose-authoring method where the artist/author judges the actual silhouette, not guessed local-axis numbers.
+R1 — **Visual pose authoring source:** obtain one genuinely believable support-wrap pose on the continuous MPFB hand/wrist/forearm using a pose-authoring method where the author judges the actual silhouette, not guessed local-axis numbers or direction-only transfer.
 
 R2 — **Product-camera proof:** after R1 passes the fixed thumbnail gate, stage the candidate in the real café/bar/market camera and compare against current XR baseline and locked references.
 
@@ -73,14 +96,15 @@ Micro skin/PBR, paper fibers, glass highlights, condensation and HUD polish rema
 Change the authoring interface, not another pose coefficient.
 
 1. Keep the continuous MPFB GameEngine hero limb, v49 durable 17-bone pose format, current vessel fixture and fixed camera.
-2. Use a visual pose-authoring source/workflow that exposes the actual hand silhouette while posing (for example Blender Pose Mode / a deterministic pose asset authored from a visually inspected stance, or an equivalently direct authoring source). A CC0 holding-object pose may remain anatomical guidance, but source transforms must not silently overwrite GameEngine rig roll/rest data.
-3. Author one support wrap as a visual whole: palm close to near/side wall; thumb visibly crossing/opposing; index through pinky progressively curling in depth; distal portions disappearing behind the far contour.
-4. Save only the finished visually accepted pose into the durable partial-pose format. Do not run a solver afterward.
-5. Render full + 192×108 using the unchanged fixed camera.
-6. Reject immediately if thumbnail still reads as touching/open hand.
-7. Only after a thumbnail PASS, inspect fingertip mesh quality and then stage the exact candidate in the real Godot product camera against the XR baseline.
-8. Run independent Challenger only after real product-camera evidence improves.
+2. Author the support wrap **directly on the GameEngine rig with visual feedback** (Blender Pose Mode / a visually inspected same-rig pose asset or an equivalent direct authoring workflow). Do not destructively import a BVH into that rig.
+3. A CC0 holding-object BVH may be opened only on a sacrificial reference rig beside the target to guide anatomy and silhouette.
+4. Author one support wrap as a visual whole: palm close to near/side wall; thumb visibly crossing/opposing; index through pinky progressively curling in depth; distal portions disappearing behind the far contour.
+5. Save only the finished visually accepted pose into the durable same-rig partial-pose format. Do not run a solver afterward.
+6. Render full + 192×108 using the unchanged fixed camera.
+7. Reject immediately if thumbnail still reads as touching/open hand.
+8. Only after a thumbnail PASS, inspect fingertip mesh quality and then stage the exact candidate in the real Godot product camera against the XR baseline.
+9. Run independent Challenger only after real product-camera evidence improves.
 
 ## Do not repeat
 
-Do not return to endpoint/CCD/contact chasing, per-joint flex-axis derivation, whole-hand orbit sweeps, shared-axis tables, blind local XYZ tables, or broad coefficient sweeps. The next work must improve the **pose-authoring interface/source itself**.
+Do not return to endpoint/CCD/contact chasing, per-joint flex-axis derivation, whole-hand orbit sweeps, shared-axis tables, blind local XYZ tables, source-direction-only transfer, or broad coefficient sweeps. The next work must improve the **pose-authoring interface/source itself**.
