@@ -1,0 +1,28 @@
+{
+  "baked_polygons": 1657,
+  "baked_vertices": 1707,
+  "destructive_roll_confined_to_sacrificial_rig": true,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "output_glb": "/home/runner/work/godot/godot/artifacts/mpfb_v64/assets/right-support-wrap-v64-static.glb",
+  "output_glb_bytes": 82952,
+  "pose_baked_static": true,
+  "production_candidate": false,
+  "production_gameengine_rig_touched": false,
+  "runtime_finger_solver_required": false,
+  "sacrificial_rig_deleted_before_render_export": true,
+  "source_bvh_applied_with_native_mpfb_import": true,
+  "source_import_destructive_roll_copy": true,
+  "source_license": "CC0 (official MakeHuman Community Poses 01 pack)",
+  "source_rig": "MPFB canonical default (sacrificial)",
+  "staging_only": true,
+  "vessel_center": [
+    -0.37281733751296997,
+    -0.2384296953678131,
+    0.40927690267562866
+  ],
+  "visual_gate": "Thumbnail must read as a natural support wrap; full render must show continuous believable fingers/palm/wrist without cross-rig deformation artifacts."
+}
