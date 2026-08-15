@@ -1,0 +1,102 @@
+name: MPFB Poses02 Grip Source v56
+
+on:
+  push:
+    branches:
+      - spike/mpfb-poses02-grip-source-v56
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Acquire official CC0 Poses02 pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mpfb_poses02_grip_v56/{source,reports,renders,logs} .preview-tools
+          URL='https://files2.makehumancommunity.org/asset_packs/poses02/poses02_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_poses02_grip_v56/source/poses02_cc0.zip "$URL"
+          sha256sum artifacts/mpfb_poses02_grip_v56/source/poses02_cc0.zip | tee artifacts/mpfb_poses02_grip_v56/reports/source-pack.sha256
+          printf '%s\n' "$URL" > artifacts/mpfb_poses02_grip_v56/reports/source-url.txt
+
+      - name: Extract two explicit cylindrical-grip source candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/extract_makehuman_pose_sources_v56.py \
+            artifacts/mpfb_poses02_grip_v56/source/poses02_cc0.zip \
+            artifacts/mpfb_poses02_grip_v56/source/candidates \
+            artifacts/mpfb_poses02_grip_v56/reports/sources.json \
+            2>&1 | tee artifacts/mpfb_poses02_grip_v56/logs/extract.log
+          grep -Fq 'MAKEHUMAN_POSES02_GRIP_SOURCE_V56_SUCCESS' artifacts/mpfb_poses02_grip_v56/logs/extract.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_poses02_grip_v56/reports/sources.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['automatic_retarget_allowed'] is False, r
+          assert r['declared_license'] == 'CC0', r
+          assert set(r['candidates']) == {'henny_cyclist_normal','punkduck_cyclist01'}, r
+          print('POSES02_GRIP_SOURCE_V56_PROVENANCE_PASS', r['source_pack_sha256'])
+          PY
+
+      - name: Install pinned Blender headless runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+
+      - name: Render source-only closeups
+        shell: bash
+        run: |
+          set -euo pipefail
+          for TOKEN in henny_cyclist_normal punkduck_cyclist01; do
+            BVH="$(find artifacts/mpfb_poses02_grip_v56/source/candidates/$TOKEN -type f -iname '*.bvh' -print -quit)"
+            test -n "$BVH"
+            .preview-tools/blender/blender --background --python tools/render_makehuman_pose_reference_v50.py -- \
+              "$BVH" \
+              "artifacts/mpfb_poses02_grip_v56/renders/${TOKEN}-full.png" \
+              "artifacts/mpfb_poses02_grip_v56/renders/${TOKEN}-thumbnail.png" \
+              "artifacts/mpfb_poses02_grip_v56/reports/${TOKEN}-render.json" \
+              2>&1 | tee "artifacts/mpfb_poses02_grip_v56/logs/${TOKEN}-render.log"
+            grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_RENDER_SUCCESS' "artifacts/mpfb_poses02_grip_v56/logs/${TOKEN}-render.log"
+            test -s "artifacts/mpfb_poses02_grip_v56/renders/${TOKEN}-full.png"
+            test -s "artifacts/mpfb_poses02_grip_v56/renders/${TOKEN}-thumbnail.png"
+          done
+
+      - name: Enforce source-only gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          for token in ('henny_cyclist_normal','punkduck_cyclist01'):
+              r=json.load(open(f'artifacts/mpfb_poses02_grip_v56/reports/{token}-render.json'))
+              assert r['staging_only'] is True, r
+              assert r['production_candidate'] is False, r
+              assert r['automatic_retarget_allowed'] is False, r
+              assert r['selected_bones_by_class']['thumb'], r
+              assert len(r['selected_bones_by_class']['finger']) >= 12, r
+          print('POSES02_GRIP_SOURCE_ONLY_V56_PASS')
+          PY
+
+      - name: Upload source-screen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-poses02-grip-source-v56
+          path: artifacts/mpfb_poses02_grip_v56/
+          if-no-files-found: error
+          retention-days: 14
