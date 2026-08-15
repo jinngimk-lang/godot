@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""v57: isolate whether MPFB artist FK writes actually reach the skinned mesh.
+"""v57: isolate where MPFB artist FK changes are lost before visual review.
 
-The v55 and v56 reports persisted very different 17-bone ``matrix_basis`` values, yet their
-renders were visually indistinguishable. Before authoring another grasp, this diagnostic
-holds the MPFB source, Cup seed, whole-hand placement, vessel fixture and camera constant and
-compares three states:
+v55 and v56 persisted substantially different 17-bone ``matrix_basis`` values, yet their
+final renders were visually indistinguishable. This diagnostic holds the MPFB source, Cup
+seed, whole-hand placement, vessel fixture and camera constant and compares four states:
 
 1. baseline after canonical whole-hand placement;
-2. a deliberately large ``matrix_basis`` delta on ``index_02_r``;
-3. a deliberately large pose-space ``pb.matrix`` head-pivot delta on the same joint.
+2. a deliberately large direct ``matrix_basis`` delta on ``index_02_r``;
+3. that exact basis state after v49 save -> clear -> reload;
+4. a deliberately large pose-space ``pb.matrix`` head-pivot delta on the same joint.
 
-For each state it captures a render and evaluated skinned-mesh vertex positions. The contract
-is diagnostic, not a production pose: a pose-authoring representation is only useful if its
-write produces a nontrivial evaluated-mesh delta as well as a different matrix value.
+For each state it captures a render and evaluated skinned-mesh vertex positions. This is a
+root-cause contract, not a grasp candidate. Matrix serialization is not enough: a durable
+pose path is valid only if it preserves nontrivial evaluated-mesh deformation.
 """
 from __future__ import annotations
 
@@ -42,6 +42,7 @@ v19 = _load("mpfb_v19_for_v57", "render_mpfb_retarget_preview_v19.py")
 v23 = _load("mpfb_v23_for_v57", "render_mpfb_contact_ik_v23.py")
 v35 = _load("mpfb_v35_for_v57", "render_mpfb_canonical_grip_v35.py")
 v53 = _load("mpfb_v53_for_v57", "author_mpfb_anatomical_controls_v53.py")
+v49 = _load("mpfb_v49_for_v57", "manual_pose_asset_v49.py")
 
 JOINT = "index_02_r"
 BASIS_DEG = (62.0, 37.0, -29.0)
@@ -110,6 +111,7 @@ def run() -> None:
     xr_path, mpfb_path, out, report_path = _args()
     out.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    durable_pose_path = report_path.parent / "matrix-basis-diagnostic.pose.json"
 
     v19._reset()
     xr, xr_meshes = v19._import_armature(xr_path, "XR")
@@ -136,7 +138,7 @@ def run() -> None:
     focus = v35.v22._neutral_targets(arm)[4].lerp(center, 0.55)
     _render(cam, out, "baseline", focus)
 
-    # Variant A: the same representation used by v49/v55/v56 durable artist poses.
+    # Variant A: direct basis write, matching the representation used by v55/v56.
     basis_delta = Euler(tuple(math.radians(v) for v in BASIS_DEG), "XYZ").to_matrix().to_4x4()
     arm.pose.bones[JOINT].matrix_basis = arm.pose.bones[JOINT].matrix_basis @ basis_delta
     bpy.context.view_layer.update()
@@ -145,8 +147,22 @@ def run() -> None:
     basis_vertices = _evaluated_vertices(meshes)
     _render(cam, out, "matrix_basis_delta", focus)
 
-    # Restore all imported pose bases, then reproduce the older visibly active head-pivot
-    # pose-space path used by v53's `_rot_about_joint` family.
+    # Variant B: persist that exact direct-basis state through the v49 durable boundary.
+    v49.save_pose(
+        arm,
+        durable_pose_path,
+        label="v57 deformation diagnostic — NOT a grasp",
+        provenance={"kind": "deformation-contract", "production_candidate": False},
+    )
+    v49.clear_pose(arm)
+    v49.load_pose(arm, durable_pose_path)
+    reloaded_joint_basis = arm.pose.bones[JOINT].matrix_basis.copy()
+    reloaded_joint_pose = arm.pose.bones[JOINT].matrix.copy()
+    reloaded_vertices = _evaluated_vertices(meshes)
+    _render(cam, out, "matrix_basis_reloaded", focus)
+
+    # Variant C: restore canonical baseline and reproduce the older head-pivot pose-space
+    # write used by v53's visibly active `_rot_about_joint` family.
     _restore_basis(arm, baseline_basis)
     _palm, _forward, span, normal = v53._local_palm_frame(arm)
     world_normal = arm.matrix_world.to_3x3() @ normal
@@ -161,36 +177,46 @@ def run() -> None:
     _render(cam, out, "pose_space_delta", focus)
 
     basis_vertex = _vertex_delta(baseline_vertices, basis_vertices)
+    reloaded_vertex = _vertex_delta(baseline_vertices, reloaded_vertices)
+    basis_vs_reloaded_vertex = _vertex_delta(basis_vertices, reloaded_vertices)
     pose_vertex = _vertex_delta(baseline_vertices, pose_vertices)
-    basis_vs_pose_vertex = _vertex_delta(basis_vertices, pose_vertices)
 
+    threshold = 1e-5
     report = {
         "staging_only": True,
         "production_candidate": False,
         "joint": JOINT,
-        "whole_rotation_deg": whole_rotation_deg,
-        "root_shift": [float(v) for v in root_shift],
+        "whole_rotation_deg": float(whole_rotation_deg),
+        "root_shift": float(root_shift),
         "basis_delta_xyz_deg": list(BASIS_DEG),
         "pose_space_delta_deg": POSE_SPACE_DEG,
         "pose_space_sign": sign,
         "matrix_deltas": {
             "basis_write_matrix_basis_max_abs": _matrix_max_abs_delta(baseline_joint_basis, basis_joint_basis),
             "basis_write_pose_matrix_max_abs": _matrix_max_abs_delta(baseline_joint_pose, basis_joint_pose),
+            "reload_vs_direct_matrix_basis_max_abs": _matrix_max_abs_delta(basis_joint_basis, reloaded_joint_basis),
+            "reload_vs_direct_pose_matrix_max_abs": _matrix_max_abs_delta(basis_joint_pose, reloaded_joint_pose),
             "pose_write_matrix_basis_max_abs": _matrix_max_abs_delta(baseline_joint_basis, pose_joint_basis),
             "pose_write_pose_matrix_max_abs": _matrix_max_abs_delta(baseline_joint_pose, pose_joint_pose),
         },
         "evaluated_mesh_delta_from_baseline": {
             "matrix_basis_write": basis_vertex,
+            "matrix_basis_reloaded": reloaded_vertex,
             "pose_space_write": pose_vertex,
         },
-        "evaluated_mesh_delta_basis_vs_pose": basis_vs_pose_vertex,
+        "evaluated_mesh_delta_direct_vs_reloaded": basis_vs_reloaded_vertex,
         "diagnostic_contract": {
-            "nontrivial_vertex_delta_threshold": 1e-5,
-            "matrix_basis_write_visibly_deforms": basis_vertex["max_distance"] > 1e-5,
-            "pose_space_write_visibly_deforms": pose_vertex["max_distance"] > 1e-5,
+            "nontrivial_vertex_delta_threshold": threshold,
+            "matrix_basis_write_visibly_deforms": basis_vertex["max_distance"] > threshold,
+            "matrix_basis_reload_preserves_deformation": (
+                reloaded_vertex["max_distance"] > threshold
+                and basis_vs_reloaded_vertex["max_distance"] <= threshold
+            ),
+            "pose_space_write_visibly_deforms": pose_vertex["max_distance"] > threshold,
         },
         "baseline_joint_basis": _flat_matrix(baseline_joint_basis),
         "basis_joint_basis": _flat_matrix(basis_joint_basis),
+        "reloaded_joint_basis": _flat_matrix(reloaded_joint_basis),
         "pose_joint_basis": _flat_matrix(pose_joint_basis),
     }
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
