@@ -1,0 +1,132 @@
+name: MPFB Baked Source v64
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-baked-source-v64
+    paths-ignore:
+      - 'docs/superpowers/evidence/mpfb-v64/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  baked-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-baked-source-v64
+
+      - name: Acquire official CC0 holding-object source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mpfb_v64/{source,assets,reports,logs,previews} docs/superpowers/evidence/mpfb-v64 .preview-tools
+          URL='https://files2.makehumancommunity.org/asset_packs/poses01/poses01_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_v64/source/poses01_cc0.zip "$URL"
+          python tools/inspect_makehuman_pose_v50.py \
+            artifacts/mpfb_v64/source/poses01_cc0.zip \
+            artifacts/mpfb_v64/source/holding-wine-glass \
+            artifacts/mpfb_v64/reports/source-pose.json \
+            2>&1 | tee artifacts/mpfb_v64/logs/source.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_INSPECT_SUCCESS' artifacts/mpfb_v64/logs/source.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v64/reports/source-pose.json'))
+          assert r['declared_license_from_official_pack_page'] == 'CC0', r
+          print('V64_SOURCE_PROVENANCE_PASS', r['source_pack_sha256'])
+          PY
+
+      - name: Install headless runtime and pinned Blender/MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build, pose and bake same-rig static support limb
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_v64/source/holding-wine-glass -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          .preview-tools/blender/blender --background --python tools/bake_mpfb_default_pose_v64.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            "$BVH" \
+            artifacts/mpfb_v64/previews \
+            artifacts/mpfb_v64/assets/right-support-wrap-v64-static.glb \
+            artifacts/mpfb_v64/reports/right-support-wrap-v64.json \
+            2>&1 | tee artifacts/mpfb_v64/logs/bake.log
+          grep -Fq 'MPFB_BAKED_SOURCE_V64_SUCCESS' artifacts/mpfb_v64/logs/bake.log
+          test -s artifacts/mpfb_v64/previews/baked_source_v64_candidate.png
+          test -s artifacts/mpfb_v64/previews/baked_source_v64_thumbnail.png
+          test -s artifacts/mpfb_v64/assets/right-support-wrap-v64-static.glb
+
+      - name: Enforce sacrificial-rig boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v64/reports/right-support-wrap-v64.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['source_license'].startswith('CC0'), r
+          assert r['source_rig'] == 'MPFB canonical default (sacrificial)', r
+          assert r['source_bvh_applied_with_native_mpfb_import'] is True, r
+          assert r['source_import_destructive_roll_copy'] is True, r
+          assert r['destructive_roll_confined_to_sacrificial_rig'] is True, r
+          assert r['sacrificial_rig_deleted_before_render_export'] is True, r
+          assert r['production_gameengine_rig_touched'] is False, r
+          assert r['pose_baked_static'] is True, r
+          assert r['runtime_finger_solver_required'] is False, r
+          assert r['baked_vertices'] >= 300, r
+          assert r['output_glb_bytes'] > 0, r
+          print('MPFB_BAKED_SOURCE_V64_BOUNDARY_PASS')
+          PY
+
+      - name: Persist visual and static-mesh evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v64/previews/baked_source_v64_candidate.png docs/superpowers/evidence/mpfb-v64/support-wrap-full.png
+          cp artifacts/mpfb_v64/previews/baked_source_v64_thumbnail.png docs/superpowers/evidence/mpfb-v64/support-wrap-thumbnail.png
+          cp artifacts/mpfb_v64/reports/right-support-wrap-v64.json docs/superpowers/evidence/mpfb-v64/support-wrap-report.json
+          cp artifacts/mpfb_v64/reports/source-pose.json docs/superpowers/evidence/mpfb-v64/source-pose-provenance.json
+          .preview-tools/blender/blender --background --python tools/export_render_rgbhex.py -- \
+            docs/superpowers/evidence/mpfb-v64/support-wrap-thumbnail.png \
+            docs/superpowers/evidence/mpfb-v64/support-wrap-thumbnail.rgbhex \
+            192 108
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v64
+          git commit -m 'evidence: persist baked same-rig support mesh v64'
+          git push origin HEAD:spike/mpfb-hero-limb-baked-source-v64
+
+      - name: Upload redundant artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-baked-source-v64
+          path: artifacts/mpfb_v64/
+          if-no-files-found: error
+          retention-days: 14
