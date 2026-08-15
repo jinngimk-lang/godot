@@ -82,6 +82,17 @@ jobs:
             artifacts/mpfb_native_pose_bake_v57/assets/native-support-wrap-v57.glb; do
             test -s "$f"
           done
+      - name: Render exported baked hand without diagnostic prop
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/render_mpfb_baked_hand_only_v57.py -- \
+            artifacts/mpfb_native_pose_bake_v57/assets/native-support-wrap-v57.glb \
+            artifacts/mpfb_native_pose_bake_v57/previews \
+            2>&1 | tee artifacts/mpfb_native_pose_bake_v57/logs/hand-only.log
+          grep -Fq 'MPFB_BAKED_HAND_ONLY_V57_SUCCESS' artifacts/mpfb_native_pose_bake_v57/logs/hand-only.log
+          test -s artifacts/mpfb_native_pose_bake_v57/previews/native_pose_v57_baked_hand_only.png
+          test -s artifacts/mpfb_native_pose_bake_v57/previews/native_pose_v57_baked_hand_only_thumbnail.png
       - name: Upload native-pose evidence
         if: always()
         uses: actions/upload-artifact@v4
