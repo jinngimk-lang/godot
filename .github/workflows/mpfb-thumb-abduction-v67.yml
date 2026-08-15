@@ -1,0 +1,112 @@
+name: MPFB Thumb Abduction v67
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-thumb-abduction-v67
+    paths-ignore:
+      - 'docs/superpowers/evidence/mpfb-v67/**'
+      - 'docs/superpowers/checkpoints/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  thumb-abduction:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-thumb-abduction-v67
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v67/{previews,reports,logs} docs/superpowers/evidence/mpfb-v67
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Render pristine-B thumb-abduction candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_thumb_abduction_v67.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v67/previews \
+            artifacts/mpfb_v67/reports/thumb-abduction-v67.json \
+            2>&1 | tee artifacts/mpfb_v67/logs/author.log
+          grep -Fq 'MPFB_THUMB_ABDUCTION_V67_SUCCESS' artifacts/mpfb_v67/logs/author.log
+          for f in \
+            support-wrap-B67-with-vessel.png \
+            support-wrap-B67-thumbnail.png \
+            support-wrap-B67-anatomy-oblique.png \
+            support-wrap-B67-anatomy-thumbnail.png \
+            right-support-wrap-v65-B67-static.glb; do
+            test -s "artifacts/mpfb_v67/previews/$f"
+          done
+
+      - name: Enforce abduction-only staging boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v67/reports/thumb-abduction-v67.json'))
+          assert r['staging_only'] is True and r['production_candidate'] is False, r
+          assert r['base_candidate'] == 'pristine v65-B', r
+          assert r['base_palmar_sign'] == -1.0, r
+          assert r['thumb_root_abduction_only'] is True, r
+          assert r['thumb_curl_changed_from_v65_b'] is False, r
+          assert r['non_thumb_fingers_changed_from_v65_b'] is False, r
+          assert r['wrist_changed_from_v65_b'] is False, r
+          assert r['palm_vessel_relationship_changed_from_v65_b'] is False, r
+          assert r['camera_changed_from_v65_b'] is False and r['crop_changed_from_v65_b'] is False, r
+          assert r['ccd_used'] is False and r['endpoint_optimizer_used'] is False and r['parameter_sweep_used'] is False, r
+          c=r['candidate']
+          assert c['baked_vertices'] >= 1400 and c['palm_vertex_coverage'] >= 220 and c['min_segment_vertex_coverage'] >= 12, c
+          print('MPFB_THUMB_ABDUCTION_V67_BOUNDARY_PASS')
+          PY
+
+      - name: Persist visual evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v67/previews/support-wrap-B67-with-vessel.png docs/superpowers/evidence/mpfb-v67/support-wrap-with-vessel.png
+          cp artifacts/mpfb_v67/previews/support-wrap-B67-thumbnail.png docs/superpowers/evidence/mpfb-v67/support-wrap-thumbnail.png
+          cp artifacts/mpfb_v67/previews/support-wrap-B67-anatomy-oblique.png docs/superpowers/evidence/mpfb-v67/anatomy-oblique.png
+          cp artifacts/mpfb_v67/previews/support-wrap-B67-anatomy-thumbnail.png docs/superpowers/evidence/mpfb-v67/anatomy-thumbnail.png
+          cp artifacts/mpfb_v67/reports/thumb-abduction-v67.json docs/superpowers/evidence/mpfb-v67/thumb-abduction-v67.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v67
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist thumb abduction v67'
+            git push origin HEAD:spike/mpfb-hero-limb-thumb-abduction-v67
+          fi
+
+      - name: Upload redundant artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-thumb-abduction-v67
+          path: artifacts/mpfb_v67/
+          if-no-files-found: error
+          retention-days: 14
