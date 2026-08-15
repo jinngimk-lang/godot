@@ -1,0 +1,112 @@
+{
+  "base_pose": "pristine v65-B",
+  "camera_changed_from_v65_b": false,
+  "crop_policy_changed_from_v65_b": false,
+  "diagnostic_only": true,
+  "evidence": [
+    "/home/runner/work/godot/godot/artifacts/mpfb_v71/frames/thumb-id-with-vessel.png",
+    "/home/runner/work/godot/godot/artifacts/mpfb_v71/frames/thumb-id-thumbnail.png",
+    "/home/runner/work/godot/godot/artifacts/mpfb_v71/frames/thumb-id-anatomy-oblique.png",
+    "/home/runner/work/godot/godot/artifacts/mpfb_v71/frames/thumb-id-anatomy-thumbnail.png"
+  ],
+  "high_weight_thumb_vertex_count": 224,
+  "high_weight_vertex_threshold": 0.5,
+  "marked_thumb_face_count_before_crop": 238,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v65_b": false,
+  "normalized_bbox_outside_over_vessel_radius": 0.0,
+  "normalized_root_tip_span_over_vessel_radius": 2.1346334628728303,
+  "pose_changed_from_v65_b": false,
+  "production_candidate": false,
+  "projected_thumb_bbox_outside_vessel_px": 0.0,
+  "projected_thumb_root": {
+    "depth": 0.3216112554073334,
+    "px_top_left": [
+      80.16280174255371,
+      -4.692471027374268
+    ],
+    "uv_bottom_left": [
+      0.4175145924091339,
+      1.043448805809021
+    ]
+  },
+  "projected_thumb_root_tip_span_px": 75.13458627481421,
+  "projected_thumb_skin_bbox": {
+    "center_px": [
+      108.275559425354,
+      19.124066054821014
+    ],
+    "height_px": 76.29273927211761,
+    "max": [
+      135.75424575805664,
+      57.27043569087982
+    ],
+    "min": [
+      80.79687309265137,
+      -19.022303581237793
+    ],
+    "projected_point_count": 224,
+    "width_px": 54.95737266540527
+  },
+  "projected_thumb_tip": {
+    "depth": 0.3782205283641815,
+    "px_top_left": [
+      129.76001358032227,
+      51.74619770050049
+    ],
+    "uv_bottom_left": [
+      0.6758334040641785,
+      0.5208685398101807
+    ]
+  },
+  "projected_vessel_contour": [
+    {
+      "depth": 0.37926048040390015,
+      "px_top_left": [
+        146.9593276977539,
+        40.26151728630066
+      ],
+      "uv_bottom_left": [
+        0.7654131650924683,
+        0.6272081732749939
+      ]
+    },
+    {
+      "depth": 0.37926045060157776,
+      "px_top_left": [
+        76.56355476379395,
+        70.2055914402008
+      ],
+      "uv_bottom_left": [
+        0.39876851439476013,
+        0.3499482274055481
+      ]
+    }
+  ],
+  "projected_vessel_diameter_px": 70.39577293395996,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "screen_space_contract_for_next_pose": {
+    "provisional_measurement_guard": "Use the v71 measurements as baseline evidence. A next pose is not accepted from metrics alone; it must visibly improve the 192x108 ID view and anatomy-oblique view. Root-tip span and thumb-skin area outside the vessel contour should both increase materially without self-intersection.",
+    "structural_target": "Increase visible camera-space opposition, not raw 3D bone travel. The next single pose must enlarge a continuous root-to-tip thumb silhouette on the near/opposing side while preserving unobstructed anatomy continuity.",
+    "visual_requirement": "At 192x108 the cyan thumb-influenced skin must form an independently legible opposing contour/region rather than disappearing into the palm or vessel; the four frozen v65-B fingers must remain unchanged and enclosing."
+  },
+  "thumb_bones": [
+    "finger1-1.R",
+    "finger1-2.R",
+    "finger1-3.R"
+  ],
+  "thumb_face_weight_threshold": 0.35,
+  "thumbnail_size": [
+    192,
+    108
+  ],
+  "vessel_changed_from_v65_b": false,
+  "wrist_changed_from_v65_b": false
+}
