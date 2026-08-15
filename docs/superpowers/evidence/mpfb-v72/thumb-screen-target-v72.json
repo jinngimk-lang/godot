@@ -1,0 +1,172 @@
+{
+  "base_pose": "pristine v65-B",
+  "baseline": {
+    "bbox": {
+      "center_px": [
+        108.275559425354,
+        19.124066054821014
+      ],
+      "height_px": 76.29273927211761,
+      "max": [
+        135.75424575805664,
+        57.27043569087982
+      ],
+      "min": [
+        80.79687309265137,
+        -19.022303581237793
+      ],
+      "projected_point_count": 224,
+      "width_px": 54.95737266540527
+    },
+    "bbox_outside_px": 0.0,
+    "root": {
+      "depth": 0.3216112554073334,
+      "px_top_left": [
+        80.16280174255371,
+        -4.692471027374268
+      ],
+      "uv_bottom_left": [
+        0.4175145924091339,
+        1.043448805809021
+      ]
+    },
+    "root_tip_span_px": 75.13459090096437,
+    "tip": {
+      "depth": 0.3782205283641815,
+      "px_top_left": [
+        129.76001358032227,
+        51.74619770050049
+      ],
+      "uv_bottom_left": [
+        0.6758334040641785,
+        0.5208685398101807
+      ]
+    },
+    "vessel_contour": [
+      {
+        "depth": 0.37926048040390015,
+        "px_top_left": [
+          146.9593276977539,
+          40.26151728630066
+        ],
+        "uv_bottom_left": [
+          0.7654131650924683,
+          0.6272081732749939
+        ]
+      },
+      {
+        "depth": 0.37926045060157776,
+        "px_top_left": [
+          76.56355476379395,
+          70.2055914402008
+        ],
+        "uv_bottom_left": [
+          0.39876851439476013,
+          0.3499482274055481
+        ]
+      }
+    ],
+    "vessel_diameter_px": 70.39577293395996,
+    "vessel_x_px": [
+      76.56355476379395,
+      146.9593276977539
+    ]
+  },
+  "camera_changed_from_v65_b": false,
+  "candidate": {
+    "bbox": {
+      "center_px": [
+        127.52681636810303,
+        10.103489756584167
+      ],
+      "height_px": 60.311806440353394,
+      "max": [
+        170.11287689208984,
+        40.259392976760864
+      ],
+      "min": [
+        84.94075584411621,
+        -20.05241346359253
+      ],
+      "projected_point_count": 224,
+      "width_px": 85.17212104797363
+    },
+    "bbox_outside_px": 23.153549194335938,
+    "root": {
+      "depth": 0.3216112554073334,
+      "px_top_left": [
+        80.16280174255371,
+        -4.692471027374268
+      ],
+      "uv_bottom_left": [
+        0.4175145924091339,
+        1.043448805809021
+      ]
+    },
+    "root_tip_span_px": 92.39349537935587,
+    "tip": {
+      "depth": 0.3559393584728241,
+      "px_top_left": [
+        163.7449493408203,
+        34.68496656417847
+      ],
+      "uv_bottom_left": [
+        0.8528382778167725,
+        0.6788429021835327
+      ]
+    },
+    "vessel_contour": [
+      {
+        "depth": 0.37926048040390015,
+        "px_top_left": [
+          146.9593276977539,
+          40.26151728630066
+        ],
+        "uv_bottom_left": [
+          0.7654131650924683,
+          0.6272081732749939
+        ]
+      },
+      {
+        "depth": 0.37926045060157776,
+        "px_top_left": [
+          76.56355476379395,
+          70.2055914402008
+        ],
+        "uv_bottom_left": [
+          0.39876851439476013,
+          0.3499482274055481
+        ]
+      }
+    ],
+    "vessel_diameter_px": 70.39577293395996,
+    "vessel_x_px": [
+      76.56355476379395,
+      146.9593276977539
+    ]
+  },
+  "ccd_used": false,
+  "computed_lateral_world_m": 0.02601254851530051,
+  "computed_needed_px": 24.942849140167226,
+  "endpoint_optimizer_used": false,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v65_b": false,
+  "non_thumb_matrix_max_abs_delta": 0.0,
+  "parameter_sweep_used": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "same_rig_pose_path": "/home/runner/work/godot/godot/artifacts/mpfb_v72/frames/support-wrap-v72-canonical-pose.json",
+  "screen_target_margin_vessel_radius": 0.22,
+  "single_screen_space_authoring": true,
+  "staging_only": true,
+  "vessel_changed_from_v65_b": false,
+  "visual_gate": "Candidate must visibly expose one continuous opposing thumb in the 192x108 vessel view and preserve continuous anatomy in oblique view. Positive screen-space metrics are necessary but not sufficient.",
+  "wrist_changed_from_v65_b": false
+}
