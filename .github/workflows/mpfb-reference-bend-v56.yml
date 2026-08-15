@@ -1,0 +1,99 @@
+name: MPFB Reference Bend v56
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-reference-bend-v56
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install headless runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_reference_bend_v56/{assets,reports,logs,previews,source}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo "92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz" | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name "MPFB CI" --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+      - name: Acquire official CC0 holding-object anatomy reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://files2.makehumancommunity.org/asset_packs/poses01/poses01_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_reference_bend_v56/source/poses01_cc0.zip "$URL"
+          echo '67b1d14923adda85f371f81e1c529fcd058f975d0bf93848838e1a3860705b7d  artifacts/mpfb_reference_bend_v56/source/poses01_cc0.zip' | sha256sum -c -
+          python tools/inspect_makehuman_pose_v50.py artifacts/mpfb_reference_bend_v56/source/poses01_cc0.zip artifacts/mpfb_reference_bend_v56/source/holding-wine-glass artifacts/mpfb_reference_bend_v56/reports/source-pose.json 2>&1 | tee artifacts/mpfb_reference_bend_v56/logs/source.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_INSPECT_SUCCESS' artifacts/mpfb_reference_bend_v56/logs/source.log
+      - name: Build stable GameEngine source human
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- bl_ext.mpfb_ci.mpfb artifacts/mpfb_reference_bend_v56/assets/mpfb-human-source.glb artifacts/mpfb_reference_bend_v56/reports/mpfb-human-source.json 2>&1 | tee artifacts/mpfb_reference_bend_v56/logs/build.log
+          grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_reference_bend_v56/logs/build.log
+      - name: Author one bounded reference-bend candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_reference_bend_v56/source/holding-wine-glass -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          .preview-tools/blender/blender --background --python tools/author_mpfb_reference_bend_v56.py -- \
+            assets/models/hands/hand_right.glb \
+            artifacts/mpfb_reference_bend_v56/assets/mpfb-human-source.glb \
+            "$BVH" \
+            artifacts/mpfb_reference_bend_v56/previews \
+            artifacts/mpfb_reference_bend_v56/assets/right-support-wrap-v56.pose.json \
+            artifacts/mpfb_reference_bend_v56/reports/right-support-wrap-v56.json \
+            2>&1 | tee artifacts/mpfb_reference_bend_v56/logs/author.log
+          grep -Fq "MPFB_REFERENCE_BEND_V56_SUCCESS" artifacts/mpfb_reference_bend_v56/logs/author.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_reference_bend_v56/reports/right-support-wrap-v56.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['automatic_retarget'] is False, r
+          assert r['source_matrices_copied'] is False, r
+          assert r['source_bone_roll_copied'] is False, r
+          assert r['source_translations_copied'] is False, r
+          assert r['source_absolute_directions_copied'] is False, r
+          assert r['pose_bone_count'] == 17, r
+          assert r['max_reload_matrix_error'] <= 1e-6, r
+          for digit in ('index','middle','ring','pinky'):
+              row=r['reference_bend_contract'][digit]
+              assert 12.0 <= row['proximal_pitch_deg'] <= 48.0, row
+              assert len(row['relative_bend_deg']) == 2, row
+              assert all(10.0 <= v <= 52.0 for v in row['relative_bend_deg']), row
+          print('REFERENCE_BEND_V56_CONTRACT_PASS')
+          PY
+          test -s artifacts/mpfb_reference_bend_v56/previews/reference_bend_v56_candidate.png
+          test -s artifacts/mpfb_reference_bend_v56/previews/reference_bend_v56_thumbnail.png
+      - name: Upload reference-bend evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-reference-bend-v56
+          path: artifacts/mpfb_reference_bend_v56/
+          if-no-files-found: error
+          retention-days: 14
