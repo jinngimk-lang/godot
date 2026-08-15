@@ -1,0 +1,262 @@
+{
+  "after_finger_screen_metrics": {
+    "index": {
+      "bbox": {
+        "center_px": [
+          130.06181716918945,
+          59.99035334587097
+        ],
+        "height_px": 32.341994762420654,
+        "max": [
+          151.42766189575195,
+          76.1613507270813
+        ],
+        "min": [
+          108.69597244262695,
+          43.819355964660645
+        ],
+        "projected_point_count": 313,
+        "width_px": 42.731689453125
+      },
+      "center_x_px": 130.06181716918945,
+      "high_weight_vertex_count": 313,
+      "inside_vessel_x_fraction": 0.9584664536741214,
+      "left_outside_px": 0.0,
+      "right_outside_px": 4.468334197998047
+    },
+    "middle": {
+      "bbox": {
+        "center_px": [
+          104.16814041137695,
+          69.17881608009338
+        ],
+        "height_px": 37.70605659484863,
+        "max": [
+          123.16519546508789,
+          88.0318443775177
+        ],
+        "min": [
+          85.17108535766602,
+          50.32578778266907
+        ],
+        "projected_point_count": 310,
+        "width_px": 37.994110107421875
+      },
+      "center_x_px": 104.16814041137695,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 1.0,
+      "left_outside_px": 0.0,
+      "right_outside_px": 0.0
+    },
+    "pinky": {
+      "bbox": {
+        "center_px": [
+          72.58459281921387,
+          68.65368193387985
+        ],
+        "height_px": 28.9704612493515,
+        "max": [
+          96.6353530883789,
+          83.1389125585556
+        ],
+        "min": [
+          48.53383255004883,
+          54.1684513092041
+        ],
+        "projected_point_count": 309,
+        "width_px": 48.10152053833008
+      },
+      "center_x_px": 72.58459281921387,
+      "high_weight_vertex_count": 309,
+      "inside_vessel_x_fraction": 0.42394822006472493,
+      "left_outside_px": 28.029722213745117,
+      "right_outside_px": 0.0
+    },
+    "ring": {
+      "bbox": {
+        "center_px": [
+          83.38940620422363,
+          69.80671611428261
+        ],
+        "height_px": 35.587062656879425,
+        "max": [
+          102.02825546264648,
+          87.60024744272232
+        ],
+        "min": [
+          64.75055694580078,
+          52.013184785842896
+        ],
+        "projected_point_count": 310,
+        "width_px": 37.2776985168457
+      },
+      "center_x_px": 83.38940620422363,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 0.8741935483870967,
+      "left_outside_px": 11.812997817993164,
+      "right_outside_px": 0.0
+    }
+  },
+  "base_pose": "exact reconstructed v74 on pristine v65-B",
+  "before_finger_screen_metrics": {
+    "index": {
+      "bbox": {
+        "center_px": [
+          130.3799057006836,
+          60.20658391714096
+        ],
+        "height_px": 32.025527358055115,
+        "max": [
+          151.37920761108398,
+          76.21934759616852
+        ],
+        "min": [
+          109.3806037902832,
+          44.1938202381134
+        ],
+        "projected_point_count": 313,
+        "width_px": 41.99860382080078
+      },
+      "center_x_px": 130.3799057006836,
+      "high_weight_vertex_count": 313,
+      "inside_vessel_x_fraction": 0.9648562300319489,
+      "left_outside_px": 0.0,
+      "right_outside_px": 4.419879913330078
+    },
+    "middle": {
+      "bbox": {
+        "center_px": [
+          103.7611141204834,
+          71.87661918997765
+        ],
+        "height_px": 38.24251717329025,
+        "max": [
+          122.30314636230469,
+          90.99787777662277
+        ],
+        "min": [
+          85.21908187866211,
+          52.75536060333252
+        ],
+        "projected_point_count": 310,
+        "width_px": 37.08406448364258
+      },
+      "center_x_px": 103.7611141204834,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 1.0,
+      "left_outside_px": 0.0,
+      "right_outside_px": 0.0
+    },
+    "pinky": {
+      "bbox": {
+        "center_px": [
+          74.91670989990234,
+          71.65504887700081
+        ],
+        "height_px": 27.726357758045197,
+        "max": [
+          100.19974136352539,
+          85.5182277560234
+        ],
+        "min": [
+          49.6336784362793,
+          57.79186999797821
+        ],
+        "projected_point_count": 309,
+        "width_px": 50.566062927246094
+      },
+      "center_x_px": 74.91670989990234,
+      "high_weight_vertex_count": 309,
+      "inside_vessel_x_fraction": 0.42718446601941745,
+      "left_outside_px": 26.92987632751465,
+      "right_outside_px": 0.0
+    },
+    "ring": {
+      "bbox": {
+        "center_px": [
+          81.14968585968018,
+          72.29371449351311
+        ],
+        "height_px": 39.764842450618744,
+        "max": [
+          97.89526748657227,
+          92.17613571882248
+        ],
+        "min": [
+          64.40410423278809,
+          52.411293268203735
+        ],
+        "projected_point_count": 310,
+        "width_px": 33.49116325378418
+      },
+      "center_x_px": 81.14968585968018,
+      "high_weight_vertex_count": 310,
+      "inside_vessel_x_fraction": 0.867741935483871,
+      "left_outside_px": 12.15945053100586,
+      "right_outside_px": 0.0
+    }
+  },
+  "camera_changed_from_v75": false,
+  "ccd_used": false,
+  "contact_servo_used": false,
+  "correction_degrees": {
+    "2": {
+      "curl": [
+        3.0,
+        5.0,
+        3.0
+      ],
+      "fan": 5.0
+    },
+    "3": {
+      "curl": [
+        5.0,
+        8.0,
+        5.0
+      ],
+      "fan": 2.0
+    },
+    "4": {
+      "curl": [
+        8.0,
+        12.0,
+        7.0
+      ],
+      "fan": -4.0
+    },
+    "5": {
+      "curl": [
+        10.0,
+        14.0,
+        8.0
+      ],
+      "fan": -8.0
+    }
+  },
+  "endpoint_optimizer_used": false,
+  "frozen_matrix_max_abs_delta": 0.0,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "parameter_sweep_used": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "root_orbit_motion_used": false,
+  "same_rig_pose_path": "/home/runner/work/godot/godot/artifacts/mpfb_v76/frames/support-wrap-v76-canonical-pose.json",
+  "single_reference_derived_candidate": true,
+  "staging_only": true,
+  "thumb_distal_outside_vessel_px": 12.05306625366211,
+  "thumb_pose_from_v74_frozen": true,
+  "vessel_diameter_px": 70.39577293395996,
+  "vessel_x_px": [
+    76.56355476379395,
+    146.9593276977539
+  ],
+  "visual_gate": "Macro at 192x108 must immediately read as a relaxed but firm human bottle-support wrap: thumb visibly opposes the four fingers and the non-thumb digits no longer fan into a fist/clump. Meso unobstructed view must preserve distinct index-to-pinky ordering, continuous palm/wrist anatomy, and avoid major self-intersection or sharp kinks. Metrics diagnose only; they cannot pass the pose.",
+  "wrist_frozen": true
+}
