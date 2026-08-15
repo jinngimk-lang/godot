@@ -1,0 +1,127 @@
+{
+  "authoring": {
+    "finger1-2.R": {
+      "offset_camera_m": [
+        0.006,
+        0.034,
+        0.0
+      ],
+      "target_world": [
+        -0.3795472979545593,
+        -0.24991069734096527,
+        0.20630285143852234
+      ]
+    },
+    "finger1-3.R": {
+      "offset_camera_m": [
+        0.006,
+        0.044,
+        0.0
+      ],
+      "target_world": [
+        -0.3497577905654907,
+        -0.2503345012664795,
+        0.2393672913312912
+      ]
+    }
+  },
+  "base_pose": "rejected v72 over pristine v65-B",
+  "camera_changed": false,
+  "ccd_used": false,
+  "crop_changed": false,
+  "editable_matrix_max_delta": 0.4411151558160782,
+  "endpoint_optimizer_used": false,
+  "frozen_matrix_max_delta": 0.0,
+  "iterative_solver_used": false,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v72": false,
+  "one_shot_candidate": true,
+  "only_thumb_proximal_distal_changed": true,
+  "palm_vessel_relationship_changed": false,
+  "parameter_sweep_used": false,
+  "pose_asset": "/home/runner/work/godot/godot/artifacts/mpfb_v74/renders/support-wrap-v74-canonical-pose.json",
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "render_space_evaluation": {
+    "frame_recovery_gate": {
+      "distal_min_positive_side_px": 4.0,
+      "distal_min_top_margin_px": 6,
+      "intent": "preserve v72 distal opposition while bringing proximal/distal fully into the 192x108 image interior",
+      "pass": false,
+      "proximal_min_side_px": -8.0,
+      "proximal_min_top_margin_px": 2
+    },
+    "masks": {
+      "thumb_distal": {
+        "bbox_px": null,
+        "centroid_px": null,
+        "count": 0,
+        "touches_top": false
+      },
+      "thumb_proximal": {
+        "bbox_px": [
+          117,
+          0,
+          126,
+          26
+        ],
+        "centroid_px": [
+          120.79338842975207,
+          7.809917355371901
+        ],
+        "count": 121,
+        "touches_top": true
+      },
+      "thumb_root": {
+        "bbox_px": [
+          73,
+          0,
+          118,
+          30
+        ],
+        "centroid_px": [
+          98.26195652173914,
+          11.294565217391304
+        ],
+        "count": 920,
+        "touches_top": true
+      },
+      "vessel": {
+        "bbox_px": [
+          85,
+          0,
+          178,
+          107
+        ],
+        "centroid_px": [
+          135.312,
+          76.15142857142857
+        ],
+        "count": 3500,
+        "touches_top": true
+      }
+    },
+    "segment_signed_side_px": {
+      "thumb_distal": null,
+      "thumb_proximal": -12.718025178704778,
+      "thumb_root": -35.45412856481846
+    },
+    "vessel_centerline": {
+      "a_x_per_y": 0.05873519684199296,
+      "b_x": 133.05269657526938,
+      "mean_abs_residual_px": 6.413489185385184,
+      "row_count": 104
+    }
+  },
+  "staging_only": true,
+  "thumb_root_changed_from_v72": false,
+  "visual_gate": "Numeric gate is necessary but insufficient. The anatomy view must show a continuous thumb arc without self-intersection, and the with-vessel thumbnail must read as an opposing thumb rather than a clipped top blob.",
+  "wrist_changed_from_v72": false
+}
