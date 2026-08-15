@@ -1,0 +1,52 @@
+{
+  "adaptive_crop_v64b": true,
+  "baked_polygons": 1735,
+  "baked_vertices": 1747,
+  "destructive_roll_confined_to_sacrificial_rig": true,
+  "evidence_only_fix": "crop envelope derived from posed skeleton scale; darker diagnostic vessel; anatomical coverage gate",
+  "min_segment_vertex_coverage": 55,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "output_glb": "/home/runner/work/godot/godot/artifacts/mpfb_v64b/assets/right-support-wrap-v64b-static.glb",
+  "output_glb_bytes": 85552,
+  "palm_vertex_coverage": 1300,
+  "pose_baked_static": true,
+  "pose_changed_from_v64": false,
+  "production_candidate": false,
+  "production_gameengine_rig_touched": false,
+  "runtime_finger_solver_required": false,
+  "sacrificial_rig_deleted_before_render_export": true,
+  "segment_vertex_coverage": {
+    "finger1-1.R": 55,
+    "finger1-2.R": 168,
+    "finger1-3.R": 148,
+    "finger2-1.R": 201,
+    "finger2-2.R": 240,
+    "finger2-3.R": 174,
+    "finger3-1.R": 267,
+    "finger3-2.R": 314,
+    "finger3-3.R": 218,
+    "finger4-1.R": 229,
+    "finger4-2.R": 337,
+    "finger4-3.R": 292,
+    "finger5-1.R": 279,
+    "finger5-2.R": 376,
+    "finger5-3.R": 352,
+    "lowerarm02.R": 211,
+    "wrist.R": 182
+  },
+  "source_bvh_applied_with_native_mpfb_import": true,
+  "source_import_destructive_roll_copy": true,
+  "source_license": "CC0 (official MakeHuman Community Poses 01 pack)",
+  "source_rig": "MPFB canonical default (sacrificial)",
+  "staging_only": true,
+  "vessel_center": [
+    -0.37281733751296997,
+    -0.2384296953678131,
+    0.40927690267562866
+  ],
+  "visual_gate": "Thumbnail must read as a natural support wrap; full render must show continuous believable fingers/palm/wrist without cross-rig deformation artifacts."
+}
