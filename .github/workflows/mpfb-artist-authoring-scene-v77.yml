@@ -1,0 +1,106 @@
+name: MPFB Artist Authoring Scene v77
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-artist-scene-v77
+    paths:
+      - 'tools/build_mpfb_artist_authoring_scene_v77.py'
+      - '.github/workflows/mpfb-artist-authoring-scene-v77.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  authoring-scene:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-artist-scene-v77
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v77/{reports,logs,scene,frames} docs/superpowers/evidence/mpfb-v77
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+      - name: Build native-rig artist authoring scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_artist_authoring_scene_v77.py -- \
+            bl_ext.mpfb_ci.mpfb artifacts/mpfb_v77/scene artifacts/mpfb_v77/reports/artist-authoring-scene-v77.json \
+            2>&1 | tee artifacts/mpfb_v77/logs/build.log
+          grep -Fq 'MPFB_ARTIST_AUTHORING_SCENE_V77_SUCCESS' artifacts/mpfb_v77/logs/build.log
+          cp artifacts/mpfb_v77/scene/*.png artifacts/mpfb_v77/frames/
+      - name: Enforce authoring-scene contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          r=json.load(open('artifacts/mpfb_v77/reports/artist-authoring-scene-v77.json'))
+          assert r['staging_only'] and not r['production_candidate']
+          assert r['authoring_infrastructure_only'] and r['native_gameengine_rig']
+          assert r['direct_pose_editing_expected'] and r['pose_authoring_in_v77'] is False
+          assert r['parameter_sweep_used'] is False and r['ccd_used'] is False
+          assert r['endpoint_optimizer_used'] is False and r['contact_servo_used'] is False
+          assert r['root_orbit_motion_used'] is False
+          assert r['selected_pose_bone_count'] == 12, r['selected_pose_bone_count']
+          assert len(r['edit_bones']) == 12 and len(r['frozen_bones']) == 4
+          assert r['non_thumb_seed_matrix_max_abs_delta'] <= 1e-6, r['non_thumb_seed_matrix_max_abs_delta']
+          assert r['frozen_seed_matrix_max_abs_delta_after_scene_save'] <= 1e-6, r['frozen_seed_matrix_max_abs_delta_after_scene_save']
+          assert r['thumb_distal_outside_vessel_px'] >= 2.0, r['thumb_distal_outside_vessel_px']
+          scene_files=list(pathlib.Path('artifacts/mpfb_v77/scene').glob('*.blend'))
+          assert len(scene_files)==1 and scene_files[0].stat().st_size > 100000, scene_files
+          print('MPFB_ARTIST_AUTHORING_SCENE_V77_STRUCTURAL_PASS')
+          PY
+      - name: Reopen saved scene and verify embedded authoring contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          scene="$(find artifacts/mpfb_v77/scene -maxdepth 1 -name '*.blend' -print -quit)"
+          .preview-tools/blender/blender "$scene" --background --python-expr "import bpy; a=bpy.data.objects['PeelCalm_GameEngine_HeroRig_V77']; assert a.get('peel_calm_reference_set')=='bar_v1,market_v1'; assert 'PEEL_CALM_V77_AUTHORING_GUIDE' in bpy.data.texts; assert bpy.data.objects['LOCKED_VESSEL_PROXY_V77'].get('peel_calm_locked') is True; print('MPFB_V77_REOPEN_PASS')" \
+            2>&1 | tee artifacts/mpfb_v77/logs/reopen.log
+          grep -Fq 'MPFB_V77_REOPEN_PASS' artifacts/mpfb_v77/logs/reopen.log
+      - name: Persist reproducible evidence metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v77/reports/artist-authoring-scene-v77.json docs/superpowers/evidence/mpfb-v77/
+          cp artifacts/mpfb_v77/frames/*.png docs/superpowers/evidence/mpfb-v77/
+          cp artifacts/mpfb_v77/scene/*seed-pose.json docs/superpowers/evidence/mpfb-v77/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v77
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist artist authoring scene v77 metadata'
+            git pull --rebase origin spike/mpfb-hero-limb-artist-scene-v77
+            git push origin HEAD:spike/mpfb-hero-limb-artist-scene-v77
+          fi
+      - name: Upload authoring scene artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-artist-authoring-scene-v77
+          path: artifacts/mpfb_v77/
+          if-no-files-found: error
+          retention-days: 14
