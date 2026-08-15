@@ -51,10 +51,12 @@ jobs:
           print('MAKEHUMAN_SOURCE_PROVENANCE_V50_PASS', r['source_pack_sha256'])
           PY
 
-      - name: Install pinned Blender for sacrificial source-armature render
+      - name: Install headless runtime and pinned Blender
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
           curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
           echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
           tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
