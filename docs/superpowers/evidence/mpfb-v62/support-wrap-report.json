@@ -1,0 +1,147 @@
+{
+  "camera_focus_preserves_pose": true,
+  "contact_servo_used": false,
+  "direction_only_transfer": false,
+  "max_reload_matrix_error": 1.1920928955078125e-07,
+  "pose_bone_count": 17,
+  "production_candidate": false,
+  "representation": "source local pose rotation delta conjugated source-rest -> target-rest",
+  "root_shift": 0.020900907709769184,
+  "source_chains": {
+    "index": [
+      "finger2-1.R",
+      "finger2-2.R",
+      "finger2-3.R"
+    ],
+    "middle": [
+      "finger3-1.R",
+      "finger3-2.R",
+      "finger3-3.R"
+    ],
+    "pinky": [
+      "finger5-1.R",
+      "finger5-2.R",
+      "finger5-3.R"
+    ],
+    "ring": [
+      "finger4-1.R",
+      "finger4-2.R",
+      "finger4-3.R"
+    ],
+    "thumb": [
+      "finger1-1.R",
+      "finger1-2.R",
+      "finger1-3.R"
+    ]
+  },
+  "source_edit_bone_roll_copied": false,
+  "source_license": "CC0 (official MakeHuman Community Poses 01 pack)",
+  "source_pose_matrix_copied": false,
+  "staging_only": true,
+  "target_rest_structure_error": 0.0,
+  "target_solver_used": false,
+  "transfer": {
+    "index": [
+      {
+        "mapped_delta_angle_deg": 16.33616812662782,
+        "source": "finger2-1.R",
+        "source_delta_angle_deg": 16.336118607756337,
+        "target": "index_01_r"
+      },
+      {
+        "mapped_delta_angle_deg": 8.817822029810651,
+        "source": "finger2-2.R",
+        "source_delta_angle_deg": 8.817822029810651,
+        "target": "index_02_r"
+      },
+      {
+        "mapped_delta_angle_deg": 7.0834269712274365,
+        "source": "finger2-3.R",
+        "source_delta_angle_deg": 7.083537534914626,
+        "target": "index_03_r"
+      }
+    ],
+    "middle": [
+      {
+        "mapped_delta_angle_deg": 30.9326392603292,
+        "source": "finger3-1.R",
+        "source_delta_angle_deg": 30.932666581085883,
+        "target": "middle_01_r"
+      },
+      {
+        "mapped_delta_angle_deg": 29.89516426125553,
+        "source": "finger3-2.R",
+        "source_delta_angle_deg": 29.89519158201221,
+        "target": "middle_02_r"
+      },
+      {
+        "mapped_delta_angle_deg": 37.68299717932285,
+        "source": "finger3-3.R",
+        "source_delta_angle_deg": 37.683017669890354,
+        "target": "middle_03_r"
+      }
+    ],
+    "pinky": [
+      {
+        "mapped_delta_angle_deg": 20.38303301174557,
+        "source": "finger5-1.R",
+        "source_delta_angle_deg": 20.3830722853333,
+        "target": "pinky_01_r"
+      },
+      {
+        "mapped_delta_angle_deg": 39.54232835065664,
+        "source": "finger5-2.R",
+        "source_delta_angle_deg": 39.54232835065664,
+        "target": "pinky_02_r"
+      },
+      {
+        "mapped_delta_angle_deg": 32.81409341438467,
+        "source": "finger5-3.R",
+        "source_delta_angle_deg": 32.81411732004676,
+        "target": "pinky_03_r"
+      }
+    ],
+    "ring": [
+      {
+        "mapped_delta_angle_deg": 19.440173208149503,
+        "source": "finger4-1.R",
+        "source_delta_angle_deg": 19.440173208149503,
+        "target": "ring_01_r"
+      },
+      {
+        "mapped_delta_angle_deg": 49.23381353758196,
+        "source": "finger4-2.R",
+        "source_delta_angle_deg": 49.23381353758196,
+        "target": "ring_02_r"
+      },
+      {
+        "mapped_delta_angle_deg": 37.827981604834704,
+        "source": "finger4-3.R",
+        "source_delta_angle_deg": 37.827981604834704,
+        "target": "ring_03_r"
+      }
+    ],
+    "thumb": [
+      {
+        "mapped_delta_angle_deg": 19.09814124017736,
+        "source": "finger1-1.R",
+        "source_delta_angle_deg": 19.098182221312378,
+        "target": "thumb_01_r"
+      },
+      {
+        "mapped_delta_angle_deg": 14.351615682145594,
+        "source": "finger1-2.R",
+        "source_delta_angle_deg": 14.351670323658954,
+        "target": "thumb_02_r"
+      },
+      {
+        "mapped_delta_angle_deg": 1.763199994025569,
+        "source": "finger1-3.R",
+        "source_delta_angle_deg": 1.763199994025569,
+        "target": "thumb_03_r"
+      }
+    ]
+  },
+  "visual_gate": "192x108 must immediately read as a natural vessel wrap with progressive finger curl/disappearance, opposed thumb, and no broken-joint silhouette.",
+  "whole_rotation_deg": 64.47574267049143
+}
