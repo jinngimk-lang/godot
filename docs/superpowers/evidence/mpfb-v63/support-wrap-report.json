@@ -1,0 +1,301 @@
+{
+  "camera_focus_preserves_pose": true,
+  "contact_servo_used": false,
+  "damping_or_curl_grid_used": false,
+  "direction_only_transfer": false,
+  "max_reload_matrix_error": 1.1920928955078125e-07,
+  "per_joint_bend_plane_reconstruction": false,
+  "pose_bone_count": 17,
+  "production_candidate": false,
+  "representation": "source pose axis+angle mapped through coherent phalanx-rest + shared-palm semantic frames",
+  "root_shift": 0.020900907709769184,
+  "semantic_frame_transfer": true,
+  "source_angle_preserved": true,
+  "source_chains": {
+    "index": [
+      "finger2-1.R",
+      "finger2-2.R",
+      "finger2-3.R"
+    ],
+    "middle": [
+      "finger3-1.R",
+      "finger3-2.R",
+      "finger3-3.R"
+    ],
+    "pinky": [
+      "finger5-1.R",
+      "finger5-2.R",
+      "finger5-3.R"
+    ],
+    "ring": [
+      "finger4-1.R",
+      "finger4-2.R",
+      "finger4-3.R"
+    ],
+    "thumb": [
+      "finger1-1.R",
+      "finger1-2.R",
+      "finger1-3.R"
+    ]
+  },
+  "source_edit_bone_roll_copied": false,
+  "source_license": "CC0 (official MakeHuman Community Poses 01 pack)",
+  "source_pose_matrix_copied": false,
+  "staging_only": true,
+  "target_rest_structure_error": 0.0,
+  "target_solver_used": false,
+  "transfer": {
+    "index": [
+      {
+        "mapped_delta_angle_deg": 16.336118607756337,
+        "semantic_axis_coefficients": [
+          0.18702098727226257,
+          0.9335754252970219,
+          0.305712565779686
+        ],
+        "source": "finger2-1.R",
+        "source_delta_angle_deg": 16.336118607756337,
+        "target": "index_01_r",
+        "target_local_axis": [
+          0.25684723258018494,
+          0.9335753917694092,
+          0.24993303418159485
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 8.817822029810651,
+        "semantic_axis_coefficients": [
+          0.9610851556062698,
+          7.197260856628418e-05,
+          0.2762523740530014
+        ],
+        "source": "finger2-2.R",
+        "source_delta_angle_deg": 8.817822029810651,
+        "target": "index_02_r",
+        "target_local_axis": [
+          0.9999758005142212,
+          7.158519292715937e-05,
+          0.006954969838261604
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 7.083537534914626,
+        "semantic_axis_coefficients": [
+          0.9609197825193405,
+          8.277595043182373e-06,
+          0.2768270820379257
+        ],
+        "source": "finger2-3.R",
+        "source_delta_angle_deg": 7.083537534914626,
+        "target": "index_03_r",
+        "target_local_axis": [
+          0.9999628067016602,
+          7.882716090534814e-06,
+          0.008627386763691902
+        ]
+      }
+    ],
+    "middle": [
+      {
+        "mapped_delta_angle_deg": 30.932666581085883,
+        "semantic_axis_coefficients": [
+          0.9850198030471802,
+          2.919137477874756e-05,
+          0.17244131863117218
+        ],
+        "source": "finger3-1.R",
+        "source_delta_angle_deg": 30.932666581085883,
+        "target": "middle_01_r",
+        "target_local_axis": [
+          0.9999200105667114,
+          2.8774138627341017e-05,
+          0.012644080445170403
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 29.89519158201221,
+        "semantic_axis_coefficients": [
+          0.9885521233081818,
+          -3.742426633834839e-05,
+          0.15087996423244476
+        ],
+        "source": "finger3-2.R",
+        "source_delta_angle_deg": 29.89519158201221,
+        "target": "middle_02_r",
+        "target_local_axis": [
+          0.9999398589134216,
+          -3.7953264836687595e-05,
+          0.01097074430435896
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 37.683017669890354,
+        "semantic_axis_coefficients": [
+          0.9857601821422577,
+          5.42541965842247e-06,
+          0.1681576371192932
+        ],
+        "source": "finger3-3.R",
+        "source_delta_angle_deg": 37.683017669890354,
+        "target": "middle_03_r",
+        "target_local_axis": [
+          0.9999369382858276,
+          4.887582235824084e-06,
+          0.01122960727661848
+        ]
+      }
+    ],
+    "pinky": [
+      {
+        "mapped_delta_angle_deg": 20.3830722853333,
+        "semantic_axis_coefficients": [
+          0.7449455708265305,
+          -0.0889807790517807,
+          -0.6611645519733429
+        ],
+        "source": "finger5-1.R",
+        "source_delta_angle_deg": 20.3830722853333,
+        "target": "pinky_01_r",
+        "target_local_axis": [
+          0.75030118227005,
+          -0.08898120373487473,
+          -0.6550806164741516
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 39.54232835065664,
+        "semantic_axis_coefficients": [
+          0.9997824355959892,
+          4.221498966217041e-05,
+          -0.02086108922958374
+        ],
+        "source": "finger5-2.R",
+        "source_delta_angle_deg": 39.54232835065664,
+        "target": "pinky_02_r",
+        "target_local_axis": [
+          0.9999409317970276,
+          4.1797757148742676e-05,
+          0.010873198509216309
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 32.81411732004676,
+        "semantic_axis_coefficients": [
+          0.999994307756424,
+          3.3937394618988037e-06,
+          -0.0033581331372261047
+        ],
+        "source": "finger5-3.R",
+        "source_delta_angle_deg": 32.81411732004676,
+        "target": "pinky_03_r",
+        "target_local_axis": [
+          0.9998852610588074,
+          3.114343144261511e-06,
+          0.01515248604118824
+        ]
+      }
+    ],
+    "ring": [
+      {
+        "mapped_delta_angle_deg": 19.440173208149503,
+        "semantic_axis_coefficients": [
+          0.9891471192240715,
+          -0.047611236572265625,
+          -0.13900035619735718
+        ],
+        "source": "finger4-1.R",
+        "source_delta_angle_deg": 19.440173208149503,
+        "target": "ring_01_r",
+        "target_local_axis": [
+          0.9586752653121948,
+          -0.047611795365810394,
+          -0.2804904878139496
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 49.23381353758196,
+        "semantic_axis_coefficients": [
+          0.9921219646930695,
+          0.00014915317296981812,
+          0.12527625262737274
+        ],
+        "source": "finger4-2.R",
+        "source_delta_angle_deg": 49.23381353758196,
+        "target": "ring_02_r",
+        "target_local_axis": [
+          0.9999916553497314,
+          0.00014871361781843007,
+          0.00408411119133234
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 37.827981604834704,
+        "semantic_axis_coefficients": [
+          0.9865133315324783,
+          -2.1498650312423706e-05,
+          0.16368114203214645
+        ],
+        "source": "finger4-3.R",
+        "source_delta_angle_deg": 37.827981604834704,
+        "target": "ring_03_r",
+        "target_local_axis": [
+          0.9999537467956543,
+          -2.1830206605955027e-05,
+          0.009624393656849861
+        ]
+      }
+    ],
+    "thumb": [
+      {
+        "mapped_delta_angle_deg": 19.098182221312378,
+        "semantic_axis_coefficients": [
+          0.12468892335891724,
+          -0.7243295609951019,
+          0.678085021674633
+        ],
+        "source": "finger1-1.R",
+        "source_delta_angle_deg": 19.098182221312378,
+        "target": "thumb_01_r",
+        "target_local_axis": [
+          0.6056777238845825,
+          -0.7243293523788452,
+          0.32939577102661133
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 14.351670323658954,
+        "semantic_axis_coefficients": [
+          0.4707881258800626,
+          6.105378270149231e-05,
+          0.8822462409734726
+        ],
+        "source": "finger1-2.R",
+        "source_delta_angle_deg": 14.351670323658954,
+        "target": "thumb_02_r",
+        "target_local_axis": [
+          0.9999673962593079,
+          6.136113370303065e-05,
+          -0.008074367418885231
+        ]
+      },
+      {
+        "mapped_delta_angle_deg": 1.763199994025569,
+        "semantic_axis_coefficients": [
+          0.2889542356133461,
+          1.1242926120758057e-05,
+          0.9573429599404335
+        ],
+        "source": "finger1-3.R",
+        "source_delta_angle_deg": 1.763199994025569,
+        "target": "thumb_03_r",
+        "target_local_axis": [
+          0.9996525049209595,
+          1.1537224054336548e-05,
+          0.02636033296585083
+        ]
+      }
+    ]
+  },
+  "visual_gate": "Retain v62 thumbnail enclosure while removing broken/blocky phalanges and major self-intersection; thumb must oppose visibly.",
+  "whole_rotation_deg": 64.47574267049143
+}
