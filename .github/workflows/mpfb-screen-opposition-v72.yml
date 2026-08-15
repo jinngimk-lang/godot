@@ -1,0 +1,119 @@
+name: MPFB Screen Opposition v72
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-screen-opposition-v72
+    paths:
+      - 'tools/author_mpfb_screen_opposition_v72.py'
+      - '.github/workflows/mpfb-screen-opposition-v72.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  screen-opposition:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-screen-opposition-v72
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v72/{renders,reports,logs,poses} docs/superpowers/evidence/mpfb-v72
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Author and render the single v72 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_screen_opposition_v72.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v72/renders \
+            artifacts/mpfb_v72/reports/screen-opposition-v72.json \
+            2>&1 | tee artifacts/mpfb_v72/logs/author.log
+          grep -Fq 'MPFB_SCREEN_OPPOSITION_V72_SUCCESS' artifacts/mpfb_v72/logs/author.log
+          cp artifacts/mpfb_v72/renders/support-wrap-v72-canonical-pose.json artifacts/mpfb_v72/poses/
+
+      - name: Enforce frozen-baseline and render-space contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/mpfb_v72/reports/screen-opposition-v72.json')
+          r=json.load(p.open())
+          assert r['staging_only'] is True and r['production_candidate'] is False, r
+          assert r['base_pose']=='pristine v65-B', r
+          assert r['reference_set']==['bar_v1','market_v1'], r
+          assert r['one_shot_candidate'] is True and r['camera_basis_authoring'] is True, r
+          assert r['ccd_used'] is False and r['endpoint_optimizer_used'] is False, r
+          assert r['parameter_sweep_used'] is False and r['iterative_solver_used'] is False, r
+          assert r['wrist_changed_from_v65_b'] is False, r
+          assert r['non_thumb_fingers_changed_from_v65_b'] is False, r
+          assert r['palm_vessel_relationship_changed_from_v65_b'] is False, r
+          assert r['camera_changed_from_v65_b'] is False and r['crop_changed_from_v65_b'] is False, r
+          assert r['frozen_matrix_max_delta'] <= 1e-8, r['frozen_matrix_max_delta']
+          assert r['thumb_matrix_max_delta'] > 1e-5, r['thumb_matrix_max_delta']
+          e=r['render_space_evaluation']
+          assert 'screen_space_opposition_gate' in e and 'digit_signed_side_px' in e, e
+          for name in ['digit-opposition-v72-192x108.png','digit-opposition-v72-anatomy-192x108.png','support-wrap-v72-canonical-pose.json']:
+              q=Path('artifacts/mpfb_v72/renders')/name
+              assert q.is_file() and q.stat().st_size>0, q
+          print('MPFB_SCREEN_OPPOSITION_V72_CONTRACT_PASS')
+          print(json.dumps({
+            'thumb_side_px':e['thumb_side_px'],
+            'median_four_finger_side_px':e['median_four_finger_side_px'],
+            'opposite_sign':e['thumb_and_fingers_have_opposite_sign'],
+            'thumb_touches_top':e['masks']['thumb']['touches_top'],
+            'gate':e['screen_space_opposition_gate'],
+            'frozen_matrix_max_delta':r['frozen_matrix_max_delta'],
+          },indent=2))
+          PY
+
+      - name: Persist v72 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v72/reports/screen-opposition-v72.json docs/superpowers/evidence/mpfb-v72/
+          cp artifacts/mpfb_v72/renders/*.png docs/superpowers/evidence/mpfb-v72/
+          cp artifacts/mpfb_v72/renders/support-wrap-v72-canonical-pose.json docs/superpowers/evidence/mpfb-v72/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v72
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist screen-space opposition v72'
+            git pull --rebase origin spike/mpfb-hero-limb-screen-opposition-v72
+            git push origin HEAD:spike/mpfb-hero-limb-screen-opposition-v72
+          fi
+
+      - name: Upload v72 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-screen-opposition-v72
+          path: artifacts/mpfb_v72/
+          if-no-files-found: error
+          retention-days: 14
