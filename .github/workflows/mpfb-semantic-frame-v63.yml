@@ -1,0 +1,146 @@
+name: MPFB Semantic Frame v63
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-semantic-frame-v63
+    paths-ignore:
+      - 'docs/superpowers/evidence/mpfb-v63/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  semantic-frame:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-semantic-frame-v63
+
+      - name: Acquire official CC0 holding-object anatomy source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mpfb_v63/{source,assets,reports,logs,previews} docs/superpowers/evidence/mpfb-v63 .preview-tools
+          URL='https://files2.makehumancommunity.org/asset_packs/poses01/poses01_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_v63/source/poses01_cc0.zip "$URL"
+          python tools/inspect_makehuman_pose_v50.py \
+            artifacts/mpfb_v63/source/poses01_cc0.zip \
+            artifacts/mpfb_v63/source/holding-wine-glass \
+            artifacts/mpfb_v63/reports/source-pose.json \
+            2>&1 | tee artifacts/mpfb_v63/logs/source.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_INSPECT_SUCCESS' artifacts/mpfb_v63/logs/source.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v63/reports/source-pose.json'))
+          assert r['declared_license_from_official_pack_page'] == 'CC0', r
+          assert r['automatic_retarget_allowed'] is False, r
+          print('V63_SOURCE_PROVENANCE_PASS', r['source_pack_sha256'])
+          PY
+
+      - name: Install headless runtime and pinned Blender/MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build continuous GameEngine target limb
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v63/assets/mpfb-human-source.glb \
+            artifacts/mpfb_v63/reports/mpfb-human-source.json \
+            2>&1 | tee artifacts/mpfb_v63/logs/build.log
+          grep -Fq 'MPFB_LIMB_BUILD_SUCCESS' artifacts/mpfb_v63/logs/build.log
+
+      - name: Author coherent semantic-frame pose
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_v63/source/holding-wine-glass -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          .preview-tools/blender/blender --background --python tools/author_mpfb_semantic_frame_v63.py -- \
+            assets/models/hands/hand_right.glb \
+            artifacts/mpfb_v63/assets/mpfb-human-source.glb \
+            "$BVH" \
+            artifacts/mpfb_v63/previews \
+            artifacts/mpfb_v63/assets/right-support-wrap-v63.pose.json \
+            artifacts/mpfb_v63/reports/right-support-wrap-v63.json \
+            2>&1 | tee artifacts/mpfb_v63/logs/author.log
+          grep -Fq 'MPFB_SEMANTIC_FRAME_V63_SUCCESS' artifacts/mpfb_v63/logs/author.log
+          test -s artifacts/mpfb_v63/previews/semantic_frame_v63_candidate.png
+          test -s artifacts/mpfb_v63/previews/semantic_frame_v63_thumbnail.png
+
+      - name: Enforce coherent-frame non-destructive contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v63/reports/right-support-wrap-v63.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['source_license'].startswith('CC0'), r
+          assert r['source_edit_bone_roll_copied'] is False, r
+          assert r['source_pose_matrix_copied'] is False, r
+          assert r['semantic_frame_transfer'] is True, r
+          assert r['source_angle_preserved'] is True, r
+          assert r['per_joint_bend_plane_reconstruction'] is False, r
+          assert r['damping_or_curl_grid_used'] is False, r
+          assert r['target_solver_used'] is False, r
+          assert r['contact_servo_used'] is False, r
+          assert r['camera_focus_preserves_pose'] is True, r
+          assert r['pose_bone_count'] == 17, r
+          assert r['target_rest_structure_error'] <= 1e-10, r
+          assert r['max_reload_matrix_error'] <= 1e-6, r
+          print('MPFB_SEMANTIC_FRAME_V63_CONTRACT_PASS')
+          PY
+
+      - name: Persist visual evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v63/previews/semantic_frame_v63_candidate.png docs/superpowers/evidence/mpfb-v63/support-wrap-full.png
+          cp artifacts/mpfb_v63/previews/semantic_frame_v63_thumbnail.png docs/superpowers/evidence/mpfb-v63/support-wrap-thumbnail.png
+          cp artifacts/mpfb_v63/reports/right-support-wrap-v63.json docs/superpowers/evidence/mpfb-v63/support-wrap-report.json
+          cp artifacts/mpfb_v63/reports/source-pose.json docs/superpowers/evidence/mpfb-v63/source-pose-provenance.json
+          .preview-tools/blender/blender --background --python tools/export_render_rgbhex.py -- \
+            docs/superpowers/evidence/mpfb-v63/support-wrap-thumbnail.png \
+            docs/superpowers/evidence/mpfb-v63/support-wrap-thumbnail.rgbhex \
+            192 108
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v63
+          git commit -m 'evidence: persist semantic-frame support pose v63'
+          git push origin HEAD:spike/mpfb-hero-limb-semantic-frame-v63
+
+      - name: Upload redundant artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-semantic-frame-v63
+          path: artifacts/mpfb_v63/
+          if-no-files-found: error
+          retention-days: 14
