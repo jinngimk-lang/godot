@@ -2,15 +2,15 @@
 """v77: build a reproducible native-GameEngine artist-authoring Blender scene.
 
 v76 closed the scripted fan/curl-correction path: the exact technical candidate passed but the
-192x108 and unobstructed views still failed Macro/Meso.  The next abstraction must therefore be
+192x108 and unobstructed views still failed Macro/Meso. The next abstraction must therefore be
 direct pose editing on the native rig rather than another numerical finger solver.
 
-This script intentionally does NOT author a new support pose.  It reconstructs the verified v74
+This script intentionally does NOT author a new support pose. It reconstructs the verified v74
 thumb seed on the pristine v65-B continuous MPFB limb, freezes the camera/vessel/wrist/palm setup,
-selects only the twelve non-thumb finger pose bones for direct editing, embeds the acceptance and
-pose rules inside the .blend as a Text datablock/custom properties, saves the durable seed pose,
-renders a baseline worksheet, and writes a machine-readable report.  The .blend is an ephemeral CI
-artifact; the script/report make it reproducible so the project does not depend on artifact expiry.
+selects only the twelve non-thumb finger pose bones for direct editing, embeds acceptance/pose
+rules inside the .blend, saves the durable seed pose, renders a baseline worksheet, and writes a
+machine-readable report. The .blend is an ephemeral CI artifact; the script/report make it
+reproducible so the project does not depend on artifact expiry.
 """
 from __future__ import annotations
 
@@ -35,7 +35,6 @@ def _load(name: str, file: str):
 
 
 v76 = _load("mpfb_v76_for_v77", "author_mpfb_finger_wrap_v76.py")
-v75 = v76.v75
 v73 = v76.v73
 v65 = v76.v65
 v64 = v76.v64
@@ -56,7 +55,7 @@ Runtime/staging renders are evidence only and must not replace the locked refere
 WHY THIS SCENE EXISTS
 v76 proved that another scripted fan/curl correction does not fix the Macro/Meso grasp grammar.
 Do not use CCD, endpoint chasing, contact servo, scalar angle sweeps, whole-hand orbit search, or
-another procedural finger solver here.  Pose the visible silhouette directly on this SAME native
+another procedural finger solver here. Pose the visible silhouette directly on this SAME native
 GameEngine rig.
 
 FROZEN / DO NOT MOVE
@@ -82,7 +81,7 @@ VISUAL GATES
 3) Only after both pass may the pose enter Godot product-camera staging against XR baseline.
 
 SAVING
-Use the repository's durable same-rig partial-pose format for any accepted result.  Do not import
+Use the repository's durable same-rig partial-pose format for any accepted result. Do not import
 BVH edit-bone roll/rest transforms into the production GameEngine rig.
 """
 
@@ -133,19 +132,26 @@ def run():
     cam = v65._scene_camera(focus, longitudinal, span, palmar, "B77")
     scene = bpy.context.scene
 
-    # Reconstruct the exact v74 thumb seed.  This must not touch digits 2-5.
+    # Reconstruct the exact v74 thumb seed. This must not touch digits 2-5.
     digit_before = {name: _flat(arm.pose.bones[name]) for name in EDIT_BONES}
-    baseline = v76._reconstruct_v74(
+    v76._reconstruct_v74(
         base, arm, scene, cam, vessel_center, vessel_radius, longitudinal, focus, thumb_weights
     )
     digit_after = {name: _flat(arm.pose.bones[name]) for name in EDIT_BONES}
     non_thumb_seed_delta = max(_max_delta(digit_before[n], digit_after[n]) for n in EDIT_BONES)
 
+    # Measure the thumb AFTER v74 reconstruction. The first v77 infrastructure run accidentally
+    # reported the pre-v74 baseline metric; that was a report/gate bug, not a scene/pose failure.
+    thumb_metric_mesh = v73._static(base)
+    thumb_seed_metrics = v73._metrics(
+        scene, cam, thumb_metric_mesh, thumb_weights, vessel_center, vessel_radius, longitudinal, focus
+    )
+    bpy.data.objects.remove(thumb_metric_mesh, do_unlink=True)
+
     frozen_seed = {name: _flat(arm.pose.bones[name]) for name in FROZEN_BONES}
     seed_pose_path = out / "support-wrap-v77-authoring-seed-pose.json"
     v68._save_same_rig_pose(arm, seed_pose_path)
 
-    # Keep the native rig and skin available for direct Blender Pose Mode editing.
     vessel = v65._vessel(vessel_center, longitudinal, vessel_radius, "B77")
     vessel.name = "LOCKED_VESSEL_PROXY_V77"
     vessel["peel_calm_locked"] = True
@@ -164,7 +170,6 @@ def run():
     guide.clear()
     guide.write(GUIDE)
 
-    # A small scene Empty makes the authoring contract visible in the Outliner as well.
     marker = bpy.data.objects.new("READ_PEEL_CALM_V77_AUTHORING_GUIDE", None)
     marker.empty_display_type = "PLAIN_AXES"
     marker.empty_display_size = 0.02
@@ -181,13 +186,10 @@ def run():
     arm.hide_render = True
     baked.hide_render = False
     vessel.hide_render = False
-    worksheet_full = out / "authoring-seed-with-vessel.png"
-    worksheet_thumb = out / "authoring-seed-thumbnail.png"
-    v65._render(worksheet_full, 640, 640)
-    v65._render(worksheet_thumb, 192, 108)
+    v65._render(out / "authoring-seed-with-vessel.png", 640, 640)
+    v65._render(out / "authoring-seed-thumbnail.png", 192, 108)
     vessel.hide_render = True
-    worksheet_anatomy = out / "authoring-seed-anatomy-oblique.png"
-    v65._render(worksheet_anatomy, 640, 640)
+    v65._render(out / "authoring-seed-anatomy-oblique.png", 640, 640)
     vessel.hide_render = False
     baked.hide_viewport = True
 
@@ -206,7 +208,6 @@ def run():
     blend_path = out / "peel-calm-support-grasp-authoring-v77.blend"
     bpy.ops.wm.save_as_mainfile(filepath=str(blend_path), check_existing=False)
 
-    # Do not mutate the pose after save; record that the frozen seed remained exact.
     frozen_after = {name: _flat(arm.pose.bones[name]) for name in FROZEN_BONES}
     frozen_delta = max(_max_delta(frozen_seed[n], frozen_after[n]) for n in FROZEN_BONES)
 
@@ -228,7 +229,7 @@ def run():
         "frozen_bones": FROZEN_BONES,
         "non_thumb_seed_matrix_max_abs_delta": non_thumb_seed_delta,
         "frozen_seed_matrix_max_abs_delta_after_scene_save": frozen_delta,
-        "thumb_distal_outside_vessel_px": baseline["bones"]["finger1-3.R"]["outside_vessel_px"],
+        "thumb_distal_outside_vessel_px": thumb_seed_metrics["bones"]["finger1-3.R"]["outside_vessel_px"],
         "blend_path": str(blend_path),
         "seed_pose_path": str(seed_pose_path),
         "guide_text_datablock": guide.name,
