@@ -1,0 +1,179 @@
+{
+  "bone_projection_used": false,
+  "diagnostic_only": true,
+  "face_weight_threshold": 0.22,
+  "interpretation": "Use the distal/proximal segment evidence to choose the next abstraction. Do not demand that the whole thumb/root cross the vessel. If v72 mostly moved root/proximal while distal stayed same-side, the next pass must directly author distal-chain silhouette instead of increasing a whole-chain camera offset.",
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "new_pose_authored_in_v73": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "render_space_only": true,
+  "screen": {
+    "height": 108,
+    "width": 192
+  },
+  "states": {
+    "pristine_v65_b": {
+      "distal_opposition_gate": {
+        "distal_must_not_touch_top_frame": true,
+        "intent": "thumb root may remain on the palm side, but the visible distal segment must cross to the opposite rendered vessel side with readable clearance",
+        "min_positive_side_clearance_px": 4.0,
+        "pass": false
+      },
+      "label": "v65b",
+      "masks": {
+        "thumb_distal": {
+          "bbox_px": null,
+          "centroid_px": null,
+          "count": 0,
+          "touches_top": false
+        },
+        "thumb_proximal": {
+          "bbox_px": [
+            111,
+            3,
+            122,
+            29
+          ],
+          "centroid_px": [
+            116.10759493670886,
+            18.537974683544302
+          ],
+          "count": 158,
+          "touches_top": false
+        },
+        "thumb_root": {
+          "bbox_px": [
+            73,
+            0,
+            112,
+            31
+          ],
+          "centroid_px": [
+            95.37469586374696,
+            12.070559610705596
+          ],
+          "count": 822,
+          "touches_top": true
+        },
+        "vessel": {
+          "bbox_px": [
+            85,
+            0,
+            178,
+            107
+          ],
+          "centroid_px": [
+            134.6575417465097,
+            73.17109225294278
+          ],
+          "count": 3653,
+          "touches_top": true
+        }
+      },
+      "segment_signed_side_px": {
+        "thumb_distal": null,
+        "thumb_proximal": -15.569426853020587,
+        "thumb_root": -35.63110525850122
+      },
+      "v72_thumb_gesture_applied": false,
+      "vessel_centerline": {
+        "a_x_per_y": 0.10378499909495366,
+        "b_x": 129.75305810397552,
+        "mean_abs_residual_px": 6.576968811009032,
+        "row_count": 108
+      }
+    },
+    "rejected_v72": {
+      "distal_opposition_gate": {
+        "distal_must_not_touch_top_frame": true,
+        "intent": "thumb root may remain on the palm side, but the visible distal segment must cross to the opposite rendered vessel side with readable clearance",
+        "min_positive_side_clearance_px": 4.0,
+        "pass": false
+      },
+      "label": "v72",
+      "masks": {
+        "thumb_distal": {
+          "bbox_px": [
+            139,
+            0,
+            155,
+            5
+          ],
+          "centroid_px": [
+            145.5483870967742,
+            1.8870967741935485
+          ],
+          "count": 62,
+          "touches_top": true
+        },
+        "thumb_proximal": {
+          "bbox_px": [
+            115,
+            0,
+            139,
+            27
+          ],
+          "centroid_px": [
+            124.23893805309734,
+            6.008849557522124
+          ],
+          "count": 226,
+          "touches_top": true
+        },
+        "thumb_root": {
+          "bbox_px": [
+            73,
+            0,
+            116,
+            30
+          ],
+          "centroid_px": [
+            97.71175166297118,
+            11.537694013303769
+          ],
+          "count": 902,
+          "touches_top": true
+        },
+        "vessel": {
+          "bbox_px": [
+            85,
+            7,
+            178,
+            107
+          ],
+          "centroid_px": [
+            135.2643612460703,
+            76.29094026864819
+          ],
+          "count": 3499,
+          "touches_top": false
+        }
+      },
+      "segment_signed_side_px": {
+        "thumb_distal": 12.03842382625362,
+        "thumb_proximal": -9.490940052880859,
+        "thumb_root": -36.313116216212705
+      },
+      "v72_thumb_gesture_applied": true,
+      "vessel_centerline": {
+        "a_x_per_y": 0.053354688410017476,
+        "b_x": 133.40927781013394,
+        "mean_abs_residual_px": 6.588714024576591,
+        "row_count": 101
+      }
+    }
+  },
+  "v72_minus_v65b_segment_side_delta_px": {
+    "thumb_distal": null,
+    "thumb_proximal": 6.0784868001397285,
+    "thumb_root": -0.6820109577114835
+  }
+}
