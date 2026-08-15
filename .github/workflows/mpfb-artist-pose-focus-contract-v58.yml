@@ -1,0 +1,18 @@
+name: MPFB Artist Pose Focus Contract v58
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-artist-fk-v58
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pose-focus-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restored artist pose must survive camera-focus calculation
+        run: python tools/test_mpfb_artist_pose_survives_focus_v58.py
