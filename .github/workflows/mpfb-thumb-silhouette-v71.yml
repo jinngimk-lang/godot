@@ -1,0 +1,99 @@
+name: MPFB Thumb Silhouette Diagnostic v71
+
+on:
+  push:
+    branches:
+      - spike/mpfb-thumb-screen-mask-v71
+    paths:
+      - 'tools/diagnose_mpfb_thumb_silhouette_v71.py'
+      - '.github/workflows/mpfb-thumb-silhouette-v71.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  thumb-silhouette:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-thumb-screen-mask-v71
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v71/{reports,logs,frames} docs/superpowers/evidence/mpfb-v71
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Render and measure frozen v65-B thumb silhouette
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/diagnose_mpfb_thumb_silhouette_v71.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v71/frames \
+            artifacts/mpfb_v71/reports/thumb-silhouette-v71.json \
+            2>&1 | tee artifacts/mpfb_v71/logs/diagnose.log
+          grep -Fq 'MPFB_THUMB_SILHOUETTE_V71_SUCCESS' artifacts/mpfb_v71/logs/diagnose.log
+
+      - name: Enforce frozen-pose diagnostic boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v71/reports/thumb-silhouette-v71.json'))
+          assert r['diagnostic_only'] is True and r['production_candidate'] is False, r
+          assert r['base_pose'] == 'pristine v65-B', r
+          for key in ('pose_changed_from_v65_b','wrist_changed_from_v65_b','non_thumb_fingers_changed_from_v65_b','vessel_changed_from_v65_b','camera_changed_from_v65_b','crop_policy_changed_from_v65_b'):
+              assert r[key] is False, (key,r[key])
+          assert r['thumb_bones'] == ['finger1-1.R','finger1-2.R','finger1-3.R'], r
+          assert r['high_weight_thumb_vertex_count'] >= 100, r['high_weight_thumb_vertex_count']
+          assert r['marked_thumb_face_count_before_crop'] > 0, r
+          assert r['projected_vessel_diameter_px'] > 1.0, r
+          assert r['projected_thumb_root_tip_span_px'] > 1.0, r
+          print('MPFB_THUMB_SILHOUETTE_V71_DIAGNOSTIC_PASS')
+          PY
+
+      - name: Persist screen-space evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v71/reports/thumb-silhouette-v71.json docs/superpowers/evidence/mpfb-v71/thumb-silhouette-v71.json
+          cp artifacts/mpfb_v71/frames/*.png docs/superpowers/evidence/mpfb-v71/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v71
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist thumb silhouette diagnostic v71'
+            git pull --rebase origin spike/mpfb-thumb-screen-mask-v71
+            git push origin HEAD:spike/mpfb-thumb-screen-mask-v71
+          fi
+
+      - name: Upload diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-thumb-silhouette-v71
+          path: artifacts/mpfb_v71/
+          if-no-files-found: error
+          retention-days: 14
