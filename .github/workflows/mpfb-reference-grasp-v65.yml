@@ -1,0 +1,120 @@
+name: MPFB Reference Grasp v65
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-reference-grasp-v65
+    paths-ignore:
+      - 'docs/superpowers/evidence/mpfb-v65/**'
+      - 'docs/superpowers/checkpoints/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  reference-grasp:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-reference-grasp-v65
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v65/{previews,reports,logs} docs/superpowers/evidence/mpfb-v65
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Author and render reference-derived grasp
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_reference_grasp_v65.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v65/previews \
+            artifacts/mpfb_v65/reports/reference-grasp-v65.json \
+            2>&1 | tee artifacts/mpfb_v65/logs/author.log
+          grep -Fq 'MPFB_REFERENCE_GRASP_V65_SUCCESS' artifacts/mpfb_v65/logs/author.log
+          for suffix in A B; do
+            for f in \
+              "support-wrap-${suffix}-with-vessel.png" \
+              "support-wrap-${suffix}-thumbnail.png" \
+              "support-wrap-${suffix}-anatomy-oblique.png" \
+              "support-wrap-${suffix}-anatomy-thumbnail.png" \
+              "right-support-wrap-v65-${suffix}-static.glb"; do
+              test -s "artifacts/mpfb_v65/previews/$f"
+            done
+          done
+
+      - name: Enforce staging boundary and anatomical coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v65/reports/reference-grasp-v65.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['external_pose_source_used'] is False, r
+          assert r['ccd_used'] is False, r
+          assert r['endpoint_optimizer_used'] is False, r
+          assert r['parameter_sweep_used'] is False, r
+          assert r['basis_sign_disambiguation_only'] is True, r
+          assert r['production_gameengine_rig_touched'] is False, r
+          assert r['candidate_count'] == 2, r
+          for c in r['candidates']:
+              assert c['baked_vertices'] >= 1400, c
+              assert c['palm_vertex_coverage'] >= 220, c
+              assert c['min_segment_vertex_coverage'] >= 12, c
+              assert c['glb_bytes'] > 0, c
+          print('MPFB_REFERENCE_GRASP_V65_BOUNDARY_PASS')
+          PY
+
+      - name: Persist visual evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v65/previews/support-wrap-A-with-vessel.png docs/superpowers/evidence/mpfb-v65/support-wrap-A-with-vessel.png
+          cp artifacts/mpfb_v65/previews/support-wrap-A-thumbnail.png docs/superpowers/evidence/mpfb-v65/support-wrap-A-thumbnail.png
+          cp artifacts/mpfb_v65/previews/support-wrap-A-anatomy-oblique.png docs/superpowers/evidence/mpfb-v65/support-wrap-A-anatomy-oblique.png
+          cp artifacts/mpfb_v65/previews/support-wrap-A-anatomy-thumbnail.png docs/superpowers/evidence/mpfb-v65/support-wrap-A-anatomy-thumbnail.png
+          cp artifacts/mpfb_v65/previews/support-wrap-B-with-vessel.png docs/superpowers/evidence/mpfb-v65/support-wrap-B-with-vessel.png
+          cp artifacts/mpfb_v65/previews/support-wrap-B-thumbnail.png docs/superpowers/evidence/mpfb-v65/support-wrap-B-thumbnail.png
+          cp artifacts/mpfb_v65/previews/support-wrap-B-anatomy-oblique.png docs/superpowers/evidence/mpfb-v65/support-wrap-B-anatomy-oblique.png
+          cp artifacts/mpfb_v65/previews/support-wrap-B-anatomy-thumbnail.png docs/superpowers/evidence/mpfb-v65/support-wrap-B-anatomy-thumbnail.png
+          cp artifacts/mpfb_v65/reports/reference-grasp-v65.json docs/superpowers/evidence/mpfb-v65/reference-grasp-v65.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v65
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist reference support grasp v65'
+            git push origin HEAD:spike/mpfb-hero-limb-reference-grasp-v65
+          fi
+
+      - name: Upload redundant artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-reference-grasp-v65
+          path: artifacts/mpfb_v65/
+          if-no-files-found: error
+          retention-days: 14
