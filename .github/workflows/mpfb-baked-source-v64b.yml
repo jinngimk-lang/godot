@@ -82,7 +82,12 @@ jobs:
           assert r['pose_baked_static'] is True, r
           assert r['production_gameengine_rig_touched'] is False, r
           assert r['sacrificial_rig_deleted_before_render_export'] is True, r
-          assert r['baked_vertices'] >= 2200, r
+          assert r['baked_vertices'] >= 1400, r
+          assert r['palm_vertex_coverage'] >= 220, r
+          assert r['min_segment_vertex_coverage'] >= 12, r
+          required=['lowerarm02.R','wrist.R']+[f'finger{d}-{j}.R' for d in range(1,6) for j in range(1,4)]
+          missing=[name for name in required if r['segment_vertex_coverage'].get(name,0) < 12]
+          assert not missing, (missing, r)
           print('MPFB_BAKED_SOURCE_V64B_BOUNDARY_PASS')
           PY
       - name: Persist corrected visual evidence
