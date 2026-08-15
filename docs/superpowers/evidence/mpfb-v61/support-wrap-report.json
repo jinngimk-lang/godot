@@ -1,0 +1,296 @@
+{
+  "camera_focus_preserves_pose": true,
+  "contact_servo_used": false,
+  "max_reload_matrix_error": 2.384185791015625e-07,
+  "max_twist_deg": 48.0,
+  "pose_bone_count": 17,
+  "production_candidate": false,
+  "root_shift": 0.020900907709769184,
+  "source_chains": {
+    "index": [
+      "finger2-1.R",
+      "finger2-2.R",
+      "finger2-3.R"
+    ],
+    "middle": [
+      "finger3-1.R",
+      "finger3-2.R",
+      "finger3-3.R"
+    ],
+    "pinky": [
+      "finger5-1.R",
+      "finger5-2.R",
+      "finger5-3.R"
+    ],
+    "ring": [
+      "finger4-1.R",
+      "finger4-2.R",
+      "finger4-3.R"
+    ],
+    "thumb": [
+      "finger1-1.R",
+      "finger1-2.R",
+      "finger1-3.R"
+    ]
+  },
+  "source_edit_bone_roll_copied": false,
+  "source_license": "CC0 (official MakeHuman Community Poses 01 pack)",
+  "source_pose_matrix_copied": false,
+  "staging_only": true,
+  "target_rest_structure_error": 0.0,
+  "target_solver_used": false,
+  "transfer": {
+    "index": [
+      {
+        "desired_world_direction": [
+          0.34767988324165344,
+          -0.9201035499572754,
+          0.18035578727722168
+        ],
+        "desired_world_plane": [
+          -0.0013274871744215488,
+          0.1918729841709137,
+          0.9814189076423645
+        ],
+        "source": "finger2-1.R",
+        "swing_deg": 6.017645960685939,
+        "target": "index_01_r",
+        "twist_deg": 48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.656613290309906,
+          -0.7400459051132202,
+          0.14557135105133057
+        ],
+        "desired_world_plane": [
+          0.07383867353200912,
+          -0.1290065199136734,
+          -0.9888908267021179
+        ],
+        "source": "finger2-2.R",
+        "swing_deg": 12.178929092069954,
+        "target": "index_02_r",
+        "twist_deg": -48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.8213576674461365,
+          -0.5545300841331482,
+          0.1336708962917328
+        ],
+        "desired_world_plane": [
+          0.07383867353200912,
+          -0.1290065199136734,
+          -0.9888908267021179
+        ],
+        "source": "finger2-3.R",
+        "swing_deg": 16.444983285389878,
+        "target": "index_03_r",
+        "twist_deg": -48.00000000000001
+      }
+    ],
+    "middle": [
+      {
+        "desired_world_direction": [
+          0.783858597278595,
+          -0.6187294721603394,
+          -0.052340660244226456
+        ],
+        "desired_world_plane": [
+          0.11934838443994522,
+          0.06740523129701614,
+          0.9905617833137512
+        ],
+        "source": "finger3-1.R",
+        "swing_deg": 27.736214889148076,
+        "target": "middle_01_r",
+        "twist_deg": 48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.9918756484985352,
+          -0.05233960598707199,
+          -0.11594513058662415
+        ],
+        "desired_world_plane": [
+          0.12439551204442978,
+          0.20836053788661957,
+          0.9701090455055237
+        ],
+        "source": "finger3-2.R",
+        "swing_deg": 15.451919883846921,
+        "target": "middle_02_r",
+        "twist_deg": 37.61455742713191
+      },
+      {
+        "desired_world_direction": [
+          0.7241228222846985,
+          0.6493626832962036,
+          -0.23232358694076538
+        ],
+        "desired_world_plane": [
+          0.12439551204442978,
+          0.20836053788661957,
+          0.9701090455055237
+        ],
+        "source": "finger3-3.R",
+        "swing_deg": 36.7381258850162,
+        "target": "middle_03_r",
+        "twist_deg": 10.250832779493907
+      }
+    ],
+    "pinky": [
+      {
+        "desired_world_direction": [
+          0.6054080724716187,
+          -0.7952976226806641,
+          -0.031349051743745804
+        ],
+        "desired_world_plane": [
+          0.08939467370510101,
+          0.10708294063806534,
+          -0.9902231097221375
+        ],
+        "source": "finger5-1.R",
+        "swing_deg": 26.341177779476943,
+        "target": "pinky_01_r",
+        "twist_deg": -48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.9930364489555359,
+          -0.08617319166660309,
+          0.08032982796430588
+        ],
+        "desired_world_plane": [
+          0.08043282479047775,
+          -0.0022814481053501368,
+          -0.996757447719574
+        ],
+        "source": "finger5-2.R",
+        "swing_deg": 46.93987401426567,
+        "target": "pinky_02_r",
+        "twist_deg": -48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.8683335781097412,
+          0.4911652207374573,
+          0.06894552707672119
+        ],
+        "desired_world_plane": [
+          0.08043282479047775,
+          -0.0022814481053501368,
+          -0.996757447719574
+        ],
+        "source": "finger5-3.R",
+        "swing_deg": 48.66320928903534,
+        "target": "pinky_03_r",
+        "twist_deg": -9.585218069960732
+      }
+    ],
+    "ring": [
+      {
+        "desired_world_direction": [
+          0.6251407861709595,
+          -0.7774448990821838,
+          -0.06912634521722794
+        ],
+        "desired_world_plane": [
+          0.08289255201816559,
+          -0.021933678537607193,
+          0.9963170886039734
+        ],
+        "source": "finger4-1.R",
+        "swing_deg": 18.33753820439391,
+        "target": "ring_01_r",
+        "twist_deg": 48.00000000000001
+      },
+      {
+        "desired_world_direction": [
+          0.9954241514205933,
+          0.04951147735118866,
+          -0.08172832429409027
+        ],
+        "desired_world_plane": [
+          0.07355664670467377,
+          0.14891532063484192,
+          0.9861103892326355
+        ],
+        "source": "finger4-2.R",
+        "swing_deg": 36.85275694985653,
+        "target": "ring_02_r",
+        "twist_deg": 37.15602632558455
+      },
+      {
+        "desired_world_direction": [
+          0.6466336846351624,
+          0.7456516623497009,
+          -0.16083714365959167
+        ],
+        "desired_world_plane": [
+          0.07355664670467377,
+          0.14891532063484192,
+          0.9861103892326355
+        ],
+        "source": "finger4-3.R",
+        "swing_deg": 34.89489346955613,
+        "target": "ring_03_r",
+        "twist_deg": 8.145220046480677
+      }
+    ],
+    "thumb": [
+      {
+        "desired_world_direction": [
+          0.71434485912323,
+          -0.3923209011554718,
+          0.5794788002967834
+        ],
+        "desired_world_plane": [
+          0.6021595001220703,
+          -0.07728293538093567,
+          -0.7946264743804932
+        ],
+        "source": "finger1-1.R",
+        "swing_deg": 29.940359622993505,
+        "target": "thumb_01_r",
+        "twist_deg": 28.112459291705424
+      },
+      {
+        "desired_world_direction": [
+          0.44310715794563293,
+          -0.7955856919288635,
+          0.4131580889225006
+        ],
+        "desired_world_plane": [
+          0.8838136196136475,
+          0.31052571535110474,
+          -0.3499249219894409
+        ],
+        "source": "finger1-2.R",
+        "swing_deg": 26.1936166651007,
+        "target": "thumb_02_r",
+        "twist_deg": 39.9197180566777
+      },
+      {
+        "desired_world_direction": [
+          0.35537007451057434,
+          -0.9320674538612366,
+          0.07044358551502228
+        ],
+        "desired_world_plane": [
+          0.8838136196136475,
+          0.31052571535110474,
+          -0.3499249219894409
+        ],
+        "source": "finger1-3.R",
+        "swing_deg": 24.263604988688318,
+        "target": "thumb_03_r",
+        "twist_deg": 2.762876919322661
+      }
+    ]
+  },
+  "visual_gate": "192x108 must immediately read as a natural vessel wrap: palm beside/around vessel, progressive far-contour finger disappearance, opposed thumb, no kinks/self-intersection.",
+  "whole_rotation_deg": 64.47574267049143
+}
