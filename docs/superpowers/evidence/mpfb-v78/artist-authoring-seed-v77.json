@@ -1,0 +1,51 @@
+{
+  "authoring_infrastructure_only": true,
+  "base_pose": "exact reconstructed v74 on pristine v65-B",
+  "blend_path": "/home/runner/work/godot/godot/artifacts/mpfb_v78/scene/peel-calm-support-grasp-authoring-v77.blend",
+  "ccd_used": false,
+  "contact_servo_used": false,
+  "direct_pose_editing_expected": true,
+  "edit_bones": [
+    "finger2-1.R",
+    "finger2-2.R",
+    "finger2-3.R",
+    "finger3-1.R",
+    "finger3-2.R",
+    "finger3-3.R",
+    "finger4-1.R",
+    "finger4-2.R",
+    "finger4-3.R",
+    "finger5-1.R",
+    "finger5-2.R",
+    "finger5-3.R"
+  ],
+  "endpoint_optimizer_used": false,
+  "frozen_bones": [
+    "wrist.R",
+    "finger1-1.R",
+    "finger1-2.R",
+    "finger1-3.R"
+  ],
+  "frozen_seed_matrix_max_abs_delta_after_scene_save": 0.0,
+  "guide_text_datablock": "PEEL_CALM_V77_AUTHORING_GUIDE",
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "native_gameengine_rig": true,
+  "next_gate": "Open/regenerate this scene and directly pose the twelve selected non-thumb bones as one whole reference-derived silhouette. Do not script another angle sweep. An accepted pose must pass the 192x108 vessel Macro gate and unobstructed oblique Meso anatomy gate before Godot integration.",
+  "non_thumb_seed_matrix_max_abs_delta": 0.0,
+  "parameter_sweep_used": false,
+  "pose_authoring_in_v77": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "root_orbit_motion_used": false,
+  "seed_pose_path": "/home/runner/work/godot/godot/artifacts/mpfb_v78/scene/support-wrap-v77-authoring-seed-pose.json",
+  "selected_pose_bone_count": 12,
+  "staging_only": true,
+  "thumb_distal_outside_vessel_px": 12.05306625366211
+}
