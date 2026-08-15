@@ -1,0 +1,78 @@
+{
+  "base_candidate": "v65-B",
+  "base_palmar_sign": -1.0,
+  "camera_changed_from_v65_b": false,
+  "candidate": {
+    "baked_polygons": 1735,
+    "baked_vertices": 1747,
+    "diagnostics": {
+      "far_side_finger_count": 1,
+      "finger_tips": {
+        "2": {
+          "palm_side_dot": 0.056894637644290924,
+          "world": [
+            -0.42860984802246094,
+            -0.28143730759620667,
+            0.130266472697258
+          ]
+        },
+        "3": {
+          "palm_side_dot": -0.42242059111595154,
+          "world": [
+            -0.43099445104599,
+            -0.25165578722953796,
+            0.11404555290937424
+          ]
+        },
+        "4": {
+          "palm_side_dot": 0.48444967716932297,
+          "world": [
+            -0.44056928157806396,
+            -0.22815589606761932,
+            0.11375235766172409
+          ]
+        },
+        "5": {
+          "palm_side_dot": 0.960315365344286,
+          "world": [
+            -0.45782753825187683,
+            -0.24090251326560974,
+            0.12272441387176514
+          ]
+        }
+      },
+      "thumb_palm_side_dot": 0.3641057163476944
+    },
+    "glb": "/home/runner/work/godot/godot/artifacts/mpfb_v66/previews/right-support-wrap-v65-B66-static.glb",
+    "glb_bytes": 85564,
+    "min_segment_vertex_coverage": 68,
+    "palm_vertex_coverage": 1527,
+    "palmar_sign": -1.0,
+    "suffix": "B66",
+    "vessel_radius": 0.04
+  },
+  "ccd_used": false,
+  "crop_changed_from_v65_b": false,
+  "endpoint_optimizer_used": false,
+  "extra_thumb_distal_curl_degrees": 6.0,
+  "extra_thumb_proximal_curl_degrees": 10.0,
+  "extra_thumb_root_opposition_degrees": 24.0,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v65_b": false,
+  "palm_vessel_relationship_changed_from_v65_b": false,
+  "parameter_sweep_used": false,
+  "production_candidate": false,
+  "production_gameengine_rig_touched": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "staging_only": true,
+  "thumb_only_change": true,
+  "visual_gate": "At 192x108 the thumb must be immediately readable on the opposing near/upper side without self-intersection while the frozen v65-B four-finger grip remains intact; then inspect the unobstructed oblique anatomy view.",
+  "wrist_changed_from_v65_b": false
+}
