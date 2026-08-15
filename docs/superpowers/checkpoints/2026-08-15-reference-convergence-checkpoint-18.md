@@ -97,10 +97,12 @@ The direction-table family is now closed. Do not create v49 by tuning these coef
 
 ## Research-backed next route
 
-Fresh primary/official MPFB documentation confirms a more appropriate authoring path exists:
+Fresh primary/official MPFB documentation and source inspection confirms a more appropriate authoring path exists:
 
 - MPFB has a dedicated MakePose workflow for saving deliberately posed FK/partial poses as reusable JSON assets.
 - Saved poses can be full or partial and are reloadable for the same rig type.
+- Current MPFB source also contains `AnimationService.import_bvh_file_as_pose`, but the implementation explicitly warns that it is destructive: it copies source BVH edit-bone roll values into the destination rig and therefore ruins the destination rig's original roll values. This must **not** be run directly on the production GameEngine hero rig.
+- If a MakeHuman BVH pose is evaluated, import it only into a sacrificial/default staging rig to study anatomy/silhouette. The final GameEngine hero hand should be authored/saved through native partial pose data or deliberately keyed FK transforms.
 - MakeHuman Community publishes CC0 pose asset packs; `Poses 01` includes a `mindfront_sitting_in_armchair_holding_wine_glass` pose, which is a potentially useful anatomical *reference/source* for an object-holding hand but is not automatically assumed to match our GameEngine rig or bottle grasp.
 - The MakeHuman `Hands 01` target pack is CC0 and contains hand-shape corrections (finger correction, thenar/hypothenar, knuckles) that may later improve anatomy, but it is Micro/Meso shape support and must not precede a correct grasp silhouette.
 
@@ -117,6 +119,7 @@ Do not return to:
 - per-joint axis tables;
 - rigid whole-hand orbit sweeps;
 - direct world-space direction-table authoring (v42–v48 family) as the final pose method;
+- destructive BVH application onto the production GameEngine hero rig;
 - Micro material polish as camouflage.
 
 ## Current reds
@@ -152,8 +155,8 @@ Build a v49 **manual-pose ingestion/authoring spike**, not another grasp solver:
 
 1. use the stable MPFB GameEngine-rig human before hero-limb extraction;
 2. establish a reusable partial hand/wrist pose asset path (MPFB MakePose-compatible JSON or directly keyed Blender FK pose saved as a repository staging asset);
-3. first evaluate a permissively licensed object-holding pose source only as anatomical reference/seed, with explicit provenance;
-4. manually/keyframe-correct the right hand so the fixed reference camera shows true vessel enclosure;
+3. evaluate a permissively licensed object-holding BVH only on a sacrificial/default rig as anatomical reference/seed, with explicit provenance; never destructively apply it to the GameEngine production rig;
+4. manually/keyframe-correct the GameEngine right hand so the fixed reference camera shows true vessel enclosure;
 5. save the resulting pose asset so later cup/bottle radius adaptations start from a visual human pose rather than solver output;
 6. render one full frame + true thumbnail and apply the same Macro/Meso gate;
 7. only after a pass, export the posed continuous limb and enter Godot product-camera staging.
