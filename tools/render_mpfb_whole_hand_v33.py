@@ -46,6 +46,17 @@ THUMB_ANGLE_DEG = -58.0
 MIN_TIP_SPACING = 0.007
 
 
+def _remove_v33_objects() -> None:
+    """Keep each sign candidate visually isolated in the evidence frames."""
+    for obj in list(bpy.data.objects):
+        if (
+            obj.name.startswith("WholeHandV33Vessel_")
+            or obj.name.startswith("SupportTarget_")
+            or obj.name.startswith("PinchTarget_")
+        ):
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+
 def _rigid_translate_limb(arm, delta: Vector) -> None:
     arm.location += delta
     for obj in bpy.context.scene.objects:
@@ -88,6 +99,7 @@ def _palm_frame(arm):
 
 def _fixed_fixture(arm, sign: float):
     v19._clear(arm)
+    arm.location = Vector((0.0, 0.0, 0.0))
     bpy.context.view_layer.update()
     palm, _forward, _span, normal = _palm_frame(arm)
     facing = normal * sign
@@ -177,6 +189,7 @@ def _opposition_metrics(arm, center: Vector, axis: Vector, near: Vector):
 
 def _run_candidate(xr, arm, cam, out, sign: float, camera_target: Vector):
     label = "positive" if sign > 0 else "negative"
+    _remove_v33_objects()
     v19._remove_proxies()
     center, axis, facing, _ = _fixed_fixture(arm, sign)
     rows, root_delta = _stage_root(xr, arm, center, facing)
@@ -188,8 +201,7 @@ def _run_candidate(xr, arm, cam, out, sign: float, camera_target: Vector):
 
     near, side = _radial_basis(arm, center, axis)
     targets = v23._support_targets(arm, center, VESSEL_RADIUS, axis)
-    thumb_target = _thumb_target(arm, center, axis, near, side)
-    targets["thumb"] = thumb_target
+    targets["thumb"] = _thumb_target(arm, center, axis, near, side)
 
     results = {}
     chains = dict(v23.SUPPORT_CHAINS)
@@ -250,6 +262,7 @@ def _run():
     for sign in (1.0, -1.0):
         passes.append(_run_candidate(xr, mpfb, cam, out, sign, camera_target))
 
+    _remove_v33_objects()
     print("WHOLE_HAND_V33_OBJECTIVE_PASS_COUNT", sum(1 for p in passes if p))
     print("MPFB_WHOLE_HAND_V33_SUCCESS")
 
