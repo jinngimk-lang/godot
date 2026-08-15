@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Render a sacrificial BVH-source armature as an anatomical proxy.
+"""Render a sacrificial BVH-source hand/forearm as an anatomical proxy.
 
 The source BVH is imported into a throwaway Blender scene. Cylinders/spheres are
-built along the posed right arm/hand bone chain. No MPFB GameEngine rig is
-loaded, modified, or retargeted. Output is only a visual anatomy reference.
+built only for the posed right distal forearm, wrist and fingers. No MPFB
+GameEngine rig is loaded, modified, or retargeted. Output is only a close-up
+visual anatomy reference; the thumb is colored separately so opposition is easy
+to judge at Macro/Meso scale.
 """
 from __future__ import annotations
 
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -28,7 +29,7 @@ def material(name: str, rgba: tuple[float, float, float, float]):
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf:
         bsdf.inputs["Base Color"].default_value = rgba
-        bsdf.inputs["Roughness"].default_value = 0.7
+        bsdf.inputs["Roughness"].default_value = 0.72
     return mat
 
 
@@ -38,7 +39,7 @@ def bone_segment(a: Vector, b: Vector, radius: float, mat) -> None:
     if length <= 1e-6:
         return
     mid = (a + b) * 0.5
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=radius, depth=length, location=mid)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=18, radius=radius, depth=length, location=mid)
     obj = bpy.context.object
     obj.data.materials.append(mat)
     obj.rotation_mode = "QUATERNION"
@@ -46,23 +47,34 @@ def bone_segment(a: Vector, b: Vector, radius: float, mat) -> None:
 
 
 def joint_marker(p: Vector, radius: float, mat) -> None:
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=radius, location=p)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=18, ring_count=10, radius=radius, location=p)
     bpy.context.object.data.materials.append(mat)
 
 
-def is_right_arm_hand(name: str) -> bool:
+def classify_bone(name: str) -> str | None:
+    """Return forearm/wrist/thumb/finger for the known MakeHuman BVH naming."""
     n = name.lower()
-    side = any(k in n for k in ("right", "r_", "_r", ".r", "rhand", "rwrist"))
-    anatomy = any(k in n for k in ("clav", "shoulder", "upperarm", "arm", "elbow", "forearm", "wrist", "hand", "thumb", "index", "middle", "ring", "pinky", "finger"))
-    return side and anatomy
+    if not n.endswith(".r"):
+        return None
+    if n == "lowerarm02.r":
+        return "forearm"
+    if n == "wrist.r":
+        return "wrist"
+    if n.startswith("finger1-"):
+        return "thumb"
+    if any(n.startswith(f"finger{i}-") for i in range(2, 6)):
+        return "finger"
+    return None
 
 
 def fit_camera(points: list[Vector]) -> tuple[Vector, float]:
     if not points:
-        return Vector((0, 0, 0)), 1.0
-    center = sum(points, Vector()) / len(points)
+        raise RuntimeError("no right hand/distal-forearm points selected")
+    mins = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
+    maxs = Vector((max(p.x for p in points), max(p.y for p in points), max(p.z for p in points)))
+    center = (mins + maxs) * 0.5
     radius = max((p - center).length for p in points)
-    return center, max(radius, 0.35)
+    return center, max(radius, 0.08)
 
 
 def render(path: Path, size: int) -> None:
@@ -74,7 +86,7 @@ def render(path: Path, size: int) -> None:
     scene.render.image_settings.file_format = "PNG"
     scene.render.filepath = str(path)
     scene.render.film_transparent = False
-    scene.world.color = (0.035, 0.035, 0.035)
+    scene.world.color = (0.025, 0.025, 0.025)
     bpy.ops.render.render(write_still=True)
 
 
@@ -94,53 +106,55 @@ def main() -> int:
     arm = armatures[0]
     bpy.context.scene.frame_set(1)
 
-    limb_mat = material("SacrificialLimb", (0.72, 0.50, 0.35, 1.0))
-    joint_mat = material("SacrificialJoint", (0.90, 0.72, 0.55, 1.0))
-    vessel_mat = material("ReferenceVessel", (0.18, 0.30, 0.42, 1.0))
+    limb_mat = material("SacrificialLimb", (0.76, 0.54, 0.39, 1.0))
+    thumb_mat = material("SacrificialThumb", (0.96, 0.52, 0.22, 1.0))
+    joint_mat = material("SacrificialJoint", (0.93, 0.76, 0.58, 1.0))
+    wrist_mat = material("SacrificialWrist", (0.58, 0.70, 0.82, 1.0))
 
-    selected = []
+    selected: list[str] = []
+    selected_by_class: dict[str, list[str]] = {"forearm": [], "wrist": [], "thumb": [], "finger": []}
     points: list[Vector] = []
     for pb in arm.pose.bones:
-        if not is_right_arm_hand(pb.name):
+        category = classify_bone(pb.name)
+        if category is None:
             continue
         head = arm.matrix_world @ pb.head
         tail = arm.matrix_world @ pb.tail
         length = (tail - head).length
-        radius = max(min(length * 0.10, 0.028), 0.007)
-        bone_segment(head, tail, radius, limb_mat)
-        joint_marker(head, radius * 1.15, joint_mat)
+        radius = max(min(length * (0.12 if category in {"forearm", "wrist"} else 0.16), 0.022), 0.0045)
+        seg_mat = thumb_mat if category == "thumb" else (wrist_mat if category == "wrist" else limb_mat)
+        bone_segment(head, tail, radius, seg_mat)
+        joint_marker(head, radius * 1.10, joint_mat)
         selected.append(pb.name)
+        selected_by_class[category].append(pb.name)
         points.extend([head, tail])
 
-    if len(selected) < 5:
-        # Naming varies across MakeHuman source rigs; fall back to all descendants
-        # of a right-hand-like bone so CI still yields useful evidence.
-        candidates = [pb for pb in arm.pose.bones if any(k in pb.name.lower() for k in ("hand", "wrist"))]
-        if not candidates:
-            raise RuntimeError("could not identify a hand/wrist chain in source BVH")
+    expected = {"forearm": 1, "wrist": 1, "thumb": 3, "finger": 12}
+    for category, minimum in expected.items():
+        if len(selected_by_class[category]) < minimum:
+            raise RuntimeError(f"insufficient {category} bones: {selected_by_class[category]}")
 
     center, radius = fit_camera(points)
 
-    # A neutral vertical proxy provides context for judging whether the source
-    # thumb/finger relationship actually resembles an object-holding grasp.
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=max(radius * 0.14, 0.035), depth=max(radius * 0.8, 0.22), location=center + Vector((radius * 0.12, 0, 0)))
-    bpy.context.object.data.materials.append(vessel_mat)
-
-    bpy.ops.object.camera_add(location=center + Vector((radius * 2.4, -radius * 3.0, radius * 1.3)))
+    # Close-up orthographic view: no invented vessel geometry. This isolates the
+    # only question v50 is allowed to answer — whether the source hand anatomy
+    # contains useful progressive finger curl and thumb opposition.
+    bpy.ops.object.camera_add(location=center + Vector((radius * 2.2, -radius * 3.0, radius * 1.35)))
     cam = bpy.context.object
     direction = center - cam.location
     cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-    cam.data.lens = 58
+    cam.data.type = "ORTHO"
+    cam.data.ortho_scale = radius * 2.35
     bpy.context.scene.camera = cam
 
-    bpy.ops.object.light_add(type="AREA", location=center + Vector((radius * 1.2, -radius * 1.0, radius * 2.0)))
+    bpy.ops.object.light_add(type="AREA", location=center + Vector((radius * 1.4, -radius * 1.2, radius * 2.2)))
     key = bpy.context.object
-    key.data.energy = 700
+    key.data.energy = 650
     key.data.shape = "DISK"
     key.data.size = radius * 2.0
-    bpy.ops.object.light_add(type="AREA", location=center + Vector((-radius * 1.2, radius * 0.5, radius * 0.8)))
+    bpy.ops.object.light_add(type="AREA", location=center + Vector((-radius * 1.4, radius * 0.7, radius * 0.9)))
     fill = bpy.context.object
-    fill.data.energy = 280
+    fill.data.energy = 240
     fill.data.size = radius * 1.5
 
     render(full_path, 768)
@@ -151,10 +165,13 @@ def main() -> int:
         "automatic_retarget_allowed": False,
         "source_armature": arm.name,
         "selected_bones": selected,
+        "selected_bones_by_class": selected_by_class,
         "selected_bone_count": len(selected),
         "camera_center": list(center),
         "camera_radius": radius,
-        "visual_gate": "Anatomical reference only. A useful result must show believable thumb/finger opposition; it never advances directly to production.",
+        "camera_scope": "right lowerarm02 + wrist + finger1..5 only",
+        "thumb_material": "SacrificialThumb",
+        "visual_gate": "Anatomical reference only. Useful only if the close-up shows progressive finger curl and clear thumb opposition; it never advances directly to production.",
     }
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     print("MAKEHUMAN_POSE_REFERENCE_V50_RENDER_SUCCESS")
