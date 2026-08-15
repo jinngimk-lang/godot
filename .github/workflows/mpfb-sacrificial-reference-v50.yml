@@ -1,0 +1,101 @@
+name: MPFB Sacrificial Anatomy Reference v50
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-sacrificial-reference-v50
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Acquire official CC0 Poses 01 pack and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mpfb_sacrificial_reference_v50/{source,reports,renders,logs} .preview-tools
+          URL='https://files2.makehumancommunity.org/asset_packs/poses01/poses01_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_sacrificial_reference_v50/source/poses01_cc0.zip "$URL"
+          sha256sum artifacts/mpfb_sacrificial_reference_v50/source/poses01_cc0.zip | tee artifacts/mpfb_sacrificial_reference_v50/reports/poses01-pack.sha256
+          printf '%s\n' "$URL" > artifacts/mpfb_sacrificial_reference_v50/reports/source-url.txt
+
+      - name: Extract and inspect holding-wine-glass source pose
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/inspect_makehuman_pose_v50.py \
+            artifacts/mpfb_sacrificial_reference_v50/source/poses01_cc0.zip \
+            artifacts/mpfb_sacrificial_reference_v50/source/holding-wine-glass \
+            artifacts/mpfb_sacrificial_reference_v50/reports/source-pose.json \
+            2>&1 | tee artifacts/mpfb_sacrificial_reference_v50/logs/inspect.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_INSPECT_SUCCESS' artifacts/mpfb_sacrificial_reference_v50/logs/inspect.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_sacrificial_reference_v50/reports/source-pose.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['automatic_retarget_allowed'] is False, r
+          assert r['declared_license_from_official_pack_page'] == 'CC0', r
+          assert r['bvh']['joint_count'] > 10, r
+          assert r['bvh']['first_frame_value_count'] > 0, r
+          print('MAKEHUMAN_SOURCE_PROVENANCE_V50_PASS', r['source_pack_sha256'])
+          PY
+
+      - name: Install pinned Blender for sacrificial source-armature render
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+
+      - name: Render sacrificial BVH anatomy proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_sacrificial_reference_v50/source/holding-wine-glass -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          .preview-tools/blender/blender --background --python tools/render_makehuman_pose_reference_v50.py -- \
+            "$BVH" \
+            artifacts/mpfb_sacrificial_reference_v50/renders/holding-wine-glass-full.png \
+            artifacts/mpfb_sacrificial_reference_v50/renders/holding-wine-glass-thumbnail.png \
+            artifacts/mpfb_sacrificial_reference_v50/reports/render.json \
+            2>&1 | tee artifacts/mpfb_sacrificial_reference_v50/logs/render.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_RENDER_SUCCESS' artifacts/mpfb_sacrificial_reference_v50/logs/render.log
+          test -s artifacts/mpfb_sacrificial_reference_v50/renders/holding-wine-glass-full.png
+          test -s artifacts/mpfb_sacrificial_reference_v50/renders/holding-wine-glass-thumbnail.png
+
+      - name: Enforce no-production-retarget contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          source=json.load(open('artifacts/mpfb_sacrificial_reference_v50/reports/source-pose.json'))
+          render=json.load(open('artifacts/mpfb_sacrificial_reference_v50/reports/render.json'))
+          assert source['automatic_retarget_allowed'] is False
+          assert render['automatic_retarget_allowed'] is False
+          assert source['production_candidate'] is False
+          assert render['production_candidate'] is False
+          print('SACRIFICIAL_REFERENCE_ONLY_V50_PASS')
+          PY
+
+      - name: Upload anatomy-reference evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-sacrificial-reference-v50
+          path: artifacts/mpfb_sacrificial_reference_v50/
+          if-no-files-found: error
+          retention-days: 14
