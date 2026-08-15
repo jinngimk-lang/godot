@@ -46,12 +46,15 @@ v35 = _load("mpfb_v35_for_v61", "render_mpfb_canonical_grip_v35.py")
 v49 = _load("mpfb_manual_pose_v49_for_v61", "manual_pose_asset_v49.py")
 v53 = _load("mpfb_v53_for_v61", "author_mpfb_anatomical_controls_v53.py")
 
+# The official MakeHuman Poses 01 BVH uses an uppercase side suffix (`.R`).
+# Keep the source spelling explicit so a missing semantic bone fails loudly
+# instead of silently falling back to an unrelated left-hand chain.
 SOURCE_TO_TARGET = {
-    "finger1-1.r": "thumb_01_r", "finger1-2.r": "thumb_02_r", "finger1-3.r": "thumb_03_r",
-    "finger2-1.r": "index_01_r", "finger2-2.r": "index_02_r", "finger2-3.r": "index_03_r",
-    "finger3-1.r": "middle_01_r", "finger3-2.r": "middle_02_r", "finger3-3.r": "middle_03_r",
-    "finger4-1.r": "ring_01_r", "finger4-2.r": "ring_02_r", "finger4-3.r": "ring_03_r",
-    "finger5-1.r": "pinky_01_r", "finger5-2.r": "pinky_02_r", "finger5-3.r": "pinky_03_r",
+    "finger1-1.R": "thumb_01_r", "finger1-2.R": "thumb_02_r", "finger1-3.R": "thumb_03_r",
+    "finger2-1.R": "index_01_r", "finger2-2.R": "index_02_r", "finger2-3.R": "index_03_r",
+    "finger3-1.R": "middle_01_r", "finger3-2.R": "middle_02_r", "finger3-3.R": "middle_03_r",
+    "finger4-1.R": "ring_01_r", "finger4-2.R": "ring_02_r", "finger4-3.R": "ring_03_r",
+    "finger5-1.R": "pinky_01_r", "finger5-2.R": "pinky_02_r", "finger5-3.R": "pinky_03_r",
 }
 
 
@@ -74,17 +77,16 @@ def _orthonormal_frame(forward: Vector, span: Vector) -> tuple[Vector, Vector, V
     if n.length < 1e-6:
         raise RuntimeError("degenerate palm normal")
     n.normalize()
-    # Recompute span so numerical drift cannot make the basis non-orthogonal.
     s = n.cross(f).normalized()
     return f, s, n
 
 
 def _source_frame(src):
-    required = ["wrist.r", "finger2-1.r", "finger3-1.r", "finger4-1.r", "finger5-1.r"]
+    required = ["wrist.R", "finger2-1.R", "finger3-1.R", "finger4-1.R", "finger5-1.R"]
     missing = [name for name in required if src.pose.bones.get(name) is None]
     if missing:
         raise RuntimeError(f"source BVH missing palm landmarks: {missing}")
-    wrist = src.pose.bones["wrist.r"].head.copy()
+    wrist = src.pose.bones["wrist.R"].head.copy()
     mcps = [src.pose.bones[name].head.copy() for name in required[1:]]
     forward = (sum(mcps, Vector()) / len(mcps)) - wrist
     span = mcps[-1] - mcps[0]
