@@ -1,0 +1,129 @@
+name: MPFB Poses02 Henny v57
+
+on:
+  push:
+    branches:
+      - spike/mpfb-poses02-henny-transfer-v57
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Acquire screened official CC0 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_poses02_henny_v57/{source,assets,reports,logs,previews}
+          URL='https://files2.makehumancommunity.org/asset_packs/poses02/poses02_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_poses02_henny_v57/source/poses02_cc0.zip "$URL"
+          python tools/extract_makehuman_pose_sources_v56.py \
+            artifacts/mpfb_poses02_henny_v57/source/poses02_cc0.zip \
+            artifacts/mpfb_poses02_henny_v57/source/candidates \
+            artifacts/mpfb_poses02_henny_v57/reports/sources.json \
+            2>&1 | tee artifacts/mpfb_poses02_henny_v57/logs/source-extract.log
+          grep -Fq 'MAKEHUMAN_POSES02_GRIP_SOURCE_V56_SUCCESS' artifacts/mpfb_poses02_henny_v57/logs/source-extract.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_poses02_henny_v57/reports/sources.json'))
+          assert r['staging_only'] is True and r['production_candidate'] is False, r
+          assert r['automatic_retarget_allowed'] is False, r
+          assert r['declared_license'] == 'CC0', r
+          assert 'henny_cyclist_normal' in r['candidates'], r
+          print('POSES02_HENNY_V57_PROVENANCE_PASS', r['candidates']['henny_cyclist_normal']['sha256'])
+          PY
+
+      - name: Install headless runtime, pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo "92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz" | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name "MPFB CI" --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build stable GameEngine source human
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_poses02_henny_v57/assets/mpfb-human-source.glb \
+            artifacts/mpfb_poses02_henny_v57/reports/mpfb-human-source.json \
+            2>&1 | tee artifacts/mpfb_poses02_henny_v57/logs/build.log
+          grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_poses02_henny_v57/logs/build.log
+
+      - name: Author target using screened Henny direction prior
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_poses02_henny_v57/source/candidates/henny_cyclist_normal -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          export PEEL_MH_SOURCE_BVH="$PWD/$BVH"
+          export PEEL_V57_OUTDIR="$PWD/artifacts/mpfb_poses02_henny_v57/previews"
+          export PEEL_V57_POSE="$PWD/artifacts/mpfb_poses02_henny_v57/assets/right-support-wrap-v57.pose.json"
+          export PEEL_V57_REPORT="$PWD/artifacts/mpfb_poses02_henny_v57/reports/right-support-wrap-v57.json"
+          # v53 owns the actual positional arguments; point its output paths at v57.
+          .preview-tools/blender/blender --background --python tools/author_mpfb_poses02_henny_v57.py -- \
+            assets/models/hands/hand_right.glb \
+            artifacts/mpfb_poses02_henny_v57/assets/mpfb-human-source.glb \
+            artifacts/mpfb_poses02_henny_v57/previews \
+            artifacts/mpfb_poses02_henny_v57/assets/right-support-wrap-v57.pose.json \
+            artifacts/mpfb_poses02_henny_v57/reports/right-support-wrap-v57.json \
+            2>&1 | tee artifacts/mpfb_poses02_henny_v57/logs/author.log
+          grep -Fq "MPFB_POSES02_HENNY_V57_SUCCESS" artifacts/mpfb_poses02_henny_v57/logs/author.log
+
+      - name: Enforce transfer safety and persistence contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_poses02_henny_v57/reports/right-support-wrap-v57.json'))
+          s=json.load(open('artifacts/mpfb_poses02_henny_v57/reports/sources.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['automatic_retarget'] is False, r
+          assert r['retarget_source_transforms_used'] is False, r
+          assert r['source_local_rotations_copied'] is False, r
+          assert r['source_matrix_basis_copied'] is False, r
+          assert r['source_bone_roll_modified'] is False, r
+          assert r['source_direction_coefficients_only'] is True, r
+          assert r['target_solver_used'] is False, r
+          assert r['bend_toward_center_used'] is False, r
+          assert r['pose_bone_count'] == 17, r
+          assert r['max_reload_matrix_error'] <= 1e-6, r
+          assert r['source_asset'] == 'MakeHuman Poses02 / henny_cyclist_normal', r
+          assert r['source_declared_license'] == 'CC0', r
+          assert r['source_bvh_sha256'] == s['candidates']['henny_cyclist_normal']['sha256'], r
+          print('POSES02_HENNY_V57_TRANSFER_SAFETY_PASS')
+          PY
+          test -s artifacts/mpfb_poses02_henny_v57/previews/poses02_henny_v57_candidate.png
+          test -s artifacts/mpfb_poses02_henny_v57/previews/poses02_henny_v57_thumbnail.png
+
+      - name: Upload v57 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-poses02-henny-v57
+          path: artifacts/mpfb_poses02_henny_v57/
+          if-no-files-found: error
+          retention-days: 14
