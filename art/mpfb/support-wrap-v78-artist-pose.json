@@ -1,6 +1,6 @@
 {
   "format": "peel-calm-mpfb-screen-space-artist-handles-v1",
-  "label": "v78 one-shot direct artist support-grasp silhouette",
+  "label": "v78 evidence-corrected direct artist support-grasp silhouette r2",
   "staging_only": true,
   "production_candidate": false,
   "reference_set": ["bar_v1", "market_v1"],
@@ -12,23 +12,23 @@
   "contact_servo_used": false,
   "root_orbit_motion_used": false,
   "frozen_bones": ["wrist.R", "finger1-1.R", "finger1-2.R", "finger1-3.R"],
-  "intent": "One manually specified whole-shape gesture derived from the v78 diagnostic and locked bar/market support-grip references. Each finger follows a single continuous screen-space arc; middle/ring/pinky progressively wrap deeper than index. This file is not a search grid and must not be expanded into a parameter sweep.",
+  "intent": "One evidence-derived artist correction after checkpoint 35. The first v78 gesture visibly over-curled because each PIP/DIP reversed back left/down after its parent moved. This revision redraws each complete digit as one smooth right/down arc toward and behind the fixed vessel, with index least closed and pinky deepest, while substantially reducing camera-depth curl. It is one gesture, not a parameter sweep.",
   "handles": {
-    "finger2-1.R": {"tail_px": [133.0, 63.0], "away_from_camera": 0.20},
-    "finger2-2.R": {"tail_px": [136.0, 73.0], "away_from_camera": 0.45},
-    "finger2-3.R": {"tail_px": [128.0, 79.0], "away_from_camera": 0.65},
-    "finger3-1.R": {"tail_px": [109.0, 72.0], "away_from_camera": 0.25},
-    "finger3-2.R": {"tail_px": [118.0, 80.0], "away_from_camera": 0.55},
-    "finger3-3.R": {"tail_px": [111.0, 86.0], "away_from_camera": 0.75},
-    "finger4-1.R": {"tail_px": [87.0, 74.0], "away_from_camera": 0.30},
-    "finger4-2.R": {"tail_px": [96.0, 82.0], "away_from_camera": 0.60},
-    "finger4-3.R": {"tail_px": [89.0, 88.0], "away_from_camera": 0.80},
-    "finger5-1.R": {"tail_px": [69.0, 72.0], "away_from_camera": 0.30},
-    "finger5-2.R": {"tail_px": [77.0, 79.0], "away_from_camera": 0.60},
-    "finger5-3.R": {"tail_px": [70.0, 84.0], "away_from_camera": 0.80}
+    "finger2-1.R": {"tail_px": [133.0, 62.0], "away_from_camera": 0.10},
+    "finger2-2.R": {"tail_px": [154.0, 67.0], "away_from_camera": 0.16},
+    "finger2-3.R": {"tail_px": [160.0, 72.0], "away_from_camera": 0.22},
+    "finger3-1.R": {"tail_px": [109.0, 70.0], "away_from_camera": 0.12},
+    "finger3-2.R": {"tail_px": [138.0, 76.0], "away_from_camera": 0.20},
+    "finger3-3.R": {"tail_px": [148.0, 81.0], "away_from_camera": 0.28},
+    "finger4-1.R": {"tail_px": [87.0, 72.0], "away_from_camera": 0.14},
+    "finger4-2.R": {"tail_px": [116.0, 77.0], "away_from_camera": 0.23},
+    "finger4-3.R": {"tail_px": [136.0, 82.0], "away_from_camera": 0.32},
+    "finger5-1.R": {"tail_px": [69.0, 70.0], "away_from_camera": 0.16},
+    "finger5-2.R": {"tail_px": [96.0, 75.0], "away_from_camera": 0.26},
+    "finger5-3.R": {"tail_px": [120.0, 80.0], "away_from_camera": 0.36}
   },
   "visual_gate": {
     "macro": "At 192x108 first glance must read as a relaxed firm human bottle support grip, not a fist/claw or open hand.",
-    "meso": "Unobstructed anatomy view must show smooth finger ordering, readable web spaces, no severe self-intersection or distal kinks, and the frozen v74 thumb must remain opposing the four-finger wrap."
+    "meso": "Unobstructed anatomy view must show four smooth separated digit arcs with progressive far-side wrap, no severe self-intersection or distal kinks, and the frozen v74 thumb must remain visibly opposing the four-finger side."
   }
 }
