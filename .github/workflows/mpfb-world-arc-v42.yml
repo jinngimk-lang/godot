@@ -1,0 +1,63 @@
+name: MPFB World Arc Grasp v42
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-world-arc-v42
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install headless runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_world_arc_v42/{assets,reports,logs,previews}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo "4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz" | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo "92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz" | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name "MPFB CI" --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+      - name: Build and extract continuous right hero limb
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_limb_candidate.py -- bl_ext.mpfb_ci.mpfb artifacts/mpfb_world_arc_v42/assets/mpfb-human-source.glb artifacts/mpfb_world_arc_v42/reports/mpfb-human-source.json 2>&1 | tee artifacts/mpfb_world_arc_v42/logs/build.log
+          grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_world_arc_v42/logs/build.log
+          .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- artifacts/mpfb_world_arc_v42/assets/mpfb-human-source.glb right artifacts/mpfb_world_arc_v42/assets/mpfb-right-hero-limb.glb artifacts/mpfb_world_arc_v42/reports/mpfb-right-hero-limb.json 2>&1 | tee artifacts/mpfb_world_arc_v42/logs/extract-right.log
+          grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_world_arc_v42/logs/extract-right.log
+      - name: Render explicit world-space cylindrical-arc grasp candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/render_mpfb_world_arc_grasp_v42.py -- assets/models/hands/hand_right.glb artifacts/mpfb_world_arc_v42/assets/mpfb-right-hero-limb.glb artifacts/mpfb_world_arc_v42/previews 2>&1 | tee artifacts/mpfb_world_arc_v42/logs/world-arc-v42.log
+          grep -Fq "MPFB_WORLD_ARC_V42_SUCCESS" artifacts/mpfb_world_arc_v42/logs/world-arc-v42.log
+          test "$(find artifacts/mpfb_world_arc_v42/previews -name 'world_arc_v42_*.png' | wc -l)" -eq 4
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-world-arc-v42
+          path: artifacts/mpfb_world_arc_v42/
+          if-no-files-found: error
+          retention-days: 14
