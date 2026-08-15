@@ -1,0 +1,117 @@
+{
+  "base_candidate": "pristine v65-B",
+  "base_palmar_sign": -1.0,
+  "camera_changed_from_v65_b": false,
+  "candidate": {
+    "baked_polygons": 1735,
+    "baked_vertices": 1747,
+    "diagnostics": {
+      "far_side_finger_count": 1,
+      "finger_tips": {
+        "2": {
+          "palm_side_dot": 0.056894637644290924,
+          "world": [
+            -0.42860984802246094,
+            -0.28143730759620667,
+            0.130266472697258
+          ]
+        },
+        "3": {
+          "palm_side_dot": -0.42242059111595154,
+          "world": [
+            -0.43099445104599,
+            -0.25165578722953796,
+            0.11404555290937424
+          ]
+        },
+        "4": {
+          "palm_side_dot": 0.48444967716932297,
+          "world": [
+            -0.44056928157806396,
+            -0.22815589606761932,
+            0.11375235766172409
+          ]
+        },
+        "5": {
+          "palm_side_dot": 0.960315365344286,
+          "world": [
+            -0.45782753825187683,
+            -0.24090251326560974,
+            0.12272441387176514
+          ]
+        }
+      },
+      "thumb_palm_side_dot": 0.9915935893077403
+    },
+    "glb": "/home/runner/work/godot/godot/artifacts/mpfb_v69/previews/right-support-wrap-v65-B69-static.glb",
+    "glb_bytes": 85564,
+    "min_segment_vertex_coverage": 72,
+    "palm_vertex_coverage": 1529,
+    "palmar_sign": -1.0,
+    "suffix": "B69",
+    "vessel_radius": 0.04
+  },
+  "ccd_used": false,
+  "crop_changed_from_v65_b": false,
+  "direct_visual_thumb_chain": true,
+  "endpoint_optimizer_used": false,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v65_b": false,
+  "palm_vessel_relationship_changed_from_v65_b": false,
+  "parameter_sweep_used": false,
+  "previous_candidate": "v68 direct visual thumb chain \u2014 rejected for compressed thumb silhouette",
+  "production_candidate": false,
+  "production_gameengine_rig_touched": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "same_rig_pose_path": "/home/runner/work/godot/godot/artifacts/mpfb_v69/previews/support-wrap-v69-canonical-pose.json",
+  "same_rig_pose_persisted": true,
+  "single_axis_thumb_sweep_used": false,
+  "single_structural_correction": "longer visible thumb opposition arc",
+  "staging_only": true,
+  "thumb_bones_authored_together": [
+    "finger1-1.R",
+    "finger1-2.R",
+    "finger1-3.R"
+  ],
+  "thumb_diagnostics": {
+    "landmarks": {
+      "distal_target": [
+        -0.46921244263648987,
+        -0.23483267426490784,
+        0.15349936485290527
+      ],
+      "proximal_target": [
+        -0.46939894556999207,
+        -0.2636586129665375,
+        0.159820556640625
+      ],
+      "root_target": [
+        -0.46995922923088074,
+        -0.2948988676071167,
+        0.16610056161880493
+      ]
+    },
+    "root_world": [
+      -0.4587697982788086,
+      -0.22732385993003845,
+      0.19347652792930603
+    ],
+    "thumb_palm_side_dot": 0.9915936242323369,
+    "tip_to_index_root": 0.04227293621347235,
+    "tip_to_index_tip": 0.0626064122015509,
+    "tip_world": [
+      -0.4696906805038452,
+      -0.23991629481315613,
+      0.15280385315418243
+    ]
+  },
+  "visual_gate": "At 192x108 the thumb must be independently legible as a longer opposing digit while the frozen v65-B fingers enclose the vessel; oblique anatomy must show continuous root/proximal/distal thumb shape without self-intersection.",
+  "wrist_changed_from_v65_b": false
+}
