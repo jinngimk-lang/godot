@@ -1,0 +1,93 @@
+name: MPFB Thumb Distal Screen v74
+
+on:
+  push:
+    branches:
+      - spike/mpfb-thumb-distal-screen-v74
+    paths:
+      - 'tools/author_mpfb_thumb_distal_screen_v74.py'
+      - '.github/workflows/mpfb-thumb-distal-screen-v74.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  thumb-distal-screen:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-thumb-distal-screen-v74
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v74/{reports,logs,frames} docs/superpowers/evidence/mpfb-v74
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+      - name: Author distal-only camera-space thumb
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_thumb_distal_screen_v74.py -- \
+            bl_ext.mpfb_ci.mpfb artifacts/mpfb_v74/frames artifacts/mpfb_v74/reports/thumb-distal-screen-v74.json \
+            2>&1 | tee artifacts/mpfb_v74/logs/author.log
+          grep -Fq 'MPFB_THUMB_DISTAL_SCREEN_V74_SUCCESS' artifacts/mpfb_v74/logs/author.log
+      - name: Enforce root-frozen structural contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,math
+          r=json.load(open('artifacts/mpfb_v74/reports/thumb-distal-screen-v74.json'))
+          assert r['staging_only'] and not r['production_candidate'] and r['thumb_root_frozen']
+          assert r['authored_bones']==['finger1-2.R','finger1-3.R']
+          assert r['parameter_sweep_used'] is False and r['ccd_used'] is False and r['endpoint_optimizer_used'] is False
+          assert r['frozen_matrix_max_abs_delta'] <= 1e-7, r['frozen_matrix_max_abs_delta']
+          b,c=r['baseline']['bones'],r['candidate']['bones']
+          assert c['finger1-1.R']['outside_vessel_px']==b['finger1-1.R']['outside_vessel_px']==0.0
+          assert c['finger1-3.R']['outside_vessel_px'] >= b['finger1-3.R']['outside_vessel_px'] + 2.0, (b['finger1-3.R'],c['finger1-3.R'])
+          assert max(abs(x) for x in r['root_bbox_center_delta_px']) <= 0.5, r['root_bbox_center_delta_px']
+          assert max(abs(x) for x in r['root_bbox_size_delta_px']) <= 0.5, r['root_bbox_size_delta_px']
+          print('MPFB_THUMB_DISTAL_SCREEN_V74_STRUCTURAL_PASS')
+          PY
+      - name: Persist v74 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v74/reports/thumb-distal-screen-v74.json docs/superpowers/evidence/mpfb-v74/
+          cp artifacts/mpfb_v74/frames/*.png docs/superpowers/evidence/mpfb-v74/
+          cp artifacts/mpfb_v74/frames/*pose.json docs/superpowers/evidence/mpfb-v74/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v74
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist distal thumb screen v74'
+            git pull --rebase origin spike/mpfb-thumb-distal-screen-v74
+            git push origin HEAD:spike/mpfb-thumb-distal-screen-v74
+          fi
+      - name: Upload v74 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-thumb-distal-screen-v74
+          path: artifacts/mpfb_v74/
+          if-no-files-found: error
+          retention-days: 14
