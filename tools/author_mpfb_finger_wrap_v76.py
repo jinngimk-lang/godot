@@ -77,8 +77,8 @@ def _max_delta(before, after):
     return max(abs(a - b) for a, b in zip(before, after))
 
 
-def _reconstruct_v74(arm, scene, cam, vessel_center, vessel_radius, longitudinal, focus, thumb_weights):
-    metric_base = v73._static(arm.parent)
+def _reconstruct_v74(base, arm, scene, cam, vessel_center, vessel_radius, longitudinal, focus, thumb_weights):
+    metric_base = v73._static(base)
     baseline = v73._metrics(
         scene, cam, metric_base, thumb_weights, vessel_center, vessel_radius, longitudinal, focus
     )
@@ -154,7 +154,7 @@ def run():
     scene = bpy.context.scene
 
     baseline = _reconstruct_v74(
-        arm, scene, cam, vessel_center, vessel_radius, longitudinal, focus, thumb_weights
+        base, arm, scene, cam, vessel_center, vessel_radius, longitudinal, focus, thumb_weights
     )
 
     frozen_names = ["wrist.R", "finger1-1.R", "finger1-2.R", "finger1-3.R"]
