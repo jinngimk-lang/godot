@@ -1,0 +1,93 @@
+name: MPFB Finger Wrap v76
+
+on:
+  push:
+    branches:
+      - spike/mpfb-hero-limb-finger-wrap-v76
+    paths:
+      - 'tools/author_mpfb_finger_wrap_v76.py'
+      - '.github/workflows/mpfb-finger-wrap-v76.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  finger-wrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-hero-limb-finger-wrap-v76
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v76/{reports,logs,frames} docs/superpowers/evidence/mpfb-v76
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+      - name: Author one progressive four-finger wrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_finger_wrap_v76.py -- \
+            bl_ext.mpfb_ci.mpfb artifacts/mpfb_v76/frames artifacts/mpfb_v76/reports/finger-wrap-v76.json \
+            2>&1 | tee artifacts/mpfb_v76/logs/author.log
+          grep -Fq 'MPFB_FINGER_WRAP_V76_SUCCESS' artifacts/mpfb_v76/logs/author.log
+      - name: Enforce single-candidate structural contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v76/reports/finger-wrap-v76.json'))
+          assert r['staging_only'] and not r['production_candidate']
+          assert r['single_reference_derived_candidate'] is True
+          assert r['thumb_pose_from_v74_frozen'] is True and r['wrist_frozen'] is True
+          assert r['parameter_sweep_used'] is False and r['ccd_used'] is False
+          assert r['endpoint_optimizer_used'] is False and r['contact_servo_used'] is False
+          assert r['root_orbit_motion_used'] is False and r['camera_changed_from_v75'] is False
+          assert r['frozen_matrix_max_abs_delta'] <= 1e-6, r['frozen_matrix_max_abs_delta']
+          assert r['thumb_distal_outside_vessel_px'] >= 2.0, r['thumb_distal_outside_vessel_px']
+          assert set(r['before_finger_screen_metrics']) == {'index','middle','ring','pinky'}
+          assert set(r['after_finger_screen_metrics']) == {'index','middle','ring','pinky'}
+          print('MPFB_FINGER_WRAP_V76_STRUCTURAL_PASS')
+          PY
+      - name: Persist v76 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/mpfb_v76/reports/finger-wrap-v76.json docs/superpowers/evidence/mpfb-v76/
+          cp artifacts/mpfb_v76/frames/* docs/superpowers/evidence/mpfb-v76/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/superpowers/evidence/mpfb-v76
+          if ! git diff --cached --quiet; then
+            git commit -m 'evidence: persist progressive finger wrap v76'
+            git pull --rebase origin spike/mpfb-hero-limb-finger-wrap-v76
+            git push origin HEAD:spike/mpfb-hero-limb-finger-wrap-v76
+          fi
+      - name: Upload v76 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-finger-wrap-v76
+          path: artifacts/mpfb_v76/
+          if-no-files-found: error
+          retention-days: 14
