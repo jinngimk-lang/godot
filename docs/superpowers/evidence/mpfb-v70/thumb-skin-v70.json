@@ -1,0 +1,90 @@
+{
+  "base_pose": "pristine v65-B",
+  "diagnostic_only": true,
+  "disabled_modifier_names": [
+    "Hide helpers"
+  ],
+  "interpretation_gate": "If thumb bones move materially and vertices with >=0.5 thumb weight also move materially, skin mapping is responsive and the remaining failure is pose silhouette/occlusion. If bones move but high-weight thumb vertices barely move, investigate weights/bone mapping before any more pose authoring.",
+  "modifier_isolation": "non-Armature modifiers disabled only while measuring indexed deformation",
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_vertex_deformation": {
+    "count": 18878,
+    "max_m": 0.00029338927872064993,
+    "mean_m": 8.479365267294451e-08,
+    "p95_m": 0.0
+  },
+  "production_candidate": false,
+  "source_vertex_count": 19158,
+  "targets": {
+    "finger1-1.R": [
+      -0.46995922923088074,
+      -0.2948988676071167,
+      0.16610056161880493
+    ],
+    "finger1-2.R": [
+      -0.46939894556999207,
+      -0.2636586129665375,
+      0.159820556640625
+    ],
+    "finger1-3.R": [
+      -0.46921244263648987,
+      -0.23483267426490784,
+      0.15349936485290527
+    ]
+  },
+  "tested_change": "exact rejected v69 thumb opposition arc",
+  "thumb_bone_motion": {
+    "finger1-1.R": {
+      "head_displacement_m": 0.0,
+      "tail_displacement_m": 0.026340794958541833
+    },
+    "finger1-2.R": {
+      "head_displacement_m": 0.02634081387987349,
+      "tail_displacement_m": 0.054614192365171954
+    },
+    "finger1-3.R": {
+      "head_displacement_m": 0.054614174608818865,
+      "tail_displacement_m": 0.06377755977322186
+    }
+  },
+  "thumb_bones": [
+    "finger1-1.R",
+    "finger1-2.R",
+    "finger1-3.R"
+  ],
+  "thumb_vertex_group_counts_weight_gt_0_01": {
+    "finger1-1.R": 99,
+    "finger1-2.R": 191,
+    "finger1-3.R": 142
+  },
+  "weighted_vertex_deformation": {
+    "0.01": {
+      "count": 280,
+      "max_m": 0.07277854239894761,
+      "mean_m": 0.03839259466552225,
+      "p95_m": 0.06373537331369378
+    },
+    "0.25": {
+      "count": 238,
+      "max_m": 0.07277854239894761,
+      "mean_m": 0.04475115333742815,
+      "p95_m": 0.06402932372340053
+    },
+    "0.5": {
+      "count": 224,
+      "max_m": 0.07277854239894761,
+      "mean_m": 0.047043631427425514,
+      "p95_m": 0.06432112448849435
+    },
+    "0.75": {
+      "count": 216,
+      "max_m": 0.07277854239894761,
+      "mean_m": 0.04820260119981157,
+      "p95_m": 0.06432112448849435
+    }
+  }
+}
