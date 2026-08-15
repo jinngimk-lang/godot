@@ -44,10 +44,17 @@ def main() -> int:
     with zipfile.ZipFile(pack) as zf:
         names = zf.namelist()
         for token in TOKENS:
-            matches = [name for name in names if token in Path(name).stem.lower()]
-            bvh_matches = [name for name in matches if Path(name).suffix.lower() == ".bvh"]
+            # Poses02 includes henny_cyclist_normal and henny_cyclist_normal_tough.
+            # Match the pose directory exactly so a substring cannot silently select an
+            # ambiguous source asset.
+            bvh_matches = [
+                name for name in names
+                if Path(name).suffix.lower() == ".bvh"
+                and Path(name).parent.name.lower() == token
+                and Path(name).stem.lower() == token
+            ]
             if len(bvh_matches) != 1:
-                raise RuntimeError(f"expected one BVH for {token}, got {bvh_matches}")
+                raise RuntimeError(f"expected one exact BVH for {token}, got {bvh_matches}")
             source_name = bvh_matches[0]
             data = zf.read(source_name)
             target_dir = out / token
