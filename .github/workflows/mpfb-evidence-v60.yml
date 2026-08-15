@@ -62,7 +62,10 @@ jobs:
           cp artifacts/mpfb_v60/previews/anatomical_controls_v53_candidate.png docs/superpowers/evidence/mpfb-v60/support-wrap-full.png
           cp artifacts/mpfb_v60/previews/anatomical_controls_v53_thumbnail.png docs/superpowers/evidence/mpfb-v60/support-wrap-thumbnail.png
           cp artifacts/mpfb_v60/reports/right-support-wrap-v60.json docs/superpowers/evidence/mpfb-v60/support-wrap-report.json
-          python tools/export_render_rgbhex.py docs/superpowers/evidence/mpfb-v60/support-wrap-thumbnail.png docs/superpowers/evidence/mpfb-v60/support-wrap-thumbnail.rgbhex
+          .preview-tools/blender/blender --background --python tools/export_render_rgbhex.py -- \
+            docs/superpowers/evidence/mpfb-v60/support-wrap-thumbnail.png \
+            docs/superpowers/evidence/mpfb-v60/support-wrap-thumbnail.rgbhex \
+            192 108
       - name: Persist exact visual evidence to branch
         shell: bash
         run: |
