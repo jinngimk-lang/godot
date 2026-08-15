@@ -1,0 +1,102 @@
+{
+  "base_pose": "pristine v65-B",
+  "bones": [
+    "finger1-1.R",
+    "finger1-2.R",
+    "finger1-3.R"
+  ],
+  "camera_changed_from_v65_b": false,
+  "diagnostic_only": true,
+  "dominant_face_threshold": 0.3,
+  "high_weight_metric_threshold": 0.5,
+  "interpretation_gate": "Use the per-bone colors to identify which segment owns broad thenar/webbing versus the independently visible digit. Do not author another whole-chain translation if root/prox influence is the stretched region; next authoring may move only the anatomically distal segment(s) supported by this evidence.",
+  "marked_faces_before_crop": {
+    "finger1-1.R": 38,
+    "finger1-2.R": 96,
+    "finger1-3.R": 104
+  },
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "pose_changed_from_v65_b": false,
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "screen_metrics": {
+    "bones": {
+      "finger1-1.R": {
+        "bbox": {
+          "center_px": [
+            95.57784748077393,
+            1.5645346641540527
+          ],
+          "height_px": 41.17367649078369,
+          "max": [
+            110.35882186889648,
+            22.1513729095459
+          ],
+          "min": [
+            80.79687309265137,
+            -19.022303581237793
+          ],
+          "projected_point_count": 20,
+          "width_px": 29.561948776245117
+        },
+        "count": 20,
+        "outside_vessel_px": 0.0
+      },
+      "finger1-2.R": {
+        "bbox": {
+          "center_px": [
+            115.8387508392334,
+            21.62520718574524
+          ],
+          "height_px": 31.71531057357788,
+          "max": [
+            132.07929611206055,
+            37.48286247253418
+          ],
+          "min": [
+            99.59820556640625,
+            5.767551898956299
+          ],
+          "projected_point_count": 85,
+          "width_px": 32.4810905456543
+        },
+        "count": 85,
+        "outside_vessel_px": 0.0
+      },
+      "finger1-3.R": {
+        "bbox": {
+          "center_px": [
+            125.24118232727051,
+            41.45563191175461
+          ],
+          "height_px": 31.629607558250427,
+          "max": [
+            135.75424575805664,
+            57.27043569087982
+          ],
+          "min": [
+            114.72811889648438,
+            25.640828132629395
+          ],
+          "projected_point_count": 111,
+          "width_px": 21.026126861572266
+        },
+        "count": 111,
+        "outside_vessel_px": 0.0
+      }
+    },
+    "vessel_diameter_px": 70.39577293395996,
+    "vessel_x_px": [
+      76.56355476379395,
+      146.9593276977539
+    ]
+  },
+  "vessel_changed_from_v65_b": false
+}
