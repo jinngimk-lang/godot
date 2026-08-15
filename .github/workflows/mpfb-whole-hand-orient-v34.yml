@@ -46,11 +46,11 @@ jobs:
           grep -Fq "MPFB_LIMB_BUILD_SUCCESS" artifacts/mpfb_whole_hand_v34/logs/build.log
           .preview-tools/blender/blender --background --python tools/extract_mpfb_hero_limb.py -- artifacts/mpfb_whole_hand_v34/assets/mpfb-human-source.glb right artifacts/mpfb_whole_hand_v34/assets/mpfb-right-hero-limb.glb artifacts/mpfb_whole_hand_v34/reports/mpfb-right-hero-limb.json 2>&1 | tee artifacts/mpfb_whole_hand_v34/logs/extract-right.log
           grep -Fq "MPFB_HERO_LIMB_EXTRACT_SUCCESS" artifacts/mpfb_whole_hand_v34/logs/extract-right.log
-      - name: Render whole-hand orientation candidates
+      - name: Render isolated whole-hand orientation candidates
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_whole_hand_orient_v34.py -- assets/models/hands/hand_right.glb artifacts/mpfb_whole_hand_v34/assets/mpfb-right-hero-limb.glb artifacts/mpfb_whole_hand_v34/previews 2>&1 | tee artifacts/mpfb_whole_hand_v34/logs/whole-hand-v34.log
+          .preview-tools/blender/blender --background --python tools/render_mpfb_whole_hand_orient_v34b.py -- assets/models/hands/hand_right.glb artifacts/mpfb_whole_hand_v34/assets/mpfb-right-hero-limb.glb artifacts/mpfb_whole_hand_v34/previews 2>&1 | tee artifacts/mpfb_whole_hand_v34/logs/whole-hand-v34.log
           grep -Fq "MPFB_WHOLE_HAND_V34_SUCCESS" artifacts/mpfb_whole_hand_v34/logs/whole-hand-v34.log
           test "$(find artifacts/mpfb_whole_hand_v34/previews -name 'whole_hand_v34_*_seed.png' | wc -l)" -eq 4
           test "$(find artifacts/mpfb_whole_hand_v34/previews -name 'whole_hand_v34_*_oriented.png' | wc -l)" -eq 4
