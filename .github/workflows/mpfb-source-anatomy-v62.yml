@@ -1,0 +1,91 @@
+name: MPFB Source Anatomy v62
+
+on:
+  push:
+    branches:
+      - spike/mpfb-source-anatomy-v62
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  source-anatomy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-source-anatomy-v62
+
+      - name: Acquire official CC0 holding-object source pose
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mpfb_source_v62/{source,renders,reports,logs} .preview-tools
+          URL='https://files2.makehumancommunity.org/asset_packs/poses01/poses01_cc0.zip'
+          curl -L --fail --retry 3 -o artifacts/mpfb_source_v62/source/poses01_cc0.zip "$URL"
+          sha256sum artifacts/mpfb_source_v62/source/poses01_cc0.zip | tee artifacts/mpfb_source_v62/reports/poses01-pack.sha256
+          printf '%s\n' "$URL" > artifacts/mpfb_source_v62/reports/source-url.txt
+          python tools/inspect_makehuman_pose_v50.py \
+            artifacts/mpfb_source_v62/source/poses01_cc0.zip \
+            artifacts/mpfb_source_v62/source/holding-wine-glass \
+            artifacts/mpfb_source_v62/reports/source-pose.json \
+            2>&1 | tee artifacts/mpfb_source_v62/logs/inspect.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_INSPECT_SUCCESS' artifacts/mpfb_source_v62/logs/inspect.log
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_source_v62/reports/source-pose.json'))
+          assert r['declared_license_from_official_pack_page'] == 'CC0', r
+          assert r['production_candidate'] is False, r
+          print('V62_SOURCE_PROVENANCE_PASS', r['source_pack_sha256'])
+          PY
+
+      - name: Install pinned Blender runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+
+      - name: Render sacrificial source hand close-up
+        shell: bash
+        run: |
+          set -euo pipefail
+          BVH="$(find artifacts/mpfb_source_v62/source/holding-wine-glass -type f -iname '*.bvh' -print -quit)"
+          test -n "$BVH"
+          .preview-tools/blender/blender --background --python tools/render_makehuman_pose_reference_v50.py -- \
+            "$BVH" \
+            artifacts/mpfb_source_v62/renders/source-hand-full.png \
+            artifacts/mpfb_source_v62/renders/source-hand-thumbnail.png \
+            artifacts/mpfb_source_v62/reports/source-hand.json \
+            2>&1 | tee artifacts/mpfb_source_v62/logs/render.log
+          grep -Fq 'MAKEHUMAN_POSE_REFERENCE_V50_RENDER_SUCCESS' artifacts/mpfb_source_v62/logs/render.log
+          test -s artifacts/mpfb_source_v62/renders/source-hand-full.png
+          test -s artifacts/mpfb_source_v62/renders/source-hand-thumbnail.png
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_source_v62/reports/source-hand.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['automatic_retarget_allowed'] is False, r
+          assert r['selected_bone_count'] >= 17, r
+          print('MPFB_SOURCE_ANATOMY_V62_CONTRACT_PASS', r['selected_bone_count'])
+          PY
+
+      - name: Upload source anatomy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-source-anatomy-v62
+          path: artifacts/mpfb_source_v62/
+          if-no-files-found: error
+          retention-days: 14
