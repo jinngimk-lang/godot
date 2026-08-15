@@ -1,0 +1,176 @@
+{
+  "base_pose": "pristine v65-B",
+  "camera_basis_authoring": true,
+  "camera_changed_from_v65_b": false,
+  "ccd_used": false,
+  "crop_changed_from_v65_b": false,
+  "endpoint_optimizer_used": false,
+  "frozen_matrix_max_delta": 0.0,
+  "iterative_solver_used": false,
+  "mpfb_version": [
+    2,
+    0,
+    17
+  ],
+  "non_thumb_fingers_changed_from_v65_b": false,
+  "one_shot_candidate": true,
+  "palm_vessel_relationship_changed_from_v65_b": false,
+  "parameter_sweep_used": false,
+  "pose_asset": "/home/runner/work/godot/godot/artifacts/mpfb_v72/renders/support-wrap-v72-canonical-pose.json",
+  "production_candidate": false,
+  "reference_set": [
+    "bar_v1",
+    "market_v1"
+  ],
+  "render_space_evaluation": {
+    "digit_signed_side_px": {
+      "index": -15.899927074321994,
+      "middle": -39.18110198469908,
+      "pinky": -68.46493985098309,
+      "ring": -62.897036189613374,
+      "thumb": -31.571960082886136
+    },
+    "masks": {
+      "index": {
+        "bbox_px": [
+          72,
+          38,
+          146,
+          90
+        ],
+        "centroid_px": [
+          120.98744769874477,
+          56.933891213389124
+        ],
+        "count": 1195,
+        "touches_top": false
+      },
+      "middle": {
+        "bbox_px": [
+          74,
+          50,
+          119,
+          89
+        ],
+        "centroid_px": [
+          98.48829039812647,
+          70.85245901639344
+        ],
+        "count": 854,
+        "touches_top": false
+      },
+      "pinky": {
+        "bbox_px": [
+          48,
+          14,
+          119,
+          85
+        ],
+        "centroid_px": [
+          68.86206896551724,
+          64.75862068965517
+        ],
+        "count": 29,
+        "touches_top": false
+      },
+      "ring": {
+        "bbox_px": [
+          55,
+          68,
+          94,
+          90
+        ],
+        "centroid_px": [
+          75.24603174603175,
+          79.28306878306879
+        ],
+        "count": 378,
+        "touches_top": false
+      },
+      "thumb": {
+        "bbox_px": [
+          48,
+          0,
+          155,
+          84
+        ],
+        "centroid_px": [
+          102.88111888111888,
+          13.607614607614607
+        ],
+        "count": 1287,
+        "touches_top": true
+      },
+      "vessel": {
+        "bbox_px": [
+          85,
+          7,
+          178,
+          107
+        ],
+        "centroid_px": [
+          135.40279394644935,
+          76.5558789289872
+        ],
+        "count": 3436,
+        "touches_top": false
+      }
+    },
+    "median_four_finger_side_px": -51.03906908715623,
+    "screen_space_opposition_gate": {
+      "min_side_clearance_px": 4.0,
+      "pass": false,
+      "thumb_must_not_touch_top_frame": true
+    },
+    "thumb_and_fingers_have_opposite_sign": false,
+    "thumb_side_px": -31.571960082886136,
+    "vessel_centerline": {
+      "a_x_per_y": 0.05618520675596973,
+      "b_x": 133.68853232382062,
+      "mean_abs_residual_px": 6.912011625157859,
+      "row_count": 101
+    }
+  },
+  "staging_only": true,
+  "thumb_authoring": {
+    "finger1-1.R": {
+      "offset_camera_m": [
+        0.052,
+        -0.02,
+        0.004
+      ],
+      "target_world": [
+        -0.39082396030426025,
+        -0.2626616060733795,
+        0.16796639561653137
+      ]
+    },
+    "finger1-2.R": {
+      "offset_camera_m": [
+        0.044,
+        -0.023,
+        0.002
+      ],
+      "target_world": [
+        -0.35518190264701843,
+        -0.2729145884513855,
+        0.1717812865972519
+      ]
+    },
+    "finger1-3.R": {
+      "offset_camera_m": [
+        0.036,
+        -0.026,
+        0.0
+      ],
+      "target_world": [
+        -0.3494529128074646,
+        -0.29298317432403564,
+        0.15790414810180664
+      ]
+    }
+  },
+  "thumb_matrix_max_delta": 0.4886763393878937,
+  "visual_gate": "Pass only if the 192x108 render shows thumb and four-finger mass on opposite vessel sides with >=4 px clearance, thumb is not top-clipped, and the unobstructed anatomy ID render is continuous/non-self-intersecting. A numeric pass still requires visual review before product-camera staging.",
+  "wrist_changed_from_v65_b": false
+}
