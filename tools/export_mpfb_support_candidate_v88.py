@@ -23,6 +23,9 @@ HUMAN = "MPFB_V84_ReferenceHuman"
 VESSEL = "LOCKED_VesselProxy"
 CAMERA = "LOCKED_V84_Camera"
 WHOLE_LIMB_ARTIST_ROLL_DEG = -40.0
+PALM_ENVELOPE_RADIUS = 0.058
+WRIST_FOREARM_ENVELOPE_RADIUS = 0.046
+FINGER_ENVELOPE_RADIUS = 0.018
 
 POSE_DELTAS_DEG = {
     "wrist.R": {"rx": 10.0},
@@ -93,10 +96,10 @@ def _bake_and_crop(arm, basemesh):
     bm.verts.ensure_lookup_table()
     remove = []
     for vert in bm.verts:
-        keep = (vert.co - local_palm).length <= 0.050
+        keep = (vert.co - local_palm).length <= PALM_ENVELOPE_RADIUS
         if not keep:
             for name, a, b in local_segments:
-                radius = 0.038 if name in {"lowerarm02.R", "wrist.R"} else 0.018
+                radius = WRIST_FOREARM_ENVELOPE_RADIUS if name in {"lowerarm02.R", "wrist.R"} else FINGER_ENVELOPE_RADIUS
                 if _distance_to_segment(vert.co, a, b) <= radius:
                     keep = True
                     break
@@ -183,6 +186,12 @@ def main() -> None:
         "whole_limb_artist_roll_degrees": WHOLE_LIMB_ARTIST_ROLL_DEG,
         "whole_limb_roll_axis_blender": list(view_axis),
         "whole_limb_roll_reason": "product-camera Macro evidence: rotate diagonal upper-right approach into a reference-compatible side-on vessel approach without changing grip, scale, or root offset",
+        "crop_envelope": {
+            "palm_radius": PALM_ENVELOPE_RADIUS,
+            "wrist_forearm_radius": WRIST_FOREARM_ENVELOPE_RADIUS,
+            "finger_radius": FINGER_ENVELOPE_RADIUS,
+            "reason": "single R1a export-geometry correction: preserve more wrist/lowerarm/palm skin to remove the product-camera V-notch while leaving pose, roll, scale, root, yaw and finger envelope unchanged",
+        },
         "cropped_vertices": len(baked.data.vertices),
         "cropped_polygons": len(baked.data.polygons),
         "vessel_center_blender": list(vessel_center),
