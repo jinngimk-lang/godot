@@ -112,7 +112,7 @@ jobs:
           assert r['crop_envelope']['wrist_forearm_radius']==0.046, r
           assert r['crop_envelope']['finger_radius']==0.018, r
           assert r['candidate_version']=='v93', r
-          assert r['digit_far_depth_degrees']=={'finger2-1.R':4.0,'finger3-1.R':8.0,'finger4-1.R':13.0,'finger5-1.R':18.0}, r
+          assert r['digit_far_depth_degrees']=={'finger2-1.R':4.0,'finger3-1.R':-8.0,'finger4-1.R':-13.0,'finger5-1.R':-18.0}, r
           d=r['far_depth_delta_meters']
           vals=[d[str(i)] for i in range(2,6)]
           assert all(v > 0.00025 for v in vals), r
