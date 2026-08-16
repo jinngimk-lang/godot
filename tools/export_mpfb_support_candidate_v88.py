@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Export the single visually-authored v90 support-hand candidate for Godot product-camera staging.
+"""Export the single visually-authored v91 support-hand candidate for Godot product-camera staging.
 
-Run this against the exact v87 authoring .blend. The semantic grip deltas plus the whole-limb
-camera-plane roll below are one deliberate native-rig artist edit, not a candidate sweep.
-The v90 change is deliberately limited to whole-hand enclosure grammar: preserve the proven
-side-on approach/crop/scale/root contract while increasing common closure and progressive
-index->pinky wrap. The result is a cropped, baked static limb centered on the proxy-vessel
-grip point so Godot can stage it against the real amber/clear bottle without changing
-production hand logic.
+Run this against the exact v87 authoring .blend. The semantic grip deltas, one deliberate
+native-rig wrist spatial rotation, and the proven whole-limb camera-plane roll are a single
+artist edit, not a candidate sweep. v91 changes abstraction rather than grip magnitude:
+it preserves the v90 semantic closure, proven side-on approach/crop/scale/root contract,
+and turns the palm/finger assembly in depth so the fingers can move toward the bottle's far
+silhouette while the thumb remains opposing. The result is a cropped, baked static limb
+centered on the proxy-vessel grip point so Godot can stage it against the real amber/clear
+bottle without changing production hand logic.
 """
 from __future__ import annotations
 
@@ -26,15 +27,14 @@ HUMAN = "MPFB_V84_ReferenceHuman"
 VESSEL = "LOCKED_VesselProxy"
 CAMERA = "LOCKED_V84_Camera"
 WHOLE_LIMB_ARTIST_ROLL_DEG = -40.0
+WHOLE_HAND_SPATIAL_YAW_DEG = 16.0
 PALM_ENVELOPE_RADIUS = 0.058
 WRIST_FOREARM_ENVELOPE_RADIUS = 0.046
 FINGER_ENVELOPE_RADIUS = 0.018
 
-# Exactly one reference-derived enclosure correction. v89 already passed side-on approach
-# and wrist-continuity gates but read as an open C-shape. Keep wrist/choreography fixed,
-# increase common enclosure moderately, keep index light, and deepen middle->ring->pinky
-# progressively in the same qualitative order observed in the real water-bottle grasp
-# reference. These are semantic helper controls, not direct phalanx/endpoint optimization.
+# Preserve the exact v90 semantic enclosure values. v91 does not continue the rejected
+# scalar-grip search; it adds one whole-hand spatial wrist turn after these known controls
+# so palm and finger depth can change together in the locked product-camera relationship.
 POSE_DELTAS_DEG = {
     "wrist.R": {"rx": 10.0},
     "right_master_grip": {"rx": 18.0},
@@ -79,6 +79,18 @@ def _apply_single_artist_edit(arm) -> None:
         e = pb.rotation_euler.copy()
         e.x += math.radians(float(payload.get("rx", 0.0)))
         pb.rotation_euler = e
+
+    # One evidence-derived spatial authoring move, not a magnitude sweep. The v88 control
+    # response atlas showed wrist Y rotation changes palm/finger depth with much less local
+    # finger-shape distortion than adding still more grip. Turn the complete native-rig hand
+    # assembly once while retaining the exact semantic closure values above.
+    wrist = arm.pose.bones.get("wrist.R")
+    if wrist is None:
+        raise RuntimeError("missing wrist.R for v91 spatial authoring")
+    wrist.rotation_mode = "XYZ"
+    e = wrist.rotation_euler.copy()
+    e.y += math.radians(WHOLE_HAND_SPATIAL_YAW_DEG)
+    wrist.rotation_euler = e
     bpy.context.view_layer.update()
 
 
@@ -126,7 +138,8 @@ def _apply_whole_limb_artist_roll(obj, vessel_center: Vector, camera) -> Vector:
     """Rotate the already-authored continuous limb in the camera plane around the vessel.
 
     Product-camera evidence proved the -40 degree side-on approach. Preserve that complete
-    baked hand/wrist/forearm choreography while v90 changes only semantic enclosure controls.
+    baked hand/wrist/forearm choreography while v91 changes only the native-rig spatial palm
+    turn layered before baking.
     """
     view_axis = camera.matrix_world.translation - vessel_center
     if view_axis.length_squared < 1e-12:
@@ -189,7 +202,9 @@ def main() -> None:
         "optimizer_used": False,
         "automatic_retarget_used": False,
         "pose_deltas_degrees": POSE_DELTAS_DEG,
-        "enclosure_edit_reason": "single R1b reference-derived correction: preserve v89 side-on approach and continuous wrist while increasing common closure and progressive index-to-pinky far-side wrap",
+        "whole_hand_spatial_yaw_degrees": WHOLE_HAND_SPATIAL_YAW_DEG,
+        "enclosure_edit_reason": "single R1 reference-derived abstraction change: preserve v90 semantic closure and proven v89 side-on/crop/scale contract while turning the native-rig palm/finger assembly in depth toward far-side enclosure",
+        "whole_hand_spatial_reason": "existing v88 response atlas showed wrist local-Y rotation changes whole-palm depth without relying on further scalar-grip escalation; one fixed +16 degree edit only",
         "whole_limb_artist_roll_degrees": WHOLE_LIMB_ARTIST_ROLL_DEG,
         "whole_limb_roll_axis_blender": list(view_axis),
         "whole_limb_roll_reason": "preserved PASS from product-camera Macro evidence: reference-compatible side-on vessel approach",
