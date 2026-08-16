@@ -48,8 +48,8 @@ func run() -> Array[String]:
 	hand.set_grip_target(Vector3(1.0, 0.5, 0.8))
 	hand.tick(0.1)
 	var active_pose := String(hand.get("_last_authored_pose"))
-	if active_pose != "Pinch Tight":
-		failures.append("active authored hand must close to Pinch Tight, got %s" % active_pose)
+	if active_pose != "Pinch Flat":
+		failures.append("active authored hand must use the flat-paper Pinch Flat pose, got %s" % active_pose)
 	hand.free()
 
 	var support = hand_script.new()
