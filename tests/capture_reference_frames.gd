@@ -1,6 +1,7 @@
 extends SceneTree
 
 const OUTPUT_DIR := "res://artifacts/reference_frames"
+const THUMB_SIZE := Vector2i(48,27)
 
 func _init() -> void:
 	call_deferred("_run")
@@ -70,24 +71,14 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
 	var front := label.get_front_position(progress)
-	# Exaggerate the staging pull enough to make the lifted flap and adhesive
-	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
-	# Capture owns this deterministic staged interaction until the frame is written.
-	# The real PeelController remains idle in this test path, so leaving choreography
-	# processing enabled would incorrectly restore the idle/rest hand over the next
-	# settle frames and publish a misleading partial-peel frame.
 	if choreography != null:
 		choreography.set_process(false)
 		var venue_id := "cafe_window"
 		if venue != null:
 			venue_id = venue.get_active_profile_id()
 		hand.rotation = choreography.call("_active_peel_rotation",venue_id,progress)
-	# Reference capture must display the active authored pinch without advancing the dynamic
-	# hand's root-follow simulation. The old tick(0.0) never advanced smoothed pinch state;
-	# a nonzero tick would also move the hand root toward its previous target. Snap only the
-	# test-owned pinch state, then apply/refresh pose anchors before exact flap alignment.
 	hand.set_pinch_amount(1.0)
 	hand.set("_pinch_amount",1.0)
 	hand.call("_apply_pose")
@@ -95,10 +86,6 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	var current_pinch := hand.get_pinch_world_position()
 	hand.position += grip_world-current_pinch
 	hand.set_grip_target(grip_world)
-	# Deterministic evidence gate: the capture-only staging must prove both claims that a
-	# nonzero tick was previously being used to approximate: active Pinch Tight state and exact
-	# world-space grip alignment. If either contract breaks, fail the reference capture rather
-	# than silently publishing a misleading frame.
 	var active_pose := String(hand.get("_last_authored_pose"))
 	if active_pose != "Pinch Tight":
 		push_error("CAPTURE_RED: staged peel did not activate Pinch Tight (got %s)" % active_pose)
@@ -150,7 +137,21 @@ func _capture(name: String) -> bool:
 		quit(1)
 		return false
 	print("CAPTURE: %s" % path)
+	if name.contains("peel"):
+		_emit_thumb_rgbhex(name,image)
 	return true
+
+func _emit_thumb_rgbhex(name: String, image: Image) -> void:
+	var thumb := image.duplicate()
+	thumb.resize(THUMB_SIZE.x,THUMB_SIZE.y,Image.INTERPOLATE_BILINEAR)
+	var rgb := PackedStringArray()
+	rgb.resize(THUMB_SIZE.x*THUMB_SIZE.y)
+	var i := 0
+	for y in range(THUMB_SIZE.y):
+		for x in range(THUMB_SIZE.x):
+			rgb[i] = thumb.get_pixel(x,y).to_html(false)
+			i += 1
+	print("THUMB_RGBHEX:%s:%dx%d:%s" % [name,THUMB_SIZE.x,THUMB_SIZE.y,"".join(rgb)])
 
 func _settle_frames(count: int) -> void:
 	for _i: int in range(count):
