@@ -63,7 +63,11 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          bash tools/build_local_challenger_packet.sh origin/main HEAD /tmp/review-packet.txt
+          # The verifier implementation belongs to current main, while product
+          # contracts/diff belong to the exact candidate. This keeps old PR
+          # heads reviewable after verifier infrastructure evolves.
+          git show origin/main:tools/build_local_challenger_packet.sh > /tmp/build-local-challenger-packet.sh
+          bash /tmp/build-local-challenger-packet.sh origin/main HEAD /tmp/review-packet.txt
 
       - name: Install local Ollama runtime
         shell: bash
