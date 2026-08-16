@@ -1,9 +1,9 @@
-name: ContactPose Water Bottle Reference v79
+name: ContactPose Water Bottle Reference v80
 
 on:
   push:
     branches:
-      - spike/contactpose-water-bottle-reference-v79
+      - spike/contactpose-water-bottle-reference-v80
     paths:
       - '.github/workflows/contactpose-water-bottle-reference-v79.yml'
       - 'tools/contactpose_water_bottle_reference_v79.py'
@@ -60,13 +60,13 @@ jobs:
         run: |
           python tools/contactpose_water_bottle_reference_v79.py \
             --root /tmp/contactpose-explorer \
-            --out /tmp/contactpose-v79
+            --out /tmp/contactpose-v80
 
       - name: Upload anatomical reference evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: contactpose-water-bottle-reference-v79
-          path: /tmp/contactpose-v79
+          name: contactpose-water-bottle-reference-v80
+          path: /tmp/contactpose-v80
           if-no-files-found: warn
           retention-days: 30
