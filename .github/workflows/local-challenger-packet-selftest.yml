@@ -62,7 +62,7 @@ jobs:
           ollama list >/dev/null
           ollama pull qwen2.5-coder:3b
 
-      - name: Independent verifier-infra review
+      - name: Independent verifier-infra analysis
         shell: bash
         run: |
           set -euo pipefail
@@ -75,9 +75,42 @@ jobs:
           3. the HUD route contains the changed implementation, deterministic test, gameplay HUD source, and smoke contracts;
           4. packet size still fails closed at 42000 bytes;
           5. no product/gameplay behavior is changed by this infrastructure patch.
-          Return exactly one final line: VERDICT: VERIFIED or VERDICT: NEEDS_FIX. Before it, state one concrete counterexample you checked.
+
+          Check at least one concrete counterexample, such as building a packet for a head different from the current checkout or a non-HUD changed-path set. Produce concise adversarial prose. If there is a concrete defect, describe exactly how to reproduce it. If the claims survive your attacks, say why. Do not rely on a specific final-line format; a separate normalization step will classify your analysis.
           PROMPT
             git diff --unified=35 origin/main...HEAD -- tools/build_local_challenger_packet.sh .github/workflows/agent-challenger-local.yml .github/workflows/local-challenger-packet-selftest.yml
           } > /tmp/infra-review-prompt.txt
-          ollama run qwen2.5-coder:3b < /tmp/infra-review-prompt.txt | tee /tmp/infra-review.txt
-          grep -Fxq 'VERDICT: VERIFIED' /tmp/infra-review.txt
+          ollama run qwen2.5-coder:3b < /tmp/infra-review-prompt.txt | tee /tmp/infra-analysis.txt
+          test -s /tmp/infra-analysis.txt
+
+      - name: Normalize independent verifier verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg analysis "$(head -c 12000 /tmp/infra-analysis.txt)" \
+            --arg diff "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
+            '{
+              model:"qwen2.5-coder:3b",
+              stream:false,
+              prompt:("Normalize this independent verifier-infrastructure review. Do not invent defects unsupported by the analysis. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX. If it explicitly concludes the tested infrastructure claims survive its counterexamples, verdict may be VERIFIED. Diff context:\n" + $diff + "\nAnalysis:\n" + $analysis),
+              format:{
+                type:"object",
+                properties:{
+                  verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
+                  defect:{type:"string"},
+                  evidence:{type:"string"}
+                },
+                required:["verdict","defect","evidence"],
+                additionalProperties:false
+              }
+            }' > /tmp/infra-normalize-request.json
+
+          curl -fsS http://127.0.0.1:11434/api/generate \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/infra-normalize-request.json > /tmp/infra-normalize-response.json
+
+          response="$(jq -er '.response' /tmp/infra-normalize-response.json)"
+          printf '%s' "$response" | jq -e . > /tmp/infra-verdict.json
+          cat /tmp/infra-verdict.json
+          jq -e '.verdict == "VERIFIED"' /tmp/infra-verdict.json >/dev/null
