@@ -28,7 +28,11 @@ func _run() -> void:
 	candidate.name = "V88SupportCandidate"
 	scene.add_child(candidate)
 	candidate.visible = false
-	candidate.position = Vector3(0.0,0.24,0.0)
+	# The exported candidate report defines the GLB root as the proxy vessel
+	# center. Align that root directly with the real product origin. The previous
+	# +0.24 m Y staging offset was not part of the authored pose and pushed the
+	# palm above the bottle, contaminating the first product-camera verdict.
+	candidate.position = Vector3.ZERO
 	candidate.rotation_degrees = Vector3(0.0,BASE_YAW_DEG,0.0)
 
 	# Same exact product camera: baseline first, then only swap support-hand presentation.
