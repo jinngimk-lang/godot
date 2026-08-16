@@ -1,0 +1,35 @@
+name: MPFB Local Blender Tool v88
+
+on:
+  push:
+    branches:
+      - spike/mpfb-grip-web-viewport-v88
+    paths:
+      - '.github/workflows/mpfb-local-blender-tool-v88.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage-blender:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify pinned Blender 4.2.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/blender-tool-v88
+          curl -L --fail --retry 3 -o artifacts/blender-tool-v88/blender-4.2.0-linux-x64.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  artifacts/blender-tool-v88/blender-4.2.0-linux-x64.tar.xz' | sha256sum -c -
+          printf '%s\n' 'Pinned staging tool only. Official Blender 4.2.0 archive, SHA-256 verified. Not a production dependency.' > artifacts/blender-tool-v88/README.txt
+      - name: Upload pinned Blender tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-4.2.0-local-tool-v88
+          path: artifacts/blender-tool-v88/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
