@@ -1,0 +1,110 @@
+name: MPFB Artist Blend Ingest Gate
+
+on:
+  push:
+    branches:
+      - spike/mpfb-artist-ingest-gate-v1
+    paths:
+      - 'tools/ingest_mpfb_artist_blend.py'
+      - '.github/workflows/mpfb-artist-ingest-gate.yml'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Workflow run containing a visually edited v77-derived .blend artifact'
+        required: true
+        default: '31915509197'
+      artifact_name:
+        description: 'Artifact containing the edited .blend'
+        required: true
+        default: 'mpfb-artist-direct-v78'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      HOME: ${{ github.workspace }}/.preview-home
+      SOURCE_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id || '31915509197' }}
+      SOURCE_ARTIFACT: ${{ github.event_name == 'workflow_dispatch' && inputs.artifact_name || 'mpfb-artist-direct-v78' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artist-edited Blender artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT }}
+          path: incoming
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Assert exactly one artist candidate blend
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t blends < <(find incoming -type f -name 'peel-calm-support-grasp-v78.blend' -print)
+          if [ "${#blends[@]}" -ne 1 ]; then
+            echo "Expected exactly one v78 artist blend, found ${#blends[@]}" >&2
+            find incoming -type f -name '*.blend' -print >&2 || true
+            exit 1
+          fi
+          printf '%s\n' "${blends[0]}" > /tmp/artist-blend-path
+          echo "Artist candidate: ${blends[0]}"
+
+      - name: Install pinned Blender runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_artist_ingest/{frames,reports,pose,logs}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+
+      - name: Ingest without changing pose
+        shell: bash
+        run: |
+          set -euo pipefail
+          blend="$(cat /tmp/artist-blend-path)"
+          .preview-tools/blender/blender "$blend" --background --python tools/ingest_mpfb_artist_blend.py -- \
+            docs/superpowers/evidence/mpfb-v77/support-wrap-v77-authoring-seed-pose.json \
+            artifacts/mpfb_artist_ingest/frames \
+            artifacts/mpfb_artist_ingest/pose/support-wrap-artist-canonical-pose.json \
+            artifacts/mpfb_artist_ingest/reports/artist-ingest-report.json \
+            2>&1 | tee artifacts/mpfb_artist_ingest/logs/ingest.log
+          grep -Fq 'MPFB_ARTIST_BLEND_INGEST_SUCCESS' artifacts/mpfb_artist_ingest/logs/ingest.log
+
+      - name: Enforce handoff contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('artifacts/mpfb_artist_ingest/reports/artist-ingest-report.json')
+          d = json.loads(p.read_text())
+          assert d['reference_set'] == ['bar_v1', 'market_v1']
+          assert d['native_gameengine_rig'] is True
+          assert d['pose_generator_used'] is False
+          assert d['parameter_sweep_used'] is False
+          assert d['frozen_matrix_max_abs_delta_vs_v77_seed'] <= 1e-5
+          assert d['edited_bone_count_vs_v77_seed'] > 0
+          assert d['visual_verdict'].startswith('UNSET')
+          for name in d['evidence']:
+              assert (Path('artifacts/mpfb_artist_ingest/frames') / name).is_file(), name
+          print('ARTIST_INGEST_HANDOFF_CONTRACT_PASS')
+          PY
+
+      - name: Upload technical and visual handoff evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-artist-ingest-gate
+          path: artifacts/mpfb_artist_ingest/
+          if-no-files-found: error
+          retention-days: 14
