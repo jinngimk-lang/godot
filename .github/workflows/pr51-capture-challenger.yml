@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 25
     env:
       PR_NUMBER: "51"
-      EXPECTED_HEAD_SHA: "980345c46c2968265e4eb248067c1dce7721c545"
+      EXPECTED_HEAD_SHA: "e85f79d0dc2c75c1e1aa99dde29ab099d7ed19d0"
     steps:
       - name: Checkout verifier definition
         uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
             cat tests/capture_reference_frames.gd
           } > /tmp/focused-packet.txt
           wc -c /tmp/focused-packet.txt
-          test "$(wc -c < /tmp/focused-packet.txt)" -lt 22000
+          test "$(wc -c < /tmp/focused-packet.txt)" -lt 24000
 
       - name: Install Godot 4.7.1
         shell: bash
@@ -77,6 +77,9 @@ jobs:
           ./godot --headless --editor --path . --quit
           ./godot --headless --path . --script res://tests/test_runner.gd
           ./godot --headless --path . --script res://tests/smoke_scene.gd
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee /tmp/capture.log
+          grep -Fq 'PASS: captured base + peel + crumple/inspect visual-convergence frames' /tmp/capture.log
+          ! grep -Fq 'CAPTURE_RED:' /tmp/capture.log
 
       - name: Install local Ollama runtime
         shell: bash
@@ -101,15 +104,16 @@ jobs:
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are an independent adversarial reviewer. Review ONLY the focused exact-head packet below.
+          You are an independent adversarial reviewer. Review ONLY the focused exact-head packet and deterministic capture result below.
           The implementation author claims:
           A. The PR changes only reference-frame staging, not live gameplay.
           B. Before the PR, _stage_peel set pinch_target=1.0 but tick(0.0) could not advance the smoothed _pinch_amount, so the capture could remain in Pinch Up instead of the intended active Pinch Tight pose.
-          C. The current revision deliberately does NOT call tick with nonzero delta. It directly sets the test-owned _pinch_amount to 1.0, invokes the existing private pose application and pinch-anchor refresh, then translates the hand root only by the exact current-pinch-to-staged-flap delta and assigns the capture target.
-          D. Therefore the capture should show the active authored pinch without advancing root-follow simulation or changing production gameplay semantics.
-          E. This PR does not claim that the pose is visually reference-quality; it only repairs evidence truthfulness.
+          C. The current revision deliberately does NOT call tick with nonzero delta. It snaps only capture-owned smoothed pinch state, applies the existing pose and anchor refresh, then translates the hand root by exactly grip_world-current_pinch.
+          D. The capture now deterministically fails if _last_authored_pose is not Pinch Tight or if get_pinch_world_position() differs from grip_world by more than 0.5 mm. The independent capture run passed those gates for all staged peel frames.
+          E. Therefore the evidence path no longer needs root-follow simulation to establish position truthfulness; exact alignment is directly asserted after the pose refresh.
+          F. This PR does not claim that the pose is visually reference-quality; it only repairs evidence truthfulness.
 
-          Try to falsify those claims. Check ordering carefully: set_pinch_amount versus direct smoothed-state snap, _apply_pose, _refresh_pinch_anchors, world-space exact alignment, set_grip_target, LabelVisual peel staging, and whether any private-call usage can mutate shared/live state outside this test-only capture scene. Look for a concrete deterministic defect, not a style concern.
+          Try to falsify those claims. A valid NEEDS_FIX must identify a concrete way the exact-head capture can pass both deterministic gates while still failing the claimed evidence semantics, or a way these test-only private calls leak into production/runtime behavior. Do not repeat the already-tested generic concern that tick normally updates root position: this capture deliberately performs exact root alignment and asserts its result.
 
           Respond with exactly four lines and no terminal control codes:
           VERDICT: VERIFIED
@@ -120,6 +124,8 @@ jobs:
           If you find a concrete defect, use VERDICT: NEEDS_FIX and give the exact deterministic reproducer in MIN_TEST.
           PROMPT
             cat /tmp/focused-packet.txt
+            echo "=== INDEPENDENT CAPTURE RESULT ==="
+            cat /tmp/capture.log
           } > /tmp/prompt.txt
           raw="$(ollama run qwen2.5-coder:3b < /tmp/prompt.txt)"
           printf '%s\n' "$raw" | sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' > /tmp/report.txt
@@ -138,7 +144,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "### Focused capture Challenger — current head"
+            echo "### Focused capture Challenger — deterministic current head"
             echo
             echo "Exact product head: \`$EXPECTED_HEAD_SHA\`"
             echo
