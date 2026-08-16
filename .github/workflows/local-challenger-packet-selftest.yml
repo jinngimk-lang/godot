@@ -1,0 +1,116 @@
+name: Local Challenger Packet Self-Test
+
+on:
+  push:
+    paths:
+      - tools/build_local_challenger_packet.sh
+      - .github/workflows/agent-challenger-local.yml
+      - .github/workflows/local-challenger-packet-selftest.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-packet-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Static shell guard
+        shell: bash
+        run: bash -n tools/build_local_challenger_packet.sh
+
+      - name: Reproduce HUD packet under safety budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          git fetch origin fix/hud-macro-density-v56:refs/remotes/origin/fix/hud-macro-density-v56
+          TASK_ID_VALUE=56 \
+          PR_NUMBER_VALUE=60 \
+          EXPECTED_HEAD_VALUE=c4f9da27b05c8929eade0fab8d61993ed7e4cdcf \
+          ROUND_VALUE=1 \
+            bash tools/build_local_challenger_packet.sh \
+              origin/main \
+              refs/remotes/origin/fix/hud-macro-density-v56 \
+              /tmp/hud-review-packet.txt
+          grep -Fq '=== HUD PRESENTATION CONTRACT ===' /tmp/hud-review-packet.txt
+          grep -Fq '=== HUD DETERMINISTIC CONTRACT ===' /tmp/hud-review-packet.txt
+          grep -Fq '=== GAMEPLAY HUD SOURCE ===' /tmp/hud-review-packet.txt
+          if grep -Fq '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ===' /tmp/hud-review-packet.txt; then
+            echo 'HUD packet unexpectedly included hand-only contract bundle' >&2
+            exit 1
+          fi
+          bytes="$(wc -c < /tmp/hud-review-packet.txt)"
+          echo "hud packet bytes=$bytes"
+          test "$bytes" -lt 42000
+
+      - name: Install local reviewer
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
+          for _ in {1..40}; do
+            if ollama list >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          ollama list >/dev/null
+          ollama pull qwen2.5-coder:3b
+
+      - name: Independent verifier-infra analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          {
+            cat <<'PROMPT'
+          You are an independent CI verifier reviewer. Review ONLY the verifier-infrastructure diff below. Try to falsify these claims:
+          1. exact PR-head validation is still enforced by the caller workflow;
+          2. packet construction is path-adaptive rather than globally hand-specific;
+          3. the HUD route contains the changed implementation, deterministic test, gameplay HUD source, and smoke contracts;
+          4. packet size still fails closed at 42000 bytes;
+          5. no product/gameplay behavior is changed by this infrastructure patch.
+
+          Check at least one concrete counterexample, such as building a packet for a head different from the current checkout or a non-HUD changed-path set. Produce concise adversarial prose. If there is a concrete defect, describe exactly how to reproduce it. If the claims survive your attacks, say why. Do not rely on a specific final-line format; a separate normalization step will classify your analysis.
+          PROMPT
+            git diff --unified=35 origin/main...HEAD -- tools/build_local_challenger_packet.sh .github/workflows/agent-challenger-local.yml .github/workflows/local-challenger-packet-selftest.yml
+          } > /tmp/infra-review-prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/infra-review-prompt.txt | tee /tmp/infra-analysis.txt
+          test -s /tmp/infra-analysis.txt
+
+      - name: Normalize independent verifier verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg analysis "$(head -c 12000 /tmp/infra-analysis.txt)" \
+            --arg diff "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
+            '{
+              model:"qwen2.5-coder:3b",
+              stream:false,
+              prompt:("Normalize this independent verifier-infrastructure review. Do not invent defects unsupported by the analysis. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX. If it explicitly concludes the tested infrastructure claims survive its counterexamples, verdict may be VERIFIED. Diff context:\n" + $diff + "\nAnalysis:\n" + $analysis),
+              format:{
+                type:"object",
+                properties:{
+                  verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
+                  defect:{type:"string"},
+                  evidence:{type:"string"}
+                },
+                required:["verdict","defect","evidence"],
+                additionalProperties:false
+              }
+            }' > /tmp/infra-normalize-request.json
+
+          curl -fsS http://127.0.0.1:11434/api/generate \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/infra-normalize-request.json > /tmp/infra-normalize-response.json
+
+          response="$(jq -er '.response' /tmp/infra-normalize-response.json)"
+          printf '%s' "$response" | jq -e . > /tmp/infra-verdict.json
+          cat /tmp/infra-verdict.json
+          jq -e '.verdict == "VERIFIED"' /tmp/infra-verdict.json >/dev/null
