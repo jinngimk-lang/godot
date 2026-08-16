@@ -1,0 +1,87 @@
+name: MPFB Grip Helper Authoring v84
+
+on:
+  push:
+    branches:
+      - spike/mpfb-grip-helper-authoring-v84
+    paths:
+      - 'tools/build_mpfb_grip_helper_authoring_v84.py'
+      - 'tools/verify_mpfb_grip_helper_authoring_v84.py'
+      - '.github/workflows/mpfb-grip-helper-authoring-v84.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  authoring-scene:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-grip-helper-authoring-v84
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v84/{scene,reports,logs}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build native semantic-grip authoring scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_grip_helper_authoring_v84.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            artifacts/mpfb_v84/scene/peel-calm-grip-helper-v84.blend \
+            artifacts/mpfb_v84/reports/build.json \
+            2>&1 | tee artifacts/mpfb_v84/logs/build.log
+          grep -Fq 'MPFB_GRIP_HELPER_AUTHORING_V84_SUCCESS' artifacts/mpfb_v84/logs/build.log
+          test -s artifacts/mpfb_v84/scene/peel-calm-grip-helper-v84.blend
+
+      - name: Reopen and verify embedded anti-drift contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background artifacts/mpfb_v84/scene/peel-calm-grip-helper-v84.blend \
+            --python tools/verify_mpfb_grip_helper_authoring_v84.py -- \
+            artifacts/mpfb_v84/reports/reopen.json \
+            2>&1 | tee artifacts/mpfb_v84/logs/reopen.log
+          grep -Fq 'MPFB_GRIP_HELPER_AUTHORING_V84_REOPEN_PASS' artifacts/mpfb_v84/logs/reopen.log
+          python - <<'PY'
+          import json
+          b=json.load(open('artifacts/mpfb_v84/reports/build.json'))
+          r=json.load(open('artifacts/mpfb_v84/reports/reopen.json'))
+          assert b['candidate_count'] == 1 and b['parameter_sweep_used'] is False, b
+          assert b['visual_verdict'] == 'PENDING_DIRECT_ARTIST_EDIT', b
+          assert b['production_candidate'] is False, b
+          assert b['locked_acceptance_references'] == ['bar_v1','market_v1'], b
+          assert r['reopen_verified'] is True and r['production_candidate'] is False, r
+          assert r['visual_verdict'] == 'PENDING_DIRECT_ARTIST_EDIT', r
+          print('MPFB_GRIP_HELPER_AUTHORING_V84_BOUNDARY_PASS')
+          PY
+
+      - name: Upload editable authoring scene
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-grip-helper-authoring-v84
+          path: artifacts/mpfb_v84/
+          if-no-files-found: error
+          retention-days: 14
