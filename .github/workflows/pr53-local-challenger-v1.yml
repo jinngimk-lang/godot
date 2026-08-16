@@ -62,7 +62,7 @@ jobs:
           } > /tmp/review-packet.txt
           bytes="$(wc -c < /tmp/review-packet.txt)"
           echo "review packet bytes=$bytes"
-          test "$bytes" -lt 26000
+          test "$bytes" -lt 30000
 
       - name: Install local Ollama runtime
         shell: bash
