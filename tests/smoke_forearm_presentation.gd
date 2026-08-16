@@ -4,6 +4,7 @@ const MIN_FOREARM_LENGTH := 3.20
 const MAX_FOREARM_LENGTH := 6.80
 const MAX_FOREARM_RADIUS := 0.21
 const MIN_AUTHORED_HAND_SCALE := 4.00
+const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 
 func _init() -> void:
 	call_deferred("_run")
@@ -28,6 +29,15 @@ func _run() -> void:
 		var radius := float(presentation.call("_radius_profile",sample))
 		if radius <= 0.0 or radius > MAX_FOREARM_RADIUS:
 			_fail("forearm radius out of anatomical bound at %.2f: %.3f" % [sample,radius],scene)
+			return
+
+	if not presentation.has_method("_path_tangent_deflection_degrees"):
+		_fail("forearm path must expose an anatomical tangent-deflection contract",scene)
+		return
+	for outward_sign in [-1.0,1.0]:
+		var deflection := float(presentation.call("_path_tangent_deflection_degrees",outward_sign))
+		if deflection < MIN_FOREARM_TANGENT_DEFLECTION_DEGREES:
+			_fail("forearm path stays too beam-like; tangent deflection %.2f° < %.2f°" % [deflection,MIN_FOREARM_TANGENT_DEFLECTION_DEGREES],scene)
 			return
 
 	for hand_name in ["RightHand","LeftHand"]:
@@ -96,7 +106,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, forearms and single-owner grip choreography stay coherent")
+	print("PASS: reference-scale hands, curved forearms and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
