@@ -38,8 +38,8 @@ func _process(_delta: float) -> void:
 	layer.add_child(panel)
 	layer.move_child(panel,0)
 	label.position = Vector2(28,20)
-	label.size = Vector2(760,58)
-	label.add_theme_font_size_override("font_size",13)
+	label.size = Vector2(520,58)
+	label.add_theme_font_size_override("font_size",12)
 	label.add_theme_color_override("font_color",Color(0.97,0.96,0.93,0.90))
 	label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.58))
 	label.add_theme_constant_override("shadow_offset_x",1)
@@ -57,7 +57,7 @@ func _compact_hud_text(source: String) -> String:
 	var first := String(lines[0]).strip_edges()
 	if first.contains("PAUSED"):
 		var venue := first.get_slice("•",0).strip_edges()
-		return "%s  •  PAUSED\nEsc resume  •  Q/E scene" % venue
+		return "%s  •  PAUSED\nEsc Resume  •  R Reset" % venue
 
 	# Already-compacted copy is intentionally idempotent across process frames.
 	if lines.size() <= 2 and not normalized.contains("Quality") and not normalized.contains("residue"):
@@ -72,11 +72,28 @@ func _compact_hud_text(source: String) -> String:
 
 	var hint := ""
 	if lines.size() >= 3:
-		hint = String(lines[2]).strip_edges()
+		hint = _short_hint(String(lines[2]).strip_edges())
 	if hint.is_empty():
 		hint = "slow pull feels cleaner"
 
 	var header := venue_name
 	if not progress_text.is_empty():
 		header += "  •  %s" % progress_text
-	return "%s\n%s  •  Mouse / touch peel  •  RMB inspect" % [header,hint]
+	header += "  •  %s" % hint
+	return "%s\nMouse / touch peel  •  RMB inspect  •  Esc Pause  •  R Reset" % header
+
+func _short_hint(hint: String) -> String:
+	var lower := hint.to_lower()
+	if lower.contains("last adhesive"):
+		return "last fibers releasing"
+	if lower.contains("label released"):
+		return "label released"
+	if lower.contains("steady pull"):
+		return "steady pull"
+	if lower.contains("re-grab"):
+		return "re-grab anywhere"
+	if lower.contains("optional squeeze"):
+		return "optional squeeze"
+	if lower.contains("inspect residue"):
+		return "inspect residue"
+	return hint
