@@ -5,6 +5,10 @@ This is authoring infrastructure, not a pose solver or production candidate. It 
 seven v84 semantic controls, locked vessel/camera, and PENDING visual verdict intact while
 overlaying the verified ContactPose water-bottle 21-joint annotation as cyan geometry.
 No ContactPose transform is copied into pose bones and no parameter sweep is performed.
+
+The locked opaque vessel remains the acceptance-context object. A separate non-selectable
+wire duplicate is used only for authoring diagnostics so far-side ghost joints remain visible
+without changing vessel geometry, camera, or the final opaque Macro evidence.
 """
 from __future__ import annotations
 
@@ -86,6 +90,19 @@ def _material():
     return mat
 
 
+def _wire_material():
+    mat = bpy.data.materials.new("AUTHORING_WIRE_VESSEL_V85")
+    mat.diffuse_color = (0.08, 0.32, 0.42, 1.0)
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    if bsdf:
+        bsdf.inputs["Base Color"].default_value = (0.08, 0.32, 0.42, 1.0)
+        bsdf.inputs["Emission Color"].default_value = (0.08, 0.32, 0.42, 1.0)
+        bsdf.inputs["Emission Strength"].default_value = 0.8
+        bsdf.inputs["Roughness"].default_value = 0.55
+    return mat
+
+
 def _sphere(p: Vector, radius: float, mat, name: str):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=radius, location=p)
     obj = bpy.context.object
@@ -109,6 +126,23 @@ def _segment(a: Vector, b: Vector, radius: float, mat, name: str):
     obj["contactpose_guide"] = True
     obj.hide_select = True
     return obj
+
+
+def _wire_vessel(vessel, palm_width: float):
+    wire = vessel.copy()
+    wire.data = vessel.data.copy()
+    wire.name = "AUTHORING_WireVesselGuide_V85"
+    bpy.context.scene.collection.objects.link(wire)
+    wire.hide_select = True
+    wire["authoring_guide_only"] = True
+    wire["source_locked_vessel"] = vessel.name
+    wire.data.materials.clear()
+    wire.data.materials.append(_wire_material())
+    mod = wire.modifiers.new("V85_Wireframe", "WIREFRAME")
+    mod.thickness = max(0.0005, palm_width * 0.009)
+    mod.use_replace = True
+    wire.hide_render = True
+    return wire
 
 
 def _map(arm, source):
@@ -182,6 +216,8 @@ def run():
         obj["source_dataset"] = "ContactPose public Explorer"
         obj["license_scope"] = "MIT annotation data only"
 
+    wire = _wire_vessel(vessel, palm_width)
+
     after = {name: [list(row) for row in arm.pose.bones[name].matrix_basis] for name in v84.CONTROLS}
     max_delta = max(abs(before[n][r][c]-after[n][r][c]) for n in before for r in range(4) for c in range(4))
     if max_delta > 1e-9:
@@ -199,6 +235,7 @@ def run():
     scene["production_candidate"] = False
     scene["contactpose_automatic_retarget"] = False
     scene["parameter_sweep_used"] = False
+    scene["authoring_wire_vessel"] = wire.name
 
     text = bpy.data.texts.get("PEEL_CALM_V85_AUTHORING_GUIDE") or bpy.data.texts.new("PEEL_CALM_V85_AUTHORING_GUIDE")
     text.clear()
@@ -207,15 +244,26 @@ def run():
         "Cyan = ContactPose water_bottle full6_use hand1 21-joint annotation, guide only.\n"
         "Editable: wrist.R, right_master_grip, right_finger1_grip..right_finger5_grip.\n"
         "Locked: bottle, camera, bar_v1/market_v1 acceptance intent.\n"
+        "AUTHORING_WireVesselGuide_V85 is a non-selectable diagnostic duplicate only; LOCKED_VesselProxy remains unchanged.\n"
         "Forbidden: automatic retarget, CCD, endpoint/contact optimizers, raw-phalanx tables, parameter sweeps.\n"
-        "Macro gate: at 192x108 the hand must immediately read as a stable human vessel wrap.\n"
+        "Macro gate: at 192x108 the opaque-vessel silhouette must immediately read as a stable human bottle grip.\n"
         "Meso gate: thumb opposition, web space, knuckle flow and progressive digit depth must remain human.\n"
     )
 
+    # Acceptance-context evidence: original opaque locked vessel, no geometry/camera modification.
     vessel.hide_render = False
+    wire.hide_render = True
     _render(out / "v85-ghost-with-vessel.png", 640, 640)
     _render(out / "v85-ghost-thumbnail.png", 192, 108)
+
+    # Authoring diagnostic: show the same locked vessel shape as wire so far-side ghost depth stays visible.
     vessel.hide_render = True
+    wire.hide_render = False
+    _render(out / "v85-ghost-wire-vessel.png", 640, 640)
+    _render(out / "v85-ghost-wire-thumbnail.png", 192, 108)
+
+    # Meso anatomy diagnostic without vessel occlusion.
+    wire.hide_render = True
     _render(out / "v85-ghost-anatomy.png", 640, 640)
     vessel.hide_render = False
 
@@ -244,8 +292,10 @@ def run():
         "pose_control_max_matrix_delta_from_v84": max_delta,
         "vessel_locked": True,
         "camera_locked": True,
+        "wire_vessel_guide_only": True,
+        "wire_vessel_source": vessel.name,
         "blend": str(blend),
-        "next_gate": "Directly visually author exactly one pose with the seven semantic controls; then render Macro/Meso and reject unless it reads as a natural human vessel wrap.",
+        "next_gate": "Directly visually author exactly one pose with the seven semantic controls; use wire-vessel view only as depth guidance, then judge final Macro on the unchanged opaque vessel and Meso on unobstructed anatomy.",
     }
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
