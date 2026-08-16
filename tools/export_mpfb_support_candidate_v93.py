@@ -5,6 +5,11 @@ Checkpoint 51 permits one last code-authored structural candidate before transfo
 must stop. v93 preserves the exact v92 hand, crop, scale and side-on approach, then swings
 only the four non-thumb proximal digit roots progressively into locked-camera far depth.
 Internal PIP/DIP closure is untouched. This is one fixed gesture, not a sweep/optimizer.
+
+The MPFB Default-rig helper constraints do not preserve a uniform local rotation sign across
+digits. The first full-chain run proved the final distal response sign directly: index used the
+positive convention, while middle/ring/pinky required the opposite convention. Those signs are
+now frozen here from that one calibration run; magnitudes are unchanged.
 """
 from __future__ import annotations
 
@@ -23,11 +28,14 @@ import export_mpfb_support_candidate_v88 as base
 import export_mpfb_support_candidate_v92 as v92
 
 SUCCESS = "MPFB_SUPPORT_CANDIDATE_V93_EXPORT_SUCCESS"
+# One fixed reference-derived gesture. Signs are rig-convention calibration, not a candidate
+# sweep: the previous exact full-chain execution showed digits 3/4/5 responding opposite to
+# digit 2 at their distal tips under the same nominal positive convention.
 DIGIT_FAR_DEPTH_DEGREES = {
     "finger2-1.R": 4.0,
-    "finger3-1.R": 8.0,
-    "finger4-1.R": 13.0,
-    "finger5-1.R": 18.0,
+    "finger3-1.R": -8.0,
+    "finger4-1.R": -13.0,
+    "finger5-1.R": -18.0,
 }
 DEPTH_EPSILON_METERS = 0.00025
 
@@ -48,12 +56,11 @@ def _depths(arm, vessel_center: Vector, far_dir: Vector) -> dict[str, float]:
 
 
 def _rotate_digit(arm, digit: int, far_dir_world: Vector, degrees: float) -> None:
-    """Swing one complete digit subtree toward far depth at its MCP root.
+    """Swing one complete digit subtree at its MCP root with the frozen calibrated sign.
 
-    A 1-degree response probe chooses only the sign of this fixed artist gesture. The probe
-    observes the complete distal chain rather than the proximal tail; this fixes the first
-    v93 attempt where MPFB child constraints made ring/pinky distal tips move opposite the
-    proximal-tail response. It is not endpoint targeting: no desired point/distance is used.
+    No target point, endpoint distance, iterative solve, contact servo, candidate search or
+    parameter grid is used. The signed degree is a fixed artist gesture calibrated once from
+    the final distal-chain response of the prior failed execution.
     """
     bone_name = f"finger{digit}-1.R"
     pb = arm.pose.bones.get(bone_name)
@@ -78,16 +85,6 @@ def _rotate_digit(arm, digit: int, far_dir_world: Vector, degrees: float) -> Non
 
     head_arm = pb.head.copy()
     original = pb.matrix.copy()
-    distal_before = _tip(arm, digit)
-    probe_rotation = Matrix.Translation(head_arm) @ Matrix.Rotation(math.radians(1.0), 4, axis_arm) @ Matrix.Translation(-head_arm)
-    pb.matrix = probe_rotation @ original
-    bpy.context.view_layer.update()
-    probe_gain = (_tip(arm, digit) - distal_before).dot(far_dir_world)
-    pb.matrix = original
-    bpy.context.view_layer.update()
-    if probe_gain < 0.0:
-        axis_arm.negate()
-
     rotation = Matrix.Translation(head_arm) @ Matrix.Rotation(math.radians(degrees), 4, axis_arm) @ Matrix.Translation(-head_arm)
     pb.matrix = rotation @ original
     bpy.context.view_layer.update()
@@ -149,7 +146,7 @@ def main() -> None:
         "automatic_retarget_used": False,
         "endpoint_target_used": False,
         "contact_servo_used": False,
-        "sign_calibration_uses_distal_chain_response_only": True,
+        "sign_calibration_source": "single prior exact full-chain distal response; no magnitude search",
         "relative_depth_reason": "one final reference-derived MCP-level whole-chain gesture: preserve v92 internal closure, then progressively move index, middle, ring and pinky into locked-camera far depth",
         "stop_condition": "If the same five Godot product-camera frames do not show a material 192x108 Macro enclosure improvement, reject v93 and stop code-authored transform guessing; resume only from a genuinely interactive/artist-authored native-rig pose source.",
         "next_gate": "Exact same Godot bar/market five-frame A/B. Visual Macro is authoritative; structural depth metrics are diagnostic only.",
