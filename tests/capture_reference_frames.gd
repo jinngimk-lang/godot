@@ -78,6 +78,20 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
+	# Capture must use the same physically reachable peel endpoint as gameplay.
+	# LabelGeometry clamps an overlong requested pull to the free paper chord;
+	# if the hand is staged at the unclamped request it visually pinches empty air.
+	var flap_points := label.get_sample_points(progress,grip_local)
+	if flap_points.is_empty():
+		push_error("CAPTURE_RED: staged peel produced no label points")
+		quit(1)
+		return
+	var rendered_flap_tip_world := label.to_global(flap_points[0])
+	var hand_to_flap_error := grip_world.distance_to(rendered_flap_tip_world)
+	if hand_to_flap_error > 0.0005:
+		push_error("CAPTURE_RED: staged hand target misses rendered flap tip by %.6f m" % hand_to_flap_error)
+		quit(1)
+		return
 	# This capture stages peel state directly rather than driving PeelController.
 	# Freeze both owners that can mutate the peel hand during settle frames: the
 	# scene's gameplay _process() (which ticks HandVisual from idle controller
