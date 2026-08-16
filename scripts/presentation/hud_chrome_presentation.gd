@@ -80,7 +80,7 @@ func _compact_hud_text(source: String) -> String:
 	if not progress_text.is_empty():
 		header += "  •  %s" % progress_text
 	header += "  •  %s" % hint
-	return "%s\nMouse / touch peel  •  RMB inspect  •  Esc Pause  •  R Reset" % header
+	return "%s\nMouse / touch peel  •  RMB inspect  •  Q/E scene  •  Esc Pause  •  R Reset" % header
 
 func _short_hint(hint: String) -> String:
 	var lower := hint.to_lower()
