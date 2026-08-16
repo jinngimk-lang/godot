@@ -65,27 +65,18 @@ jobs:
             echo "ROUND=${{ inputs.round }}"
             echo '=== CHANGE STAT ==='
             git diff --stat origin/main...HEAD
-            echo '=== PEEL MODEL ==='
-            cat scripts/peel/peel_model.gd
-            echo '=== PEEL CONTROLLER ==='
-            cat scripts/peel/peel_controller.gd
-            echo '=== SESSION PROFILES ==='
-            cat scripts/session/session_model.gd
-            echo '=== INSPECTION ==='
-            cat scripts/inspection/inspection_controller.gd
-            echo '=== PEEL LAB ORCHESTRATION (selected) ==='
-            awk '/^func _process\(/,/^func _process_crumple_pointer\(/' scripts/peel_lab.gd
-            awk '/^func _update_hud\(/,/^func _quality_grade\(/' scripts/peel_lab.gd
-            awk '/^func _handle_detached_label\(/,/^func _unhandled_key_input\(/' scripts/peel_lab.gd
-            awk '/^func _unhandled_key_input\(/,/^func _consume_next_request\(/' scripts/peel_lab.gd
-            awk '/^func _apply_current_variant\(/,/^func _reset_session\(/' scripts/peel_lab.gd
-            awk '/^func _update_inspection\(/,/^func _crumple_feedback_text\(/' scripts/peel_lab.gd
-            echo '=== REFERENCE CONTRACT TESTS ==='
-            cat tests/test_peel_model.gd
-            cat tests/test_peel_controller.gd
-            cat tests/test_reference_profiles.gd
-            cat tests/test_inspection_controller.gd
-            cat tests/smoke_reference_scene.gd
+            echo '=== EXACT PR DIFF ==='
+            git diff --unified=60 origin/main...HEAD
+            echo '=== CHANGED PATHS ==='
+            git diff --name-only origin/main...HEAD
+            echo '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ==='
+            cat scripts/presentation/hand_choreography_presentation.gd
+            cat scripts/hands/hand_visual.gd
+            echo '=== REFERENCE CAPTURE CONTRACT ==='
+            cat tests/capture_reference_frames.gd
+            echo '=== HAND REGRESSION CONTRACTS ==='
+            cat tests/test_hand_visual.gd
+            cat tests/test_authored_hand_asset.gd
           } > /tmp/review-packet.txt
           bytes="$(wc -c < /tmp/review-packet.txt)"
           echo "review packet bytes=$bytes"
@@ -116,27 +107,26 @@ jobs:
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are CHALLENGER, independent from the implementation author. Review the exact PR-head production code and tests below. Try to falsify the claims; do not praise or summarize.
+          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and try to falsify this batch; do not praise or summarize.
 
-          Claims to falsify:
-          A. Any visible projected label region can start a peel; the old gold point is not required.
-          B. A short force spike loads adhesive but cannot instantly detach it; sustained force releases progressively.
-          C. Faster/harder pulls reduce integrity and increase residue relative to gentle pulls.
-          D. RMB inspection changes only inspection yaw and cannot steal LMB/touch peel ownership.
-          E. Q/E and 1/2/3 scene navigation reset transient interaction safely while preserving earned progression.
-          F. Café uses paper cup + optional crumple; Bar amber bottle and Market clear bottle never enter crumple post-peel.
-          G. Residue presentation is derived from deterministic model state, not a second gameplay authority.
-          H. Scene switching does not leave stale label/local-world transforms that would move peel hit testing away from the visible label.
+          Required attacks:
+          A. Construct at least one concrete boundary/counterexample specific to the changed path.
+          B. Check whether a test/capture helper can silently publish misleading evidence while its immediate assertions pass.
+          C. Check presentation/gameplay authority: test-only staging must not become gameplay authority, and production presentation must not own progression.
+          D. Check reset/scene-switch/process-state cleanup when the touched code can pause, resume, replace, or stage nodes.
+          E. Check coordinate-space and pose/contact assertions for false positives when relevant.
+          F. Check that the tests actually exercise the claimed path and do not only assert internal implementation state.
+          G. Do not treat CI green as proof of subjective hand naturalness or reference-image similarity; those remain visual/experiential gates.
 
-          Pay special attention to race/state bugs, wrong coordinate spaces, input ownership, direct-navigation/progression interaction, stale transforms, reset after detach, and tests that accidentally pass without exercising the claimed path.
+          The deterministic Godot wrapper is a separate gate. Your job is adversarial code/test review of this exact diff.
 
           Respond EXACTLY with these four single-line fields and no markdown/headings:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: none
-          EVIDENCE: <concise reason the strongest falsification attempts did not break the claims>
+          EVIDENCE: <concise reason the strongest falsification attempt did not break this exact batch>
 
-          If you find a concrete defect, use VERDICT: NEEDS_FIX, name exact functions/state transition in DEFECT, and give one deterministic reproducer in MIN_TEST.
+          If you find a concrete defect, use VERDICT: NEEDS_FIX, name exact function/state transition in DEFECT, and give one deterministic reproducer in MIN_TEST.
 
           Exact-head packet follows:
           PROMPT
