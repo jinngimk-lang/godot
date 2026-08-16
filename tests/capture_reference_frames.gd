@@ -69,12 +69,33 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
+	# Reference capture must display the active authored pinch without advancing the dynamic
+	# hand's root-follow simulation. The old tick(0.0) never advanced smoothed pinch state;
+	# a nonzero tick would also move the hand root toward its previous target. Snap only the
+	# test-owned pinch state, then apply/refresh pose anchors before exact flap alignment.
 	hand.set_pinch_amount(1.0)
+	hand.set("_pinch_amount",1.0)
+	hand.call("_apply_pose")
+	hand.call("_refresh_pinch_anchors")
 	var current_pinch := hand.get_pinch_world_position()
 	hand.position += grip_world-current_pinch
 	hand.set_grip_target(grip_world)
-	hand.tick(0.0)
-	label.set_peel(progress,label.to_local(hand.get_pinch_world_position()))
+	# Deterministic evidence gate: the capture-only staging must prove both claims that a
+	# nonzero tick was previously being used to approximate: active Pinch Tight state and exact
+	# world-space grip alignment. If either contract breaks, fail the reference capture rather
+	# than silently publishing a misleading frame.
+	var active_pose := String(hand.get("_last_authored_pose"))
+	if active_pose != "Pinch Tight":
+		push_error("CAPTURE_RED: staged peel did not activate Pinch Tight (got %s)" % active_pose)
+		quit(1)
+		return
+	var aligned_pinch := hand.get_pinch_world_position()
+	var alignment_error := aligned_pinch.distance_to(grip_world)
+	if alignment_error > 0.0005:
+		push_error("CAPTURE_RED: staged pinch/root alignment error %.6f m" % alignment_error)
+		quit(1)
+		return
+	label.set_peel(progress,label.to_local(aligned_pinch))
 	residue.call("set_residue",progress,residue_amount,integrity)
 
 func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: float) -> void:
