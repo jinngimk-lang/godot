@@ -1,0 +1,103 @@
+name: MPFB ContactPose Retarget v80
+
+on:
+  push:
+    branches:
+      - spike/contactpose-direct-retarget-v80
+    paths:
+      - 'tools/author_mpfb_contactpose_retarget_v80.py'
+      - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
+      - '.github/workflows/mpfb-contactpose-retarget-v80.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  retarget:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v80/{reports,logs,frames,pose}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Author one exact ContactPose reference retarget
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/author_mpfb_contactpose_retarget_v80.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            art/reference_sources/contactpose-v79-full6-use-hand1.json \
+            artifacts/mpfb_v80/pose \
+            artifacts/mpfb_v80/reports/contactpose-retarget-v80.json \
+            2>&1 | tee artifacts/mpfb_v80/logs/retarget.log
+          grep -Fq 'MPFB_CONTACTPOSE_RETARGET_V80_SUCCESS' artifacts/mpfb_v80/logs/retarget.log
+          cp artifacts/mpfb_v80/pose/*.png artifacts/mpfb_v80/frames/
+
+      - name: Enforce no-search retarget contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          r=json.load(open('artifacts/mpfb_v80/reports/contactpose-retarget-v80.json'))
+          assert r['staging_only'] and not r['production_candidate']
+          assert r['native_gameengine_rig'] and r['direct_reference_retarget']
+          assert r['retarget_candidate_count'] == 1
+          assert r['parameter_sweep_used'] is False
+          assert r['ccd_used'] is False
+          assert r['endpoint_optimizer_used'] is False
+          assert r['contact_servo_used'] is False
+          assert r['post_retarget_pose_correction_used'] is False
+          assert r['source']['dataset'] == 'ContactPose public Explorer'
+          assert r['source']['object'] == 'water_bottle'
+          assert r['source']['session'] == 'full6_use'
+          assert r['source']['hand_index'] == 1
+          assert 'MIT' in r['source']['license_scope']
+          assert r['wrist_matrix_max_abs_delta_after_digit_clear'] <= 1e-7
+          assert r['wrist_matrix_max_abs_delta_after_retarget'] <= 1e-7
+          assert r['max_post_alignment_error_deg'] <= 0.05, r['max_post_alignment_error_deg']
+          assert len(r['alignment_rows']) == 15
+          expected={
+            'support-wrap-contactpose-v80-with-vessel.png',
+            'support-wrap-contactpose-v80-thumbnail.png',
+            'support-wrap-contactpose-v80-anatomy-oblique.png',
+            'support-wrap-contactpose-v80-anatomy-thumbnail.png',
+          }
+          got={p.name for p in pathlib.Path('artifacts/mpfb_v80/frames').glob('*.png')}
+          assert expected == got, (expected, got)
+          assert all((pathlib.Path('artifacts/mpfb_v80/frames')/n).stat().st_size > 1000 for n in expected)
+          poses=list(pathlib.Path('artifacts/mpfb_v80/pose').glob('*same-rig-pose.json'))
+          assert len(poses)==1 and poses[0].stat().st_size > 500
+          print('MPFB_CONTACTPOSE_RETARGET_V80_STRUCTURAL_PASS')
+          PY
+
+      - name: Upload direct-retarget evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-contactpose-retarget-v80
+          path: artifacts/mpfb_v80/
+          if-no-files-found: error
+          retention-days: 30
