@@ -1,0 +1,97 @@
+name: MPFB Artist Control Response v88
+
+on:
+  push:
+    branches:
+      - spike/mpfb-grip-web-viewport-v88
+    paths:
+      - 'tools/render_mpfb_artist_control_response_v88.py'
+      - 'tools/build_mpfb_grip_helper_authoring_panel_v87.py'
+      - 'tools/build_mpfb_grip_helper_authoring_overlay_v86.py'
+      - 'tools/build_mpfb_grip_helper_ghost_v85.py'
+      - 'tools/build_mpfb_grip_helper_authoring_v84.py'
+      - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
+      - '.github/workflows/mpfb-artist-control-response-v88.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  response-atlas:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spike/mpfb-grip-web-viewport-v88
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v88/{scene,reports,logs,atlas}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Rebuild exact v87 native authoring scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_grip_helper_authoring_panel_v87.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            art/reference_sources/contactpose-v79-full6-use-hand1.json \
+            artifacts/mpfb_v88/scene \
+            artifacts/mpfb_v88/reports/v87-build.json \
+            2>&1 | tee artifacts/mpfb_v88/logs/v87-build.log
+          grep -Fq 'MPFB_GRIP_HELPER_AUTHORING_PANEL_V87_SUCCESS' artifacts/mpfb_v88/logs/v87-build.log
+          test -s artifacts/mpfb_v88/scene/peel-calm-grip-helper-authoring-panel-v87.blend
+
+      - name: Render non-candidate visual control response atlas
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background artifacts/mpfb_v88/scene/peel-calm-grip-helper-authoring-panel-v87.blend \
+            --python tools/render_mpfb_artist_control_response_v88.py -- \
+            artifacts/mpfb_v88/atlas artifacts/mpfb_v88/reports/response-atlas.json \
+            2>&1 | tee artifacts/mpfb_v88/logs/response-atlas.log
+          grep -Fq 'MPFB_ARTIST_CONTROL_RESPONSE_V88_SUCCESS' artifacts/mpfb_v88/logs/response-atlas.log
+          test -s artifacts/mpfb_v88/atlas/00-seed-opaque-macro.png
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v88/reports/response-atlas.json'))
+          assert r['production_candidate'] is False, r
+          assert r['authoring_calibration_only'] is True, r
+          assert r['visual_verdict']=='NOT_A_CANDIDATE', r
+          assert r['reference_set']==['bar_v1','market_v1'], r
+          assert r['response_count']==11, r
+          assert r['parameter_sweep_used'] is False, r
+          assert r['optimizer_used'] is False, r
+          assert r['automatic_retarget_used'] is False, r
+          assert r['control_restore_max_matrix_delta'] <= 1e-9, r
+          assert r['vessel_matrix_delta'] <= 1e-9, r
+          assert r['camera_matrix_delta'] <= 1e-9, r
+          print('MPFB_ARTIST_CONTROL_RESPONSE_V88_BOUNDARY_PASS')
+          PY
+
+      - name: Upload v88 authoring calibration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-artist-control-response-v88
+          path: artifacts/mpfb_v88/
+          if-no-files-found: error
+          retention-days: 14
