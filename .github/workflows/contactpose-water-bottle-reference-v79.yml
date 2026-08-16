@@ -15,7 +15,7 @@ permissions:
 jobs:
   reference:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -26,26 +26,37 @@ jobs:
       - name: Install minimal analysis dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install numpy matplotlib gdown
+          python -m pip install numpy matplotlib
 
-      - name: Download official ContactPose sample data
+      - name: Probe and download official pose-only ContactPose grasp archive
         run: |
-          mkdir -p /tmp/contactpose-sample
-          python -m gdown 1paUAxXgHp6wDFBFw9MI1mxGElEl2KPew -O /tmp/contactpose-sample/contactpose-sample.zip
-          unzip -q /tmp/contactpose-sample/contactpose-sample.zip -d /tmp/contactpose-sample/unpacked
-          echo 'Sample top-level:'
-          find /tmp/contactpose-sample/unpacked -maxdepth 3 -type d | head -80
+          set -euo pipefail
+          mkdir -p /tmp/contactpose-grasps/unpacked
+          URL='https://www.dropbox.com/sh/jh57jcrnup7rinq/AACEPPd44_fAYu9cUhsM2htua?dl=1'
+          echo 'Probing legacy official ContactPose grasp-annotation archive...'
+          curl -L --fail --retry 2 --connect-timeout 10 --max-time 180 \
+            -o /tmp/contactpose-grasps/grasps.zip "$URL"
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/contactpose-grasps/grasps.zip')
+          print('download_bytes=', p.stat().st_size)
+          if p.stat().st_size < 1_000_000:
+              raise SystemExit('archive unexpectedly small; legacy endpoint is not yielding grasp data')
+          PY
+          unzip -q /tmp/contactpose-grasps/grasps.zip -d /tmp/contactpose-grasps/unpacked
+          find /tmp/contactpose-grasps/unpacked -maxdepth 3 -type d | head -80
 
       - name: Extract and rank real water-bottle hand poses
         run: |
           python tools/contactpose_water_bottle_reference_v79.py \
-            --root /tmp/contactpose-sample/unpacked \
+            --root /tmp/contactpose-grasps/unpacked \
             --out /tmp/contactpose-v79
 
       - name: Upload anatomical reference evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: contactpose-water-bottle-reference-v79
           path: /tmp/contactpose-v79
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
