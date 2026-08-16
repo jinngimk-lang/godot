@@ -6,6 +6,7 @@ on:
       - spike/mpfb-default-grip-helper-v83
     paths:
       - 'tools/render_mpfb_default_grip_helper_v83.py'
+      - 'tools/render_mpfb_default_grip_helper_v83b.py'
       - '.github/workflows/mpfb-default-grip-helper-v83.yml'
   workflow_dispatch:
 
@@ -43,19 +44,22 @@ jobs:
           .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
           .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
 
-      - name: Build one semantic support-grip candidate
+      - name: Build one semantic support-grip candidate and evidence-only oblique view
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background --python tools/render_mpfb_default_grip_helper_v83.py -- \
+          .preview-tools/blender/blender --background --python tools/render_mpfb_default_grip_helper_v83b.py -- \
             bl_ext.mpfb_ci.mpfb \
             artifacts/mpfb_v83/previews \
             artifacts/mpfb_v83/reports/support-grip-helper-v83.json \
             2>&1 | tee artifacts/mpfb_v83/logs/render.log
           grep -Fq 'MPFB_DEFAULT_GRIP_HELPER_V83_SUCCESS' artifacts/mpfb_v83/logs/render.log
+          grep -Fq 'MPFB_DEFAULT_GRIP_HELPER_V83B_EVIDENCE_SUCCESS' artifacts/mpfb_v83/logs/render.log
           test -s artifacts/mpfb_v83/previews/support-grip-helper-v83-full.png
           test -s artifacts/mpfb_v83/previews/support-grip-helper-v83-thumbnail.png
           test -s artifacts/mpfb_v83/previews/support-grip-helper-v83-oblique.png
+          test -s artifacts/mpfb_v83/previews/support-grip-helper-v83-vessel-oblique.png
+          test -s artifacts/mpfb_v83/previews/support-grip-helper-v83-vessel-oblique-thumbnail.png
 
       - name: Enforce semantic-helper experiment boundary
         shell: bash
