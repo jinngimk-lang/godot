@@ -28,28 +28,38 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install numpy matplotlib
 
-      - name: Probe and download official pose-only ContactPose grasp archive
+      - name: Download public Explorer water-bottle joint annotations
         run: |
           set -euo pipefail
-          mkdir -p /tmp/contactpose-grasps/unpacked
-          URL='https://www.dropbox.com/sh/jh57jcrnup7rinq/AACEPPd44_fAYu9cUhsM2htua?dl=1'
-          echo 'Probing legacy official ContactPose grasp-annotation archive...'
-          curl -L --fail --retry 2 --connect-timeout 10 --max-time 180 \
-            -o /tmp/contactpose-grasps/grasps.zip "$URL"
+          BASE='https://contactpose.cc.gatech.edu/contactpose_data'
+          mkdir -p /tmp/contactpose-explorer
+          curl -L --fail --retry 2 --connect-timeout 10 --max-time 60 \
+            "$BASE/datapoints.json" -o /tmp/contactpose-explorer/datapoints.json
           python - <<'PY'
-          from pathlib import Path
-          p=Path('/tmp/contactpose-grasps/grasps.zip')
-          print('download_bytes=', p.stat().st_size)
-          if p.stat().st_size < 1_000_000:
-              raise SystemExit('archive unexpectedly small; legacy endpoint is not yielding grasp data')
+          import json, pathlib, subprocess
+          base='https://contactpose.cc.gatech.edu/contactpose_data'
+          root=pathlib.Path('/tmp/contactpose-explorer')
+          d=json.loads((root/'datapoints.json').read_text())
+          rows=[]
+          for intent, objects in d.items():
+              sessions=objects.get('water_bottle', [])
+              for s in sessions:
+                  rows.append((intent, int(s)))
+          if not rows:
+              raise SystemExit('public Explorer datapoints has no water_bottle sessions')
+          print('water_bottle sessions:', rows)
+          for intent, s in rows:
+              out=root/f'full{s}_{intent}'/'water_bottle'
+              out.mkdir(parents=True, exist_ok=True)
+              url=f'{base}/annotations/full{s}_{intent}_water_bottle.json'
+              subprocess.run(['curl','-L','--fail','--retry','2','--connect-timeout','10','--max-time','60',url,'-o',str(out/'annotations.json')],check=True)
           PY
-          unzip -q /tmp/contactpose-grasps/grasps.zip -d /tmp/contactpose-grasps/unpacked
-          find /tmp/contactpose-grasps/unpacked -maxdepth 3 -type d | head -80
+          find /tmp/contactpose-explorer -name annotations.json -print
 
       - name: Extract and rank real water-bottle hand poses
         run: |
           python tools/contactpose_water_bottle_reference_v79.py \
-            --root /tmp/contactpose-grasps/unpacked \
+            --root /tmp/contactpose-explorer \
             --out /tmp/contactpose-v79
 
       - name: Upload anatomical reference evidence
