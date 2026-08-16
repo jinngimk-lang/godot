@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 25
     env:
       PR_NUMBER: "51"
-      EXPECTED_HEAD_SHA: "92281a4a834cb596cfa687dc9bd369b814b7f3eb"
+      EXPECTED_HEAD_SHA: "980345c46c2968265e4eb248067c1dce7721c545"
     steps:
       - name: Checkout verifier definition
         uses: actions/checkout@v4
@@ -51,11 +51,13 @@ jobs:
             awk '/^func tick\(/,/^func _ensure_anchors\(/' scripts/hands/hand_visual.gd
             echo "=== POSE SELECTION CONTRACT ==="
             awk '/^func _apply_pose\(/,/^func _apply_authored_pose\(/' scripts/hands/hand_visual.gd
+            echo "=== ANCHOR REFRESH CONTRACT ==="
+            awk '/^func _refresh_pinch_anchors\(/,/^func _estimate_bone_tip\(/' scripts/hands/hand_visual.gd
             echo "=== FULL CAPTURE STAGING ==="
             cat tests/capture_reference_frames.gd
           } > /tmp/focused-packet.txt
           wc -c /tmp/focused-packet.txt
-          test "$(wc -c < /tmp/focused-packet.txt)" -lt 18000
+          test "$(wc -c < /tmp/focused-packet.txt)" -lt 22000
 
       - name: Install Godot 4.7.1
         shell: bash
@@ -102,13 +104,14 @@ jobs:
           You are an independent adversarial reviewer. Review ONLY the focused exact-head packet below.
           The implementation author claims:
           A. The PR changes only reference-frame staging, not live gameplay.
-          B. Before the PR, _stage_peel set pinch_amount=1.0 but never advanced the smoothed HandVisual pinch because tick(0.0) has zero interpolation weight.
-          C. Advancing one bounded tick(0.1) before reading the pinch anchor makes the screenshot reflect the active authored pinch while preserving the subsequent exact alignment of the pinch anchor to the staged flap.
-          D. The change does not claim that the resulting hand pose is visually reference-quality; it only repairs evidence truthfulness.
+          B. Before the PR, _stage_peel set pinch_target=1.0 but tick(0.0) could not advance the smoothed _pinch_amount, so the capture could remain in Pinch Up instead of the intended active Pinch Tight pose.
+          C. The current revision deliberately does NOT call tick with nonzero delta. It directly sets the test-owned _pinch_amount to 1.0, invokes the existing private pose application and pinch-anchor refresh, then translates the hand root only by the exact current-pinch-to-staged-flap delta and assigns the capture target.
+          D. Therefore the capture should show the active authored pinch without advancing root-follow simulation or changing production gameplay semantics.
+          E. This PR does not claim that the pose is visually reference-quality; it only repairs evidence truthfulness.
 
-          Try to falsify those claims. Check ordering carefully: pose advance, anchor refresh inside tick, world-space alignment, target assignment, final zero-delta tick, and LabelVisual peel staging. Look for any way the 0.1 tick could leak into production behavior or make the screenshot less truthful.
+          Try to falsify those claims. Check ordering carefully: set_pinch_amount versus direct smoothed-state snap, _apply_pose, _refresh_pinch_anchors, world-space exact alignment, set_grip_target, LabelVisual peel staging, and whether any private-call usage can mutate shared/live state outside this test-only capture scene. Look for a concrete deterministic defect, not a style concern.
 
-          Respond with exactly four lines:
+          Respond with exactly four lines and no terminal control codes:
           VERDICT: VERIFIED
           DEFECT: none
           MIN_TEST: none
@@ -118,7 +121,9 @@ jobs:
           PROMPT
             cat /tmp/focused-packet.txt
           } > /tmp/prompt.txt
-          ollama run qwen2.5-coder:3b < /tmp/prompt.txt | tee /tmp/report.txt
+          raw="$(ollama run qwen2.5-coder:3b < /tmp/prompt.txt)"
+          printf '%s\n' "$raw" | sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' > /tmp/report.txt
+          cat /tmp/report.txt
           grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/report.txt
           grep -Eq '^DEFECT:' /tmp/report.txt
           grep -Eq '^MIN_TEST:' /tmp/report.txt
@@ -133,7 +138,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "### Focused capture Challenger"
+            echo "### Focused capture Challenger — current head"
             echo
             echo "Exact product head: \`$EXPECTED_HEAD_SHA\`"
             echo
