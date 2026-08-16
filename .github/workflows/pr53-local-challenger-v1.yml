@@ -1,4 +1,4 @@
-name: PR53 Exact-Head Local Challenger V1
+name: PR53 Exact-Head Local Challenger V2
 
 on:
   push:
@@ -28,33 +28,41 @@ jobs:
           test "$(git rev-parse HEAD)" = "446981e0ef97915268883577911b03dd6b4f289c"
           git fetch origin main:refs/remotes/origin/main
 
-      - name: Prepare focused exact-head packet
+      - name: Deterministic scope and ownership guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only origin/main...HEAD)"
+          test "$changed" = "tests/capture_reference_frames.gd"
+          grep -Fq 'scene.set_process(false)' tests/capture_reference_frames.gd
+          grep -Fq 'scene.set_process(true)' tests/capture_reference_frames.gd
+          grep -Fq '_assert_staged_peel_survived_settle' tests/capture_reference_frames.gd
+          test "$(grep -c '_assert_staged_peel_survived_settle(scene,' tests/capture_reference_frames.gd)" -eq 3
+          test "$(grep -c '_resume_hand_choreography(scene)' tests/capture_reference_frames.gd)" -eq 3
+          grep -Fq '_right_hand.set_pinch_amount(_interaction_presentation.derive_pinch_amount(_peel))' scripts/peel_lab.gd
+          grep -Fq '_right_hand.tick(delta)' scripts/peel_lab.gd
+
+      - name: Prepare minimal exact-head packet
         shell: bash
         run: |
           set -euo pipefail
           {
             echo 'EXPECTED_HEAD_SHA=446981e0ef97915268883577911b03dd6b4f289c'
-            echo '=== CHANGE STAT ==='
-            git diff --stat origin/main...HEAD
             echo '=== EXACT PR DIFF ==='
-            git diff --unified=60 origin/main...HEAD
-            echo '=== CHANGED PATHS ==='
-            git diff --name-only origin/main...HEAD
-            echo '=== HAND CHOREOGRAPHY OWNER ==='
-            cat scripts/presentation/hand_choreography_presentation.gd
-            echo '=== HAND VISUAL MUTATION CONTRACT ==='
-            sed -n '1,230p' scripts/hands/hand_visual.gd
-            echo '=== PEEL LAB GAMEPLAY OWNER ==='
-            sed -n '1,145p' scripts/peel_lab.gd
-            echo '=== CAPTURE CONTRACT ==='
+            git diff --unified=50 origin/main...HEAD -- tests/capture_reference_frames.gd
+            echo '=== CURRENT CAPTURE HELPER ==='
             cat tests/capture_reference_frames.gd
-            echo '=== HAND REGRESSION CONTRACTS ==='
-            cat tests/test_hand_visual.gd
-            cat tests/test_authored_hand_asset.gd
+            echo '=== CHOREOGRAPHY PROCESS OWNER ==='
+            sed -n '1,150p' scripts/presentation/hand_choreography_presentation.gd
+            echo '=== HANDVISUAL TICK/POSE CONTRACT ==='
+            sed -n '25,95p' scripts/hands/hand_visual.gd
+            sed -n '145,195p' scripts/hands/hand_visual.gd
+            echo '=== PEELLAB PROCESS OWNER ==='
+            grep -n -B18 -A28 '_right_hand.tick(delta)' scripts/peel_lab.gd
           } > /tmp/review-packet.txt
           bytes="$(wc -c < /tmp/review-packet.txt)"
           echo "review packet bytes=$bytes"
-          test "$bytes" -lt 42000
+          test "$bytes" -lt 26000
 
       - name: Install local Ollama runtime
         shell: bash
@@ -75,24 +83,29 @@ jobs:
           set -euo pipefail
           ollama pull qwen2.5-coder:3b
 
-      - name: Run adversarial analysis
+      - name: Run constrained adversarial analysis
         shell: bash
         run: |
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are an independent CHALLENGER reviewing exact PR head 446981e0ef97915268883577911b03dd6b4f289c. The Builder claims a test-only reference capture now truthfully holds Pinch Tight and exact flap contact across five settle frames by temporarily freezing both PeelLab gameplay processing and HandChoreographyPresentation, then restoring both immediately after the screenshot.
+          You are an independent CHALLENGER. Review ONLY the exact changed capture helper and directly invoked ownership contracts in this packet.
 
-          Actively try to falsify that claim. Required attacks:
-          1. Find any runtime owner that can still mutate RightHand while the scene/choreography are paused.
-          2. Find any path where processing is not restored before later cafe/bar/market capture states.
-          3. Find any false-positive in the post-settle pose/contact assertion or coordinate spaces.
-          4. Check whether set_process(false) also suppresses something required for the staged label/residue screenshot to be truthful.
-          5. Check whether the capture helper can leave persistent state that contaminates following variants.
-          6. Check that this remains test/capture-only and does not alter production gameplay authority.
-          7. Do not invent defects not supported by exact code evidence. Do not use subjective hand naturalness as a technical defect here; that is a separate visual gate.
+          Candidate: 446981e0ef97915268883577911b03dd6b4f289c
+          Changed path: tests/capture_reference_frames.gd only.
 
-          End with a provisional VERIFIED or NEEDS_FIX and cite concrete code evidence.
+          Builder claim: while a test-owned partial-peel screenshot waits five settle frames, it freezes BOTH mutation owners that previously overwrite the staged right hand: PeelLab._process() and HandChoreographyPresentation. It then asserts after settling that pose is still Pinch Tight and pinch world position remains within 0.5 mm of the staged grip, writes the screenshot, removes capture metadata, and restores both process owners before continuing.
+
+          A NEEDS_FIX defect MUST cite a changed capture behavior or a directly invoked production ownership contract included here and describe a concrete execution path defeating truthfulness or cleanup. Unchanged tests, formatting style, subjective hand aesthetics, and parse/syntax claims are out of scope; exact-head Godot 4.7.1 already parsed and executed this file successfully.
+
+          Attack these five points:
+          1. Can anything included here still mutate RightHand during the five settle frames?
+          2. Can scene/choreography processing remain disabled after a successful partial-peel capture and contaminate the next variant?
+          3. Can the post-settle pose/contact assertion pass while the screenshot hand is materially elsewhere because of coordinate-space mismatch?
+          4. Does freezing PeelLab._process() suppress required label/residue evolution even though those states are staged directly before settling?
+          5. Is capture metadata cleaned between variants?
+
+          If no concrete counterexample survives, explicitly conclude VERIFIED. If one does, conclude NEEDS_FIX with exact evidence. Do not output code.
           PROMPT
             cat /tmp/review-packet.txt
           } > /tmp/review-prompt.txt
@@ -105,7 +118,7 @@ jobs:
           set -euo pipefail
           jq -n \
             --arg analysis "$(head -c 12000 /tmp/review-analysis.txt)" \
-            '{model:"qwen2.5-coder:3b",stream:false,prompt:("Normalize this independent review. If it contains a concrete reproducible defect, NEEDS_FIX. If it explicitly says the exact diff survives its attacks, VERIFIED. Do not invent defects.\n"+$analysis),format:{type:"object",properties:{verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},defect:{type:"string"},min_test:{type:"string"},evidence:{type:"string"}},required:["verdict","defect","min_test","evidence"],additionalProperties:false}}' > /tmp/request.json
+            '{model:"qwen2.5-coder:3b",stream:false,prompt:("Normalize only the conclusion supported by this constrained review. A NEEDS_FIX defect is valid only if it cites the changed capture helper or directly included ownership path and gives a concrete counterexample. Unrelated unchanged-code or syntax claims are invalid. If no valid counterexample exists, verdict VERIFIED.\n"+$analysis),format:{type:"object",properties:{verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},defect:{type:"string"},min_test:{type:"string"},evidence:{type:"string"}},required:["verdict","defect","min_test","evidence"],additionalProperties:false}}' > /tmp/request.json
           curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/request.json > /tmp/response.json
           jq -er '.response' /tmp/response.json | jq -r . > /tmp/verdict.json
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
@@ -118,4 +131,5 @@ jobs:
             printf 'MIN_TEST: %s\n' "$min_test"
             printf 'EVIDENCE: %s\n' "$evidence"
           } | tee /tmp/review-report.txt
+          test "$(wc -l < /tmp/review-report.txt)" -eq 4
           grep -Fxq 'VERDICT: VERIFIED' /tmp/review-report.txt
