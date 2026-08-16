@@ -22,6 +22,7 @@ func _run() -> void:
 	_stage_peel(scene,0.38,0.05,0.94)
 	await _settle_frames(5)
 	if not await _capture("cafe_peel38"): return
+	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",0)
 	await _settle_frames(4)
 	_stage_crumple(scene,0.55)
@@ -34,6 +35,7 @@ func _run() -> void:
 	_stage_peel(scene,0.48,0.18,0.78)
 	await _settle_frames(5)
 	if not await _capture("bar_peel48"): return
+	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",1)
 	await _settle_frames(4)
 	_stage_inspect(scene,0.58,0.22,0.78)
@@ -46,6 +48,7 @@ func _run() -> void:
 	_stage_peel(scene,0.45,0.07,0.93)
 	await _settle_frames(5)
 	if not await _capture("market_peel45"): return
+	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",2)
 	await _settle_frames(4)
 	_stage_inspect(scene,-0.62,0.10,0.90)
@@ -61,6 +64,8 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var hand := scene.get_node("RightHand") as HandVisual
 	var residue := scene.get_node("ResidueVisual")
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	var venue := scene.get_node_or_null("VenuePresentation") as VenuePresentation
 	label.visible = true
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
@@ -69,6 +74,16 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
+	# Capture owns this deterministic staged interaction until the frame is written.
+	# The real PeelController remains idle in this test path, so leaving choreography
+	# processing enabled would incorrectly restore the idle/rest hand over the next
+	# settle frames and publish a misleading partial-peel frame.
+	if choreography != null:
+		choreography.set_process(false)
+		var venue_id := "cafe_window"
+		if venue != null:
+			venue_id = venue.get_active_profile_id()
+		hand.rotation = choreography.call("_active_peel_rotation",venue_id,progress)
 	# Reference capture must display the active authored pinch without advancing the dynamic
 	# hand's root-follow simulation. The old tick(0.0) never advanced smoothed pinch state;
 	# a nonzero tick would also move the hand root toward its previous target. Snap only the
@@ -97,6 +112,11 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 		return
 	label.set_peel(progress,label.to_local(aligned_pinch))
 	residue.call("set_residue",progress,residue_amount,integrity)
+
+func _resume_hand_choreography(scene: Node) -> void:
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	if choreography != null:
+		choreography.set_process(true)
 
 func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
