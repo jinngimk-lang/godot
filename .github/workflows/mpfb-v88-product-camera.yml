@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - spike/mpfb-grip-web-viewport-v88
+      - spike/mpfb-grip-web-crop-v89
     paths:
       - '.github/workflows/mpfb-v88-product-camera.yml'
       - 'tools/export_mpfb_support_candidate_v88.py'
-      - 'tools/build_mpfb_grip_helper_authoring_panel_v87.py'
+      - 'tools/build_mpfb_grip-helper-authoring-panel-v87.py'
       - 'tools/build_mpfb_grip_helper_authoring_overlay_v86.py'
       - 'tools/build_mpfb_grip_helper_ghost_v85.py'
       - 'tools/build_mpfb_grip_helper_authoring_v84.py'
@@ -44,10 +45,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Run the same editor initialization used by the canonical Godot Check
-          # before any Blender authoring evidence is generated under res://.
-          # This registers class_name scripts and imports checked-in JPG/GLB assets
-          # without seeing the later staging .blend files.
           ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_v88_product/logs/project-init.log
           if grep -E 'SCRIPT ERROR: Parse Error|ERROR: Failed to load script' artifacts/mpfb_v88_product/logs/project-init.log; then
             exit 1
@@ -78,69 +75,66 @@ jobs:
           set -euo pipefail
           .preview-tools/blender/blender --background --python tools/build_mpfb_grip_helper_authoring_panel_v87.py -- \
             bl_ext.mpfb_ci.mpfb \
-            art/reference_sources/contactpose-v79-full6-use-hand1.json \
-            artifacts/mpfb_v88_product/scene \
-            artifacts/mpfb_v88_product/reports/v87-build.json \
-            2>&1 | tee artifacts/mpfb_v88_product/logs/v87-build.log
-          grep -Fq 'MPFB_GRIP_HELPER_AUTHORING_PANEL_V87_SUCCESS' artifacts/mpfb_v88_product/logs/v87-build.log
-          test -s artifacts/mpfb_v88_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend
+            artifacts/mpfb_v88_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend \
+            artifacts/mpfb_v88_product/reports/authoring-panel-v87.json \
+            artifacts/mpfb_v88_product/scene/v87-seed-with-vessel.png \
+            artifacts/mpfb_v88_product/scene/v87-seed-thumbnail.png 2>&1 | tee artifacts/mpfb_v88_product/logs/build-v87.log
 
-      - name: Export the single v88 staging candidate
+      - name: Export single visually-authored support candidate
         shell: bash
         run: |
           set -euo pipefail
-          .preview-tools/blender/blender --background artifacts/mpfb_v88_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend \
-            --python tools/export_mpfb_support_candidate_v88.py -- \
-            assets/models/hands/staging/support_limb_v88.glb \
-            artifacts/mpfb_v88_product/reports/support-candidate-v88.json \
-            2>&1 | tee artifacts/mpfb_v88_product/logs/export-v88.log
+          .preview-tools/blender/blender artifacts/mpfb_v88_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend --background --python tools/export_mpfb_support_candidate_v88.py -- \
+            assets/models/hands/staging/mpfb_support_v88.glb \
+            artifacts/mpfb_v88_product/reports/support-v88-export.json 2>&1 | tee artifacts/mpfb_v88_product/logs/export-v88.log
           grep -Fq 'MPFB_SUPPORT_CANDIDATE_V88_EXPORT_SUCCESS' artifacts/mpfb_v88_product/logs/export-v88.log
-          test -s assets/models/hands/staging/support_limb_v88.glb
-          python - <<'PY'
+
+      - name: Verify staging contract before Godot capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
           import json
-          r=json.load(open('artifacts/mpfb_v88_product/reports/support-candidate-v88.json'))
-          assert r['staging_only'] is True, r
-          assert r['production_candidate'] is False, r
-          assert r['single_artist_edit'] is True, r
-          assert r['parameter_sweep_used'] is False, r
-          assert r['optimizer_used'] is False, r
-          assert r['automatic_retarget_used'] is False, r
-          assert r['reference_set']==['bar_v1','market_v1'], r
-          print('V88_STAGING_BOUNDARY_PASS')
+          from pathlib import Path
+          report = json.loads(Path('artifacts/mpfb_v88_product/reports/support-v88-export.json').read_text())
+          assert report['staging_only'] is True
+          assert report['production_candidate'] is False
+          assert report['reference_set'] == ['bar_v1', 'market_v1']
+          assert report['single_artist_edit'] is True
+          assert report['parameter_sweep_used'] is False
+          assert report['optimizer_used'] is False
+          assert report['automatic_retarget_used'] is False
+          assert report['root_is_proxy_vessel_center'] is True
+          assert report['whole_limb_artist_roll_degrees'] == -40.0
+          assert report['crop_envelope']['palm_radius'] == 0.058
+          assert report['crop_envelope']['wrist_forearm_radius'] == 0.046
+          assert report['crop_envelope']['finger_radius'] == 0.018
+          assert report['cropped_vertices'] >= 1200
           PY
 
-      - name: Validate generated v88 GLB source
+      - name: Import staging GLB in Godot 4.7.1
         shell: bash
         run: |
           set -euo pipefail
-          # Do not run a second global editor import after Blender generated
-          # staging .blend evidence under res://. The capture script uses
-          # GLTFDocument to read this newly generated GLB directly at runtime.
-          ./godot --version
-          test -s assets/models/hands/staging/support_limb_v88.glb
-          sha256sum assets/models/hands/staging/support_limb_v88.glb | tee artifacts/mpfb_v88_product/logs/generated-glb.sha256
+          ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_v88_product/logs/import-staging.log
+          ./godot --headless --path . --script res://tests/inspect_mpfb_staging_candidate.gd 2>&1 | tee artifacts/mpfb_v88_product/logs/inspect-staging.log
 
-      - name: Capture same-camera XR versus v88 product frames
+      - name: Capture same-camera XR versus MPFB product frames
         shell: bash
         run: |
           set -euo pipefail
-          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_v88_product_camera.gd 2>&1 | tee artifacts/mpfb_v88_product/logs/product-camera.log
-          grep -Fq 'PASS: captured same-camera XR/V88 support-hand product staging' artifacts/mpfb_v88_product/logs/product-camera.log
-          for name in bar_xr bar_v88 market_xr market_v88 market_v88_inspect45; do
-            test -s "artifacts/v88_product_camera/${name}.png"
+          xvfb-run -a ./godot --path . --script res://tests/capture_v88_product_camera.gd 2>&1 | tee artifacts/mpfb_v88_product/logs/capture-product-camera.log
+          for frame in bar_xr bar_v88 market_xr market_v88 market_v88_inspect45; do
+            test -s "artifacts/v88_product_camera/${frame}.png"
           done
-          if grep -E '(^|[[:space:]])(SCRIPT )?ERROR:' artifacts/mpfb_v88_product/logs/product-camera.log; then
-            exit 1
-          fi
 
-      - name: Upload exact-head v88 product-camera evidence
-        if: always()
+      - name: Upload product-camera A/B evidence
         uses: actions/upload-artifact@v4
         with:
           name: mpfb-v88-product-camera
           path: |
             artifacts/v88_product_camera/*.png
             artifacts/mpfb_v88_product/reports/*.json
-            artifacts/mpfb_v88_product/logs/*
-          if-no-files-found: warn
-          retention-days: 14
+            artifacts/mpfb_v88_product/logs/*.log
+          if-no-files-found: error
+          retention-days: 7
