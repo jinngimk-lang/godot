@@ -93,22 +93,45 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var outward_sign := -1.0 if start_world.x<cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x)<0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
-	# Reference hands enter from the lower corners with a visible elbow arc and
-	# broaden toward the viewer, rather than forming straight tubes across table.
-	var control_world := start_world+Vector3(outward_sign*0.78,-0.36,0.14)
-	var end_world := start_world+Vector3(outward_sign*4.90,-1.28,0.66)
-	var control := hand.to_local(control_world)
+
+	# Use a cubic path with two deliberate anatomical phases: a short wrist-to-
+	# forearm tangent that drops toward the table, then a broader elbow/exit arc.
+	# The old single-control quadratic only changed tangent by ~12 degrees and
+	# still read as a straight beam after the radius was fixed.
+	var offsets := _path_offsets(outward_sign)
+	var control_a_world := start_world+(offsets[0] as Vector3)
+	var control_b_world := start_world+(offsets[1] as Vector3)
+	var end_world := start_world+(offsets[2] as Vector3)
+	var control_a := hand.to_local(control_a_world)
+	var control_b := hand.to_local(control_b_world)
 	var end := hand.to_local(end_world)
 
 	var forearm := MeshInstance3D.new()
 	forearm.name = "ForearmNatural"
-	forearm.mesh = _build_curve_mesh(start,control,end)
+	forearm.mesh = _build_curve_mesh(start,control_a,control_b,end)
 	forearm.material_override = cloth
 	forearm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	hand.add_child(forearm)
 	_forearms[hand_name] = forearm
 	_cloth_materials[hand_name] = cloth
 	_skin_materials[hand_name] = skin
+
+func _path_offsets(outward_sign: float) -> Array[Vector3]:
+	var sign_value := -1.0 if outward_sign < 0.0 else 1.0
+	return [
+		Vector3(sign_value*0.55,-0.50,0.20),
+		Vector3(sign_value*2.20,-1.08,0.48),
+		Vector3(sign_value*4.90,-1.28,0.66),
+	]
+
+func _path_tangent_deflection_degrees(outward_sign: float) -> float:
+	var offsets := _path_offsets(outward_sign)
+	var start_tangent := offsets[0] as Vector3
+	var end_tangent := (offsets[2] as Vector3)-(offsets[1] as Vector3)
+	if start_tangent.length_squared()<=0.000001 or end_tangent.length_squared()<=0.000001:
+		return 0.0
+	var cosine := clampf(start_tangent.normalized().dot(end_tangent.normalized()),-1.0,1.0)
+	return rad_to_deg(acos(cosine))
 
 func _make_cafe_cloth() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -117,14 +140,14 @@ func _make_cafe_cloth() -> StandardMaterial3D:
 	material.roughness = 0.97
 	return material
 
-func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayMesh:
+func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, end: Vector3) -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
 	for ring_index in range(CURVE_RINGS):
 		var t := float(ring_index)/float(CURVE_RINGS-1)
-		var point := _quadratic_point(start,control,end,t)
-		var tangent := _quadratic_tangent(start,control,end,t).normalized()
+		var point := _cubic_point(start,control_a,control_b,end,t)
+		var tangent := _cubic_tangent(start,control_a,control_b,end,t).normalized()
 		if tangent.length_squared()<=0.000001:
 			tangent = Vector3.FORWARD
 		var helper := Vector3.UP
@@ -154,10 +177,10 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 			indices.append(a); indices.append(c); indices.append(d)
 	var start_center := vertices.size()
 	vertices.append(start)
-	normals.append(-_quadratic_tangent(start,control,end,0.0).normalized())
+	normals.append(-_cubic_tangent(start,control_a,control_b,end,0.0).normalized())
 	var end_center := vertices.size()
 	vertices.append(end)
-	normals.append(_quadratic_tangent(start,control,end,1.0).normalized())
+	normals.append(_cubic_tangent(start,control_a,control_b,end,1.0).normalized())
 	for side_index in range(RING_SIDES):
 		var side_next := (side_index+1)%RING_SIDES
 		indices.append(start_center); indices.append(side_next); indices.append(side_index)
@@ -214,12 +237,13 @@ func _find_material(node: Node, wanted_name: String):
 			return found
 	return null
 
-func _quadratic_point(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
+func _cubic_point(start: Vector3, control_a: Vector3, control_b: Vector3, end: Vector3, t: float) -> Vector3:
 	var one_minus := 1.0-t
-	return start*one_minus*one_minus+control*2.0*one_minus*t+end*t*t
+	return start*one_minus*one_minus*one_minus+control_a*3.0*one_minus*one_minus*t+control_b*3.0*one_minus*t*t+end*t*t*t
 
-func _quadratic_tangent(start: Vector3, control: Vector3, end: Vector3, t: float) -> Vector3:
-	return (control-start)*(2.0*(1.0-t))+(end-control)*(2.0*t)
+func _cubic_tangent(start: Vector3, control_a: Vector3, control_b: Vector3, end: Vector3, t: float) -> Vector3:
+	var one_minus := 1.0-t
+	return (control_a-start)*(3.0*one_minus*one_minus)+(control_b-control_a)*(6.0*one_minus*t)+(end-control_b)*(3.0*t*t)
 
 func _descendant_point_to_ancestor(descendant: Node3D, ancestor: Node3D, point: Vector3) -> Vector3:
 	var current := descendant
