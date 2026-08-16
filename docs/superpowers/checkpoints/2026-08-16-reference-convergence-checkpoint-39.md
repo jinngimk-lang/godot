@@ -5,13 +5,17 @@ Date: 2026-08-16
 Production main baseline: `769d6452e75112084f537af99be90721c2629cd5`
 
 Staging branch: `spike/contactpose-guided-artist-v82`
-Verified candidate head before this checkpoint: `d3a14f5e89d8ab30d148ad92ff4e985c394710ee`
+Verified visual candidate head: `d3a14f5e89d8ab30d148ad92ff4e985c394710ee`
+Checkpoint head before this metadata refresh: `b3c3f0ab4ee54fe1d4e892975fd8fe056c51b5a2`
 
-Godot Check: run `31922356023` — PASS
-Godot runtime reference-frame artifact: `9256750508`
+Visual-candidate Godot Check: run `31922356023` — PASS
+Visual-candidate runtime reference-frame artifact: `9256750508`
 
 MPFB ContactPose Guided Artist v82: run `31922356076` — PASS
 MPFB visual artifact: `9256800662`
+
+Checkpoint-head Godot Check: run `31922618874` — PASS
+Checkpoint-head runtime reference-frame artifact: `9256826469`
 
 ## Locked acceptance target
 
