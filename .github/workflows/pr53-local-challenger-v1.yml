@@ -1,0 +1,121 @@
+name: PR53 Exact-Head Local Challenger V1
+
+on:
+  push:
+    branches:
+      - verify/pr53-local-challenger-v1
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout verifier branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact PR53 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin 446981e0ef97915268883577911b03dd6b4f289c
+          git checkout --detach 446981e0ef97915268883577911b03dd6b4f289c
+          test "$(git rev-parse HEAD)" = "446981e0ef97915268883577911b03dd6b4f289c"
+          git fetch origin main:refs/remotes/origin/main
+
+      - name: Prepare focused exact-head packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'EXPECTED_HEAD_SHA=446981e0ef97915268883577911b03dd6b4f289c'
+            echo '=== CHANGE STAT ==='
+            git diff --stat origin/main...HEAD
+            echo '=== EXACT PR DIFF ==='
+            git diff --unified=60 origin/main...HEAD
+            echo '=== CHANGED PATHS ==='
+            git diff --name-only origin/main...HEAD
+            echo '=== HAND CHOREOGRAPHY OWNER ==='
+            cat scripts/presentation/hand_choreography_presentation.gd
+            echo '=== HAND VISUAL MUTATION CONTRACT ==='
+            sed -n '1,230p' scripts/hands/hand_visual.gd
+            echo '=== PEEL LAB GAMEPLAY OWNER ==='
+            sed -n '1,145p' scripts/peel_lab.gd
+            echo '=== CAPTURE CONTRACT ==='
+            cat tests/capture_reference_frames.gd
+            echo '=== HAND REGRESSION CONTRACTS ==='
+            cat tests/test_hand_visual.gd
+            cat tests/test_authored_hand_asset.gd
+          } > /tmp/review-packet.txt
+          bytes="$(wc -c < /tmp/review-packet.txt)"
+          echo "review packet bytes=$bytes"
+          test "$bytes" -lt 42000
+
+      - name: Install local Ollama runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
+          for _ in {1..40}; do
+            if ollama list >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ollama-server.log
+          exit 1
+
+      - name: Pull local code model
+        shell: bash
+        run: |
+          set -euo pipefail
+          ollama pull qwen2.5-coder:3b
+
+      - name: Run adversarial analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are an independent CHALLENGER reviewing exact PR head 446981e0ef97915268883577911b03dd6b4f289c. The Builder claims a test-only reference capture now truthfully holds Pinch Tight and exact flap contact across five settle frames by temporarily freezing both PeelLab gameplay processing and HandChoreographyPresentation, then restoring both immediately after the screenshot.
+
+          Actively try to falsify that claim. Required attacks:
+          1. Find any runtime owner that can still mutate RightHand while the scene/choreography are paused.
+          2. Find any path where processing is not restored before later cafe/bar/market capture states.
+          3. Find any false-positive in the post-settle pose/contact assertion or coordinate spaces.
+          4. Check whether set_process(false) also suppresses something required for the staged label/residue screenshot to be truthful.
+          5. Check whether the capture helper can leave persistent state that contaminates following variants.
+          6. Check that this remains test/capture-only and does not alter production gameplay authority.
+          7. Do not invent defects not supported by exact code evidence. Do not use subjective hand naturalness as a technical defect here; that is a separate visual gate.
+
+          End with a provisional VERIFIED or NEEDS_FIX and cite concrete code evidence.
+          PROMPT
+            cat /tmp/review-packet.txt
+          } > /tmp/review-prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-analysis.txt
+          test -s /tmp/review-analysis.txt
+
+      - name: Normalize structured verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg analysis "$(head -c 12000 /tmp/review-analysis.txt)" \
+            '{model:"qwen2.5-coder:3b",stream:false,prompt:("Normalize this independent review. If it contains a concrete reproducible defect, NEEDS_FIX. If it explicitly says the exact diff survives its attacks, VERIFIED. Do not invent defects.\n"+$analysis),format:{type:"object",properties:{verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},defect:{type:"string"},min_test:{type:"string"},evidence:{type:"string"}},required:["verdict","defect","min_test","evidence"],additionalProperties:false}}' > /tmp/request.json
+          curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/request.json > /tmp/response.json
+          jq -er '.response' /tmp/response.json | jq -r . > /tmp/verdict.json
+          verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
+          defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
+          min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
+          evidence="$(jq -er '.evidence | strings' /tmp/verdict.json)"
+          {
+            printf 'VERDICT: %s\n' "$verdict"
+            printf 'DEFECT: %s\n' "$defect"
+            printf 'MIN_TEST: %s\n' "$min_test"
+            printf 'EVIDENCE: %s\n' "$evidence"
+          } | tee /tmp/review-report.txt
+          grep -Fxq 'VERDICT: VERIFIED' /tmp/review-report.txt
