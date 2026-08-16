@@ -12,10 +12,21 @@ fi
 
 combined="$(jq -er '[.defect,.min_test,.evidence] | map(select(type == "string")) | join("\n")' "$VERDICT_JSON")"
 test "${#combined}" -ge 12
+anchor="$(jq -er '.evidence_anchor | strings | select(length >= 16)' "$VERDICT_JSON")"
+case "$anchor" in
+  '==='*|'---'*)
+    echo "NEEDS_FIX evidence_anchor must quote implementation/test evidence, not a packet heading: $anchor" >&2
+    exit 44
+    ;;
+esac
+if ! grep -Fq -- "$anchor" "$REVIEW_PACKET"; then
+  echo "NEEDS_FIX evidence_anchor is not present verbatim in the exact review packet: $anchor" >&2
+  exit 45
+fi
 
-# A concrete NEEDS_FIX verdict often cites a function or file. Those citations
-# must exist in the exact review packet. This catches reviewer hallucinations
-# without trying to decide the product verdict itself.
+# Also reject concrete function/file citations that are absent from the packet.
+# The anchor check proves the reviewer saw real code; these checks prevent a
+# real quote from being paired with an unrelated invented symbol/path.
 mapfile -t function_symbols < <(printf '%s\n' "$combined" | grep -Eo '[A-Za-z_][A-Za-z0-9_]*\(' | sed 's/($//' | sort -u || true)
 for symbol in "${function_symbols[@]}"; do
   case "$symbol" in
