@@ -99,10 +99,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_v88_product/logs/godot-import.log
+          # `--import` waits for newly generated source assets to finish importing
+          # before exiting. A plain editor `--quit` can terminate after the scan
+          # but before the runtime-imported GLB has a usable remap/cache entry.
+          ./godot --headless --path . --import 2>&1 | tee artifacts/mpfb_v88_product/logs/godot-import.log
           if grep -E 'SCRIPT ERROR: Parse Error|ERROR: Failed to load script' artifacts/mpfb_v88_product/logs/godot-import.log; then
             exit 1
           fi
+          test -s assets/models/hands/staging/support_limb_v88.glb.import
 
       - name: Capture same-camera XR versus v88 product frames
         shell: bash
@@ -118,6 +122,7 @@ jobs:
           fi
 
       - name: Upload exact-head v88 product-camera evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mpfb-v88-product-camera
@@ -125,5 +130,5 @@ jobs:
             artifacts/v88_product_camera/*.png
             artifacts/mpfb_v88_product/reports/*.json
             artifacts/mpfb_v88_product/logs/*.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
