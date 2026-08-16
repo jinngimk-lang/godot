@@ -1,0 +1,51 @@
+name: ContactPose Water Bottle Reference v79
+
+on:
+  push:
+    branches:
+      - spike/contactpose-water-bottle-reference-v79
+    paths:
+      - '.github/workflows/contactpose-water-bottle-reference-v79.yml'
+      - 'tools/contactpose_water_bottle_reference_v79.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal analysis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy matplotlib gdown
+
+      - name: Download official ContactPose sample data
+        run: |
+          mkdir -p /tmp/contactpose-sample
+          python -m gdown 1paUAxXgHp6wDFBFw9MI1mxGElEl2KPew -O /tmp/contactpose-sample/contactpose-sample.zip
+          unzip -q /tmp/contactpose-sample/contactpose-sample.zip -d /tmp/contactpose-sample/unpacked
+          echo 'Sample top-level:'
+          find /tmp/contactpose-sample/unpacked -maxdepth 3 -type d | head -80
+
+      - name: Extract and rank real water-bottle hand poses
+        run: |
+          python tools/contactpose_water_bottle_reference_v79.py \
+            --root /tmp/contactpose-sample/unpacked \
+            --out /tmp/contactpose-v79
+
+      - name: Upload anatomical reference evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: contactpose-water-bottle-reference-v79
+          path: /tmp/contactpose-v79
+          if-no-files-found: error
+          retention-days: 30
