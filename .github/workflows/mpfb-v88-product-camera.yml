@@ -28,6 +28,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Godot 4.7.1 before staging generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" artifacts/mpfb_v88_product/logs
+          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo 'c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip' | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Initialize checked-out Godot project caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run the same editor initialization used by the canonical Godot Check
+          # before any Blender authoring evidence is generated under res://.
+          # This registers class_name scripts and imports checked-in JPG/GLB assets
+          # without seeing the later staging .blend files.
+          ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_v88_product/logs/project-init.log
+          if grep -E 'SCRIPT ERROR: Parse Error|ERROR: Failed to load script' artifacts/mpfb_v88_product/logs/project-init.log; then
+            exit 1
+          fi
+
       - name: Install pinned Blender and MPFB
         shell: bash
         run: |
@@ -84,26 +109,14 @@ jobs:
           print('V88_STAGING_BOUNDARY_PASS')
           PY
 
-      - name: Install Godot 4.7.1
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          echo 'c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip' | sha256sum -c -
-          unzip -q godot.zip
-          mv Godot_v4.7.1-stable_linux.x86_64 godot
-          chmod +x godot
-          ./godot --version
-
       - name: Validate generated v88 GLB source
         shell: bash
         run: |
           set -euo pipefail
-          # Do not run a global editor import here: this staging branch contains
-          # authoring .blend evidence, which makes a headless full-project import
-          # depend on Blender editor settings unrelated to the generated GLB.
-          # capture_v88_product_camera.gd uses GLTFDocument to read this source
-          # file directly at runtime and generate the candidate scene in memory.
+          # Do not run a second global editor import after Blender generated
+          # staging .blend evidence under res://. The capture script uses
+          # GLTFDocument to read this newly generated GLB directly at runtime.
+          ./godot --version
           test -s assets/models/hands/staging/support_limb_v88.glb
           sha256sum assets/models/hands/staging/support_limb_v88.glb | tee artifacts/mpfb_v88_product/logs/generated-glb.sha256
 
