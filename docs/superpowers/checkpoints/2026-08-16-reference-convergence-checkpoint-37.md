@@ -103,27 +103,39 @@ When raw locked reference bytes become directly available to an execution enviro
 ## v81 — real-grasp ghost-guide authoring capability
 
 Branch: `spike/contactpose-ghost-guide-v81`
-Current code head before this checkpoint: `8f1ae41141f3465b915481c9452c45f578b07a0d`
+Verified code head: `8f1ae41141f3465b915481c9452c45f578b07a0d`
 Exact-head Godot Check: `31918022272` — PASS
 Runtime reference-frame artifact: `9255498445`
-MPFB ContactPose Ghost Guide run: `31918022360` — in progress at checkpoint-write time
+MPFB ContactPose Ghost Guide run: `31918022360` — PASS
+MPFB authoring artifact: `9255537898`
 
 ### Purpose
 
 v81 does **not** create another automatic pose candidate. It regenerates the native GameEngine-rig v77 authoring scene, leaves the hand pose unchanged, and overlays the selected real-human ContactPose `full6_use` / hand 1 21-joint skeleton as visible ghost geometry in the same palm-local frame.
 
-The saved `.blend` contract is:
+### Verified contract
 
 - native MPFB GameEngine hero rig;
 - current vessel/camera/wrist/palm authoring setup;
 - only the 12 non-thumb finger pose bones selected for direct visual editing;
-- real-human ghost skeleton visible as anatomical guidance;
-- ghost marked annotation-only / MIT / guide-only;
-- no automatic retarget;
-- no solver/sweep/optimizer;
-- in-scene text explicitly says the ghost is not an acceptance replacement.
+- 21 real-human guide joints + 20 guide bone segments (`41` guide objects total);
+- real-human ghost skeleton marked annotation-only / MIT / guide-only;
+- `automatic_retarget_used = false`;
+- `parameter_sweep_used = false`;
+- `ccd_used = false`;
+- `endpoint_optimizer_used = false`;
+- `contact_servo_used = false`;
+- `pose_modified_by_v81 = false`;
+- saved `.blend` reopened in a second Blender invocation and the embedded contract revalidated;
+- saved editable scene: `peel-calm-support-grasp-contactpose-guide-v81.blend` (~7.5 MB in artifact).
 
-The objective is to make genuine visual posing materially easier in a Blender viewport/editor without converting the anatomical guide back into another number search.
+### Visual diagnostic result
+
+The v81 evidence is intentionally **not** a new pose candidate. Its value is diagnostic: in the unobstructed anatomy view, the real-human ghost trajectories continue into a layered far-side enclosure while the current v77/v74 seed hand bunches/terminates much earlier on the near side. This makes the remaining anatomical mismatch directly visible inside the authoring scene instead of expressing it as another angle table.
+
+The with-vessel thumbnail also confirms why v80 failed: current mesh silhouette still does not provide a clean, readable cylindrical enclosure even though the source skeleton itself has the desired progressive closure.
+
+**R1 is not solved by v81.** v81 closes an authoring-capability gap only.
 
 ## Current red ranking
 
@@ -156,8 +168,8 @@ Frozen until Macro/Meso hand structure passes.
 
 ## Next exact action
 
-1. Complete v81 MPFB run and reopen-contract verification.
-2. If v81 is technically valid, persist its artifact/run IDs here; do **not** call R1 solved.
-3. Use the resulting ghost-guide `.blend` for direct native-rig visual posing when an execution environment has a real interactive Blender viewport/editor, or when the locked acceptance PNG bytes become directly accessible for reference-landmark overlays.
-4. The first visually authored candidate must be singular, not a sweep, and must pass both the 192×108 Macro vessel-grip gate and unobstructed oblique Meso anatomy gate before any Godot integration.
+1. Regenerate/open artifact `9255537898` when a real interactive Blender viewport/editor is available and use the cyan ContactPose ghost only as visual anatomical guidance for direct native-rig posing. Do not automatically snap bones to it.
+2. When the locked acceptance PNG bytes are directly accessible to an execution environment, add their support-hand silhouette/landmarks as the higher-priority overlay; the ContactPose ghost remains secondary anatomical guidance, never an acceptance replacement.
+3. Author **one** whole-hand candidate, not a sweep. It must pass both the 192×108 Macro vessel-grip gate and unobstructed oblique Meso anatomy gate before any Godot integration.
+4. If that candidate passes, immediately move to bar/market Godot product-camera comparison against XR baseline and run the independent Challenger; do not resume pose-search experiments.
 5. Keep production `main` untouched until that proof exists.
