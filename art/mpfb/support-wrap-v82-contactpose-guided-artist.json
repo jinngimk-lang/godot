@@ -1,0 +1,36 @@
+{
+  "format": "peel-calm-mpfb-screen-space-artist-handles-v1",
+  "label": "v82 single ContactPose-guided direct artist support grasp",
+  "staging_only": true,
+  "production_candidate": false,
+  "reference_set": ["bar_v1", "market_v1"],
+  "base_pose": "v81 ghost-guide scene on v77 exact v74 thumb seed",
+  "authoring_space": "fixed 192x108 reference-grasp camera",
+  "parameter_sweep_used": false,
+  "ccd_used": false,
+  "endpoint_optimizer_used": false,
+  "contact_servo_used": false,
+  "root_orbit_motion_used": false,
+  "automatic_retarget_used": false,
+  "frozen_bones": ["wrist.R", "finger1-1.R", "finger1-2.R", "finger1-3.R"],
+  "intent": "One manually authored whole-four-finger gesture after visually comparing the v81 native-rig seed against the cyan real-human ContactPose ghost. The ghost is guidance only: these handles do not copy its joint coordinates. Compared with rejected v78, the screen-space fan is deliberately compressed while camera-depth wrap increases progressively from index to pinky so the chains can disappear around the vessel far contour instead of forming a shelf. No candidate sweep or automatic snapping is permitted.",
+  "handles": {
+    "finger2-1.R": {"tail_px": [128.0, 63.0], "away_from_camera": 0.16},
+    "finger2-2.R": {"tail_px": [141.0, 69.0], "away_from_camera": 0.34},
+    "finger2-3.R": {"tail_px": [145.0, 75.0], "away_from_camera": 0.52},
+    "finger3-1.R": {"tail_px": [111.0, 69.0], "away_from_camera": 0.22},
+    "finger3-2.R": {"tail_px": [129.0, 76.0], "away_from_camera": 0.46},
+    "finger3-3.R": {"tail_px": [136.0, 83.0], "away_from_camera": 0.70},
+    "finger4-1.R": {"tail_px": [96.0, 71.0], "away_from_camera": 0.28},
+    "finger4-2.R": {"tail_px": [117.0, 79.0], "away_from_camera": 0.56},
+    "finger4-3.R": {"tail_px": [127.0, 87.0], "away_from_camera": 0.84},
+    "finger5-1.R": {"tail_px": [82.0, 70.0], "away_from_camera": 0.34},
+    "finger5-2.R": {"tail_px": [106.0, 79.0], "away_from_camera": 0.66},
+    "finger5-3.R": {"tail_px": [119.0, 89.0], "away_from_camera": 0.98}
+  },
+  "visual_gate": {
+    "macro": "At 192x108 first glance must read as a relaxed firm human bottle support grip. The fingers must visually enclose the cylinder rather than form a flat shelf, fan, claw, or fist clump.",
+    "meso": "Unobstructed anatomy must show index least closed and middle/ring/pinky progressively wrapping deeper with readable separation, continuous knuckle flow, no severe self-intersection, and the frozen v74 thumb visibly opposing the four-finger side.",
+    "failure_rule": "If this singular candidate fails, do not tune these numbers into a sweep. Record the mismatch and return to direct visual native-rig authoring."
+  }
+}
