@@ -31,6 +31,12 @@ jobs:
             exit 1
           fi
 
+      - name: Local Challenger verdict validator self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/test_validate_local_challenger_verdict.sh
+
       - name: Install Godot 4.7.1
         shell: bash
         run: |
