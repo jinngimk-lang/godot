@@ -48,6 +48,10 @@ jobs:
             echo 'HUD packet unexpectedly included hand-only contract bundle' >&2
             exit 1
           fi
+          if grep -Fq '_hand_presentation' /tmp/hud-review-packet.txt; then
+            echo 'HUD packet unexpectedly contains the hallucinated hand symbol' >&2
+            exit 1
+          fi
           bytes="$(wc -c < /tmp/hud-review-packet.txt)"
           echo "hud packet bytes=$bytes"
           test "$bytes" -lt 42000
@@ -64,10 +68,12 @@ jobs:
             "evidence":"_hand_presentation(node) is commented out"
           }
           JSON
-          if bash tools/validate_local_challenger_verdict.sh /tmp/hallucinated-verdict.json /tmp/hud-review-packet.txt; then
-            echo 'hallucinated NEEDS_FIX unexpectedly passed grounding validation' >&2
-            exit 1
-          fi
+          set +e
+          bash tools/validate_local_challenger_verdict.sh /tmp/hallucinated-verdict.json /tmp/hud-review-packet.txt
+          rc=$?
+          set -e
+          echo "hallucinated verdict validator rc=$rc"
+          test "$rc" -eq 42
 
       - name: Accept grounded NEEDS_FIX symbols
         shell: bash
