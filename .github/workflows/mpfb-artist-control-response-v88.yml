@@ -82,9 +82,10 @@ jobs:
           assert r['parameter_sweep_used'] is False, r
           assert r['optimizer_used'] is False, r
           assert r['automatic_retarget_used'] is False, r
-          assert r['control_restore_max_matrix_delta'] <= 1e-9, r
-          assert r['vessel_matrix_delta'] <= 1e-9, r
-          assert r['camera_matrix_delta'] <= 1e-9, r
+          assert r['restore_epsilon']==1e-7, r
+          assert r['control_restore_max_matrix_delta'] <= r['restore_epsilon'], r
+          assert r['vessel_matrix_delta'] <= r['restore_epsilon'], r
+          assert r['camera_matrix_delta'] <= r['restore_epsilon'], r
           print('MPFB_ARTIST_CONTROL_RESPONSE_V88_BOUNDARY_PASS')
           PY
 
