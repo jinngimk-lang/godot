@@ -11,6 +11,10 @@ ROUND_VALUE="${ROUND_VALUE:-unknown}"
 
 changed_paths="$(git diff --name-only "$BASE_REF...$HEAD_REF")"
 
+show_file() {
+  git show "$HEAD_REF:$1"
+}
+
 append_header() {
   {
     echo "TASK_ID=$TASK_ID_VALUE"
@@ -27,36 +31,40 @@ append_header() {
 }
 
 append_hud_contracts() {
+  local peel_lab smoke_scene smoke_reference start end
+  peel_lab="$(show_file scripts/peel_lab.gd)"
+  smoke_scene="$(show_file tests/smoke_scene.gd)"
+  smoke_reference="$(show_file tests/smoke_reference_scene.gd)"
   {
     echo '=== HUD PRESENTATION CONTRACT ==='
-    cat scripts/presentation/hud_chrome_presentation.gd
+    show_file scripts/presentation/hud_chrome_presentation.gd
     echo '=== HUD DETERMINISTIC CONTRACT ==='
-    cat tests/test_hud_chrome_presentation.gd
+    show_file tests/test_hud_chrome_presentation.gd
     echo '=== GAMEPLAY HUD SOURCE ==='
-    start="$(grep -n '^func _update_hud' scripts/peel_lab.gd | head -n1 | cut -d: -f1)"
+    start="$(printf '%s\n' "$peel_lab" | grep -n '^func _update_hud' | head -n1 | cut -d: -f1)"
     if [ -n "$start" ]; then
       end=$((start + 78))
-      sed -n "${start},${end}p" scripts/peel_lab.gd
+      printf '%s\n' "$peel_lab" | sed -n "${start},${end}p"
     fi
     echo '=== PLAYABLE HUD SMOKE ==='
-    grep -n -B 12 -A 18 -E 'player HUD|hud_text|reset and pause affordances' tests/smoke_scene.gd || true
+    printf '%s\n' "$smoke_scene" | grep -n -B 12 -A 18 -E 'player HUD|hud_text|reset and pause affordances' || true
     echo '=== REFERENCE HUD SMOKE ==='
-    grep -n -B 12 -A 18 -E 'reference HUD|hud_text' tests/smoke_reference_scene.gd || true
+    printf '%s\n' "$smoke_reference" | grep -n -B 12 -A 18 -E 'reference HUD|hud_text' || true
   } >> "$OUT"
 }
 
 append_hand_contracts() {
   {
     echo '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ==='
-    cat scripts/presentation/hand_choreography_presentation.gd
-    sed -n '1,230p' scripts/hands/hand_visual.gd
+    show_file scripts/presentation/hand_choreography_presentation.gd
+    show_file scripts/hands/hand_visual.gd | sed -n '1,230p'
     echo '=== GAMEPLAY HAND OWNERSHIP CONTRACT ==='
-    sed -n '1,145p' scripts/peel_lab.gd
+    show_file scripts/peel_lab.gd | sed -n '1,145p'
     echo '=== REFERENCE CAPTURE CONTRACT ==='
-    cat tests/capture_reference_frames.gd
+    show_file tests/capture_reference_frames.gd
     echo '=== HAND REGRESSION CONTRACTS ==='
-    cat tests/test_hand_visual.gd
-    cat tests/test_authored_hand_asset.gd
+    show_file tests/test_hand_visual.gd
+    show_file tests/test_authored_hand_asset.gd
   } >> "$OUT"
 }
 
@@ -67,9 +75,9 @@ append_generic_contracts() {
       [ -n "$path" ] || continue
       case "$path" in
         scripts/*.gd|scripts/**/*.gd|tests/*.gd|tests/**/*.gd)
-          if [ -f "$path" ]; then
+          if git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
             echo "--- $path ---"
-            head -c 6500 "$path"
+            show_file "$path" | head -c 6500
             echo
           fi
           ;;
