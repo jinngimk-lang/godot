@@ -21,6 +21,12 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+# Blender's --python execution does not consistently place the script's own directory on
+# sys.path. Add it explicitly so this thin v92 wrapper can reuse the already-verified v88
+# crop/export implementation without copying or silently diverging from it.
+TOOLS_DIR = str(Path(__file__).resolve().parent)
+if TOOLS_DIR not in sys.path:
+    sys.path.insert(0, TOOLS_DIR)
 import export_mpfb_support_candidate_v88 as base
 
 SUCCESS = "MPFB_SUPPORT_CANDIDATE_V92_EXPORT_SUCCESS"
