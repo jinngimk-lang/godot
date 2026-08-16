@@ -1,3 +1,8 @@
+---
+name: multiscale-reference-convergence
+description: Use when a Peel Calm visual, rendering, modeling, hand-pose, material, lighting, UI, camera, or interaction-state change is judged against the locked approved reference images.
+---
+
 # Multiscale Reference Convergence Skill
 
 Use this skill whenever a visual, rendering, modeling, hand-pose, material, lighting, UI, camera, or interaction-state change is judged against approved reference images.
@@ -23,62 +28,123 @@ If a lower level fails, do not spend the iteration budget on a higher level.
 5. Rank by perceptual impact and choose the highest-impact red item.
 6. Make one reversible implementation change plus an objective regression gate where possible.
 7. Run exact-head Godot Check.
-8. Capture the full reference-frame matrix, including interaction states, not just base scenes.
-9. Compare again at all three scales.
-10. Repeat until lower-scale reds are closed; only then move to fine detail.
-11. Before long-context/tool transitions, save a checkpoint containing head SHA, CI run/artifact IDs, fixed reds, remaining reds, and next action.
+8. Capture affected runtime states from the exact candidate.
+9. Compare Macro, Meso, then Micro again.
+10. Reject code-green work if the runtime frame regressed.
+11. Run an independent Challenger on the exact head.
+12. Checkpoint the evidence before merge/context transition.
 
-## Comparison guidance
+## Image-pyramid review
 
-Raw pixel equality is not the acceptance criterion because small camera/lighting shifts can increase pixel error while improving perceptual likeness. Prefer structural/perceptual concepts:
+### Macro
 
-- Multi-scale SSIM for structure across viewing scales.
-- LPIPS-style learned feature similarity for perceptual likeness.
-- Silhouette/edge overlap for vessel and hand geometry.
-- Explicit landmark ratios for camera and composition: vessel height/viewport height, hand span/vessel width, label center/hero-object center, support-contact location.
+Review a strongly downsampled frame first. A useful target is about 48–96 pixels wide or a similarly small thumbnail. Judge:
 
-Metrics support the visual review; they do not replace it.
+- hero-object screen occupancy and center;
+- hand/palm size relative to cup or bottle;
+- silhouette and negative space;
+- camera/FOV and perspective;
+- forearm entry direction;
+- dominant light/dark blocks;
+- background depth and venue identity.
 
-## Model escalation rule
+If the reference reads as a hand wrapping a bottle at thumbnail size while the game reads as a pointing/open hand, hand choreography is a Macro failure regardless of material quality.
 
-If the same macro/meso geometry red survives two evidence-backed iterations, stop polishing around the bad model and enter a model-pipeline spike.
+### Meso
 
-Candidate staging tools to evaluate:
+Then judge:
 
-- **TRELLIS / TRELLIS.2** — image-conditioned 3D generation; official Microsoft repository, MIT-licensed project/model according to its repository. Use only after confirming the exact dependency/model-card licenses in the chosen version.
-- **InstantMesh** — efficient single-image sparse-view reconstruction; official TencentARC repository, Apache-2.0 code. Confirm checkpoint/model licenses separately before production use.
-- **TripoSR** — single-image reconstruction; MIT-licensed repository. Confirm model-weight and dependency licenses before production use.
+- thumb/finger opposition;
+- real contact versus hovering;
+- wrist transition;
+- vessel shoulder/neck/lip or cup taper;
+- label curvature/thickness/lift arc;
+- residue placement;
+- glass/liquid/ice separation;
+- main highlight/shadow placement;
+- continuity across partial-peel, inspection and crumple steps.
 
-Do not make Hunyuan3D a default production dependency: its published license contains territory/distribution restrictions. It can be studied as research, but production adoption requires a separate rights review.
+### Micro
 
-External/generated 3D is staging input, never automatic production output. Require:
+Only after the first two levels pass, inspect:
 
-- source/provenance record;
-- commercially compatible rights;
-- clean silhouette and useful topology;
-- retopology/decimation target;
-- UVs and PBR materials;
-- rig/weights or a documented pose path for hands;
-- bounded polygon/material counts;
+- skin roughness/specular and normal detail;
+- nail response;
+- paper fibers and torn edges;
+- adhesive breakup;
+- condensation;
+- glass highlight structure;
+- lid molding/grooves;
+- micro-roughness and subtle shadows.
+
+## Metrics
+
+Metrics are diagnostics, not acceptance by themselves. Prefer perceptual/structural measures over raw pixel equality. Useful evidence includes:
+
+- multi-scale SSIM-style structural comparison;
+- LPIPS-style perceptual feature comparison when available;
+- silhouette/edge overlap;
+- landmark ratios such as vessel height / viewport height and palm span / vessel width;
+- contact-point distances;
+- temporal/state continuity.
+
+Never let a favorable scalar metric override a visible reference mismatch.
+
+## Interaction-state matrix
+
+For a tactile change, inspect the affected interaction states, not just idle. Depending on the work, include:
+
+- untouched/base;
+- hover/contact;
+- first lift;
+- partial peel;
+- stressed pull/residue;
+- near/final release;
+- inspection yaw;
+- crumple stages for paper cup;
+- reset/next item/scene switch.
+
+The exact interaction-step frame is part of the product contract.
+
+## Model escalation
+
+If the same Macro/Meso model red survives two evidence-backed iterations, stop polishing around the model and enter a model-pipeline spike.
+
+Candidate assets/generated models remain staging inputs until they pass:
+
+- provenance and rights;
+- topology/retopology;
+- bounded polygon/material budget;
+- PBR provenance;
+- scale/origin;
+- useful rig/pose path when deforming;
 - Godot 4.7.1 import;
-- frame-time check;
-- direct runtime-frame comparison against the references.
+- performance;
+- direct target-camera screenshot comparison.
 
-## Hand-specific acceptance
+Do not infer production safety from an open-source code repository; model weights/assets may have separate terms.
 
-Hands are tactile hero assets. A candidate hand is not accepted merely because it has more polygons.
+## Checkpoint contract
 
-At macro scale: palm/forearm size, crop, and cup/bottle relationship must match the reference.
+Every stable or context-boundary checkpoint must contain:
 
-At meso scale: support fingers must wrap the vessel; thumb and fingers should visibly oppose each other around the surface; peel thumb/index must meet the actual flap; wrist transition must read as anatomy or believable clothing rather than a tube.
+- exact branch/head;
+- main/base head;
+- CI run ID;
+- screenshot artifact ID;
+- reference family/version;
+- frames inspected;
+- Macro/Meso/Micro before/after findings;
+- failed experiments that must not be repeated;
+- remaining reds ranked;
+- next exact action.
 
-At micro scale: normals, skin roughness/specular response, nails, creases, and shading must not expose faceting at the target camera distance.
+## Anti-drift
 
-## Research anchors
-
-- Wang, Simoncelli, Bovik, “Multi-scale Structural Similarity for Image Quality Assessment” (2003): https://ece.uwaterloo.ca/~z70wang/publications/msssim.html
-- Zhang et al., “The Unreasonable Effectiveness of Deep Features as a Perceptual Metric” (LPIPS, 2018): https://arxiv.org/abs/1801.03924
-- Microsoft TRELLIS: https://github.com/microsoft/TRELLIS
-- Microsoft TRELLIS.2: https://github.com/microsoft/TRELLIS.2
-- TencentARC InstantMesh: https://github.com/TencentARC/InstantMesh
-- TripoSR: https://github.com/VAST-AI-Research/TripoSR
+- Approved references are locked targets, not mood boards.
+- Runtime captures are evidence, never replacement references.
+- A new generated image may be a derived step/explanatory reference, but may not silently redefine acceptance.
+- Do not polish Micro while Macro/Meso is visibly wrong.
+- Do not add speculative features while hero-frame mismatch remains obvious.
+- Do not claim success from CI alone.
+- Do not continue a model-search path after its configured stop condition has been reached.
