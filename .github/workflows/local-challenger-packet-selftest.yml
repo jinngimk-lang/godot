@@ -5,6 +5,7 @@ on:
     paths:
       - tools/build_local_challenger_packet.sh
       - tools/validate_local_challenger_verdict.sh
+      - tools/extract_local_challenger_json.py
       - .github/workflows/agent-challenger-local.yml
       - .github/workflows/local-challenger-packet-selftest.yml
 
@@ -26,6 +27,36 @@ jobs:
         run: |
           bash -n tools/build_local_challenger_packet.sh
           bash -n tools/validate_local_challenger_verdict.sh
+          python3 -m py_compile tools/extract_local_challenger_json.py
+
+      - name: Accept raw and fenced model JSON only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/raw-model.json <<'JSON'
+          {"verdict":"VERIFIED","defect":"none","min_test":"none","evidence":"ok","evidence_anchor":"NO_CONCRETE_DEFECT"}
+          JSON
+          python3 tools/extract_local_challenger_json.py /tmp/raw-model.json /tmp/raw-normalized.json
+          jq -e '.verdict == "VERIFIED"' /tmp/raw-normalized.json
+
+          cat > /tmp/fenced-model.txt <<'MODEL'
+          ```json
+          {"verdict":"VERIFIED","defect":"none","min_test":"none","evidence":"ok","evidence_anchor":"NO_CONCRETE_DEFECT"}
+          ```
+          MODEL
+          python3 tools/extract_local_challenger_json.py /tmp/fenced-model.txt /tmp/fenced-normalized.json
+          jq -e '.evidence_anchor == "NO_CONCRETE_DEFECT"' /tmp/fenced-normalized.json
+
+          cat > /tmp/prose-wrapped-model.txt <<'MODEL'
+          Here is the result:
+          {"verdict":"VERIFIED","defect":"none","min_test":"none","evidence":"ok","evidence_anchor":"NO_CONCRETE_DEFECT"}
+          MODEL
+          set +e
+          python3 tools/extract_local_challenger_json.py /tmp/prose-wrapped-model.txt /tmp/should-not-exist.json
+          rc=$?
+          set -e
+          echo "prose wrapped extractor rc=$rc"
+          test "$rc" -eq 4
 
       - name: Reproduce HUD packet under safety budget
         shell: bash
