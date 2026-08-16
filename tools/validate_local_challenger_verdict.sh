@@ -29,6 +29,29 @@ if [[ "$anchor" =~ ^[A-Za-z0-9_./-]+\.(gd|yml|yaml|sh)$ ]]; then
 fi
 
 if ! grep -Fq -- "$anchor" "$REVIEW_PACKET"; then
+  # Small local models sometimes copy a real source line exactly and append
+  # one sentence punctuation mark. Repair only that narrow case, only when
+  # removing exactly one trailing punctuation character produces a unique
+  # verbatim packet match. Internal whitespace/text remain strict; ambiguous
+  # or fuzzy matches still fail closed.
+  case "${anchor: -1}" in
+    ','|';'|':'|'.')
+      candidate="${anchor::-1}"
+      if [ "${#candidate}" -ge 16 ]; then
+        match_count="$(grep -Fo -- "$candidate" "$REVIEW_PACKET" | wc -l | tr -d ' ')"
+        if [ "$match_count" = "1" ]; then
+          tmp_json="$(mktemp)"
+          jq --arg repaired "$candidate" '.evidence_anchor = $repaired' "$VERDICT_JSON" > "$tmp_json"
+          mv "$tmp_json" "$VERDICT_JSON"
+          anchor="$candidate"
+          echo "Resolved one model-added trailing punctuation mark in grounded evidence_anchor" >&2
+        fi
+      fi
+      ;;
+  esac
+fi
+
+if ! grep -Fq -- "$anchor" "$REVIEW_PACKET"; then
   echo "NEEDS_FIX evidence_anchor is not present verbatim in the exact review packet: $anchor" >&2
   exit 45
 fi
