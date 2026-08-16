@@ -2,7 +2,7 @@ extends SceneTree
 
 const MIN_FOREARM_LENGTH := 3.20
 const MAX_FOREARM_LENGTH := 6.80
-const MAX_FOREARM_RADIUS := 0.31
+const MAX_FOREARM_RADIUS := 0.21
 const MIN_AUTHORED_HAND_SCALE := 4.00
 
 func _init() -> void:
