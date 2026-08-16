@@ -46,10 +46,13 @@ append_hud_contracts() {
       end=$((start + 78))
       printf '%s\n' "$peel_lab" | sed -n "${start},${end}p"
     fi
+    # Keep smoke evidence tight around the HUD assertions. A wider excerpt used
+    # to pull the unrelated _hand_presentation helper into HUD review packets,
+    # which gave the small local reviewer irrelevant material to hallucinate on.
     echo '=== PLAYABLE HUD SMOKE ==='
-    printf '%s\n' "$smoke_scene" | grep -n -B 12 -A 18 -E 'player HUD|hud_text|reset and pause affordances' || true
+    printf '%s\n' "$smoke_scene" | grep -n -B 4 -A 8 -E 'player HUD|hud_text|reset and pause affordances' || true
     echo '=== REFERENCE HUD SMOKE ==='
-    printf '%s\n' "$smoke_reference" | grep -n -B 12 -A 18 -E 'reference HUD|hud_text' || true
+    printf '%s\n' "$smoke_reference" | grep -n -B 4 -A 8 -E 'reference HUD|hud_text' || true
   } >> "$OUT"
 }
 
