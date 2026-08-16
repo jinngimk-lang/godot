@@ -48,11 +48,15 @@ jobs:
             echo 'HUD packet unexpectedly included hand-only contract bundle' >&2
             exit 1
           fi
+          if grep -Fq '_hand_presentation' /tmp/hud-review-packet.txt; then
+            echo 'HUD packet unexpectedly included unrelated hand helper' >&2
+            exit 1
+          fi
           bytes="$(wc -c < /tmp/hud-review-packet.txt)"
           echo "hud packet bytes=$bytes"
           test "$bytes" -lt 42000
 
-      - name: Reject hallucinated NEEDS_FIX symbols
+      - name: Reject invented evidence anchor
         shell: bash
         run: |
           set -euo pipefail
@@ -66,17 +70,38 @@ jobs:
             "verdict":"NEEDS_FIX",
             "defect":"A missing helper breaks the HUD path",
             "min_test":"Implement _hand_presentation(node)",
-            "evidence":"_hand_presentation(node) is commented out"
+            "evidence":"_hand_presentation(node) is commented out",
+            "evidence_anchor":"_hand_presentation(node) is commented out"
           }
           JSON
           set +e
           bash tools/validate_local_challenger_verdict.sh /tmp/hallucinated-verdict.json /tmp/grounding-packet.txt
           rc=$?
           set -e
-          echo "hallucinated verdict validator rc=$rc"
-          test "$rc" -eq 42
+          echo "invented anchor validator rc=$rc"
+          test "$rc" -eq 45
 
-      - name: Accept grounded NEEDS_FIX symbols
+      - name: Reject generic packet-heading anchor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/generic-anchor.json <<'JSON'
+          {
+            "verdict":"NEEDS_FIX",
+            "defect":"Generic section heading is not defect evidence",
+            "min_test":"none",
+            "evidence":"heading only",
+            "evidence_anchor":"=== HUD PRESENTATION CONTRACT ==="
+          }
+          JSON
+          set +e
+          bash tools/validate_local_challenger_verdict.sh /tmp/generic-anchor.json /tmp/grounding-packet.txt
+          rc=$?
+          set -e
+          echo "generic anchor validator rc=$rc"
+          test "$rc" -eq 44
+
+      - name: Accept grounded NEEDS_FIX anchor
         shell: bash
         run: |
           set -euo pipefail
@@ -90,12 +115,13 @@ jobs:
             "verdict":"NEEDS_FIX",
             "defect":"Compact HUD helper needs a regression check",
             "min_test":"Exercise _compact_hud_text(source)",
-            "evidence":"func _compact_hud_text(source: String) -> String:"
+            "evidence":"The helper is part of the exact packet",
+            "evidence_anchor":"func _compact_hud_text(source: String) -> String:"
           }
           JSON
           bash tools/validate_local_challenger_verdict.sh /tmp/grounded-verdict.json /tmp/grounding-packet.txt
 
-      - name: Accept VERIFIED without defect-symbol grounding
+      - name: Accept VERIFIED without defect grounding
         shell: bash
         run: |
           set -euo pipefail
@@ -104,7 +130,8 @@ jobs:
             "verdict":"VERIFIED",
             "defect":"none",
             "min_test":"none",
-            "evidence":"exact diff survived falsification"
+            "evidence":"exact diff survived falsification",
+            "evidence_anchor":"NO_CONCRETE_DEFECT"
           }
           JSON
           bash tools/validate_local_challenger_verdict.sh /tmp/verified.json /tmp/grounding-packet.txt
