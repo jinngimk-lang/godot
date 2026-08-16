@@ -69,7 +69,13 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
+	# Reference capture previously requested a tight pinch and then advanced the hand with
+	# zero delta. HandVisual intentionally smooths pinch state over time, so zero delta left
+	# the authored asset in Pinch Up and produced misleading open-hand peel evidence. Advance
+	# one bounded presentation step first, then align the resulting tight-pinch anchor exactly
+	# to the staged flap. Live gameplay is unchanged and continues to use frame delta.
 	hand.set_pinch_amount(1.0)
+	hand.tick(0.1)
 	var current_pinch := hand.get_pinch_world_position()
 	hand.position += grip_world-current_pinch
 	hand.set_grip_target(grip_world)
