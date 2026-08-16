@@ -1,0 +1,93 @@
+name: MPFB ContactPose Ghost Guide v81
+
+on:
+  push:
+    branches:
+      - spike/contactpose-ghost-guide-v81
+    paths:
+      - 'tools/build_mpfb_contactpose_ghost_guide_v81.py'
+      - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
+      - '.github/workflows/mpfb-contactpose-ghost-guide-v81.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  authoring-scene:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v81/{reports,logs,frames,scene}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Build native-rig authoring scene with real-grasp ghost guide
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_contactpose_ghost_guide_v81.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            art/reference_sources/contactpose-v79-full6-use-hand1.json \
+            artifacts/mpfb_v81/scene \
+            artifacts/mpfb_v81/reports/contactpose-ghost-guide-v81.json \
+            2>&1 | tee artifacts/mpfb_v81/logs/build.log
+          grep -Fq 'MPFB_CONTACTPOSE_GHOST_GUIDE_V81_SUCCESS' artifacts/mpfb_v81/logs/build.log
+          cp artifacts/mpfb_v81/scene/*.png artifacts/mpfb_v81/frames/
+
+      - name: Reopen blend and enforce visual-authoring contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          r=json.load(open('artifacts/mpfb_v81/reports/contactpose-ghost-guide-v81.json'))
+          assert r['staging_only'] and not r['production_candidate']
+          assert r['authoring_infrastructure_only'] and r['native_gameengine_rig']
+          assert r['automatic_retarget_used'] is False
+          assert r['parameter_sweep_used'] is False
+          assert r['ccd_used'] is False
+          assert r['endpoint_optimizer_used'] is False
+          assert r['contact_servo_used'] is False
+          assert r['pose_modified_by_v81'] is False
+          assert r['ghost_source']['object'] == 'water_bottle'
+          assert r['ghost_source']['session'] == 'full6_use'
+          assert r['ghost_source']['hand_index'] == 1
+          assert 'MIT' in r['ghost_source']['license_scope']
+          assert r['guide_joint_count'] == 21
+          assert r['guide_object_count'] >= 41
+          assert len(r['editable_pose_bones']) == 12
+          p=pathlib.Path(r['blend_path'])
+          assert p.exists() and p.stat().st_size > 1_000_000
+          print('MPFB_CONTACTPOSE_GHOST_GUIDE_V81_REPORT_PASS')
+          PY
+          .preview-tools/blender/blender artifacts/mpfb_v81/scene/peel-calm-support-grasp-contactpose-guide-v81.blend --background --python-expr "import bpy; arm=bpy.data.objects.get('PeelCalm_GameEngine_HeroRig_V77'); assert arm; assert arm.get('contactpose_guide_only') is True; guides=[o for o in bpy.data.objects if o.get('contactpose_guide')]; assert len(guides)>=41; assert bpy.data.texts.get('CONTACTPOSE_V81_GUIDE_CONTRACT'); print('MPFB_CONTACTPOSE_GHOST_GUIDE_V81_REOPEN_PASS', len(guides))"
+
+      - name: Upload authoring capability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-contactpose-ghost-guide-v81
+          path: artifacts/mpfb_v81/
+          if-no-files-found: error
+          retention-days: 30
