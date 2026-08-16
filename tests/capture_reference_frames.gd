@@ -74,14 +74,16 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
 	var front := label.get_front_position(progress)
-	# Exaggerate the staging pull enough to make the lifted flap and adhesive
-	# bend readable in a single screenshot; gameplay still uses live pointer input.
-	var grip_local := front+Vector3(-0.95,0.11,0.56)
+	# Exaggerate the requested staging pull enough to make the lifted flap and
+	# adhesive bend readable, then resolve it through the same reachable-paper
+	# contract as gameplay before moving the hand.
+	var desired_grip_local := front+Vector3(-0.95,0.11,0.56)
+	var grip_local := label.get_effective_grip(progress,desired_grip_local)
 	var grip_world := label.to_global(grip_local)
-	# Capture must use the same physically reachable peel endpoint as gameplay.
-	# LabelGeometry clamps an overlong requested pull to the free paper chord;
-	# if the hand is staged at the unclamped request it visually pinches empty air.
-	var flap_points := label.get_sample_points(progress,grip_local)
+	# LabelGeometry resolves the same desired pull while constructing the mesh.
+	# The hand must pinch that rendered endpoint rather than the unreachable raw
+	# request, otherwise capture can be technically aligned while visually empty.
+	var flap_points := label.get_sample_points(progress,desired_grip_local)
 	if flap_points.is_empty():
 		push_error("CAPTURE_RED: staged peel produced no label points")
 		quit(1)
@@ -89,7 +91,7 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	var rendered_flap_tip_world := label.to_global(flap_points[0])
 	var hand_to_flap_error := grip_world.distance_to(rendered_flap_tip_world)
 	if hand_to_flap_error > 0.0005:
-		push_error("CAPTURE_RED: staged hand target misses rendered flap tip by %.6f m" % hand_to_flap_error)
+		push_error("CAPTURE_RED: effective hand target misses rendered flap tip by %.6f m" % hand_to_flap_error)
 		quit(1)
 		return
 	# This capture stages peel state directly rather than driving PeelController.
