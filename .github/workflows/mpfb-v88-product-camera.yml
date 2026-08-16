@@ -5,6 +5,7 @@ on:
     branches:
       - spike/mpfb-grip-web-viewport-v88
       - spike/mpfb-grip-web-crop-v89
+      - spike/mpfb-grip-enclosure-v90
     paths:
       - '.github/workflows/mpfb-v88-product-camera.yml'
       - 'tools/export_mpfb_support_candidate_v88.py'
@@ -107,7 +108,19 @@ jobs:
           assert r['crop_envelope']['palm_radius']==0.058, r
           assert r['crop_envelope']['wrist_forearm_radius']==0.046, r
           assert r['crop_envelope']['finger_radius']==0.018, r
-          print('V88_STAGING_BOUNDARY_PASS')
+          # v90 is one fixed R1b enclosure correction, not a parameter sweep.
+          expected={
+            'wrist.R': {'rx': 10.0},
+            'right_master_grip': {'rx': 18.0},
+            'right_finger1_grip': {'rx': 4.0},
+            'right_finger2_grip': {'rx': -8.0},
+            'right_finger3_grip': {'rx': 4.0},
+            'right_finger4_grip': {'rx': 10.0},
+            'right_finger5_grip': {'rx': 16.0},
+          }
+          assert r['pose_deltas_degrees']==expected, r
+          assert 'R1b' in r['enclosure_edit_reason'], r
+          print('V90_STAGING_BOUNDARY_PASS')
           PY
 
       - name: Validate generated v88 GLB source
