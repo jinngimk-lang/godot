@@ -5,6 +5,8 @@ const MAX_FOREARM_LENGTH := 6.80
 const MAX_FOREARM_RADIUS := 0.21
 const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
+const MIN_WRIST_OVERLAP_AUTHORED := 0.009
+const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
 
 func _init() -> void:
 	call_deferred("_run")
@@ -40,6 +42,14 @@ func _run() -> void:
 			_fail("forearm path stays too beam-like; tangent deflection %.2f° < %.2f°" % [deflection,MIN_FOREARM_TANGENT_DEFLECTION_DEGREES],scene)
 			return
 
+	if not presentation.has_method("_wrist_overlap_authored"):
+		_fail("forearm presentation must expose wrist-overlap depth so the join cannot regress to a visible butt seam",scene)
+		return
+	var wrist_overlap := float(presentation.call("_wrist_overlap_authored"))
+	if wrist_overlap < MIN_WRIST_OVERLAP_AUTHORED:
+		_fail("forearm must overlap the authored wrist by at least %.3f authored units, got %.3f" % [MIN_WRIST_OVERLAP_AUTHORED,wrist_overlap],scene)
+		return
+
 	for hand_name in ["RightHand","LeftHand"]:
 		var hand := scene.get_node_or_null(hand_name) as Node3D
 		if hand == null:
@@ -53,9 +63,15 @@ func _run() -> void:
 		if forearm == null or not (forearm.mesh is ArrayMesh):
 			_fail("%s must use one smooth ForearmNatural mesh" % hand_name,scene)
 			return
-		var reach := (forearm.mesh as ArrayMesh).get_aabb().size.length()
+		var forearm_mesh := forearm.mesh as ArrayMesh
+		var reach := forearm_mesh.get_aabb().size.length()
 		if reach < MIN_FOREARM_LENGTH or reach > MAX_FOREARM_LENGTH:
 			_fail("%s forearm must continue beyond the frame without runaway geometry: %.3f" % [hand_name,reach],scene)
+			return
+		var arrays := forearm_mesh.surface_get_arrays(0)
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		if indices.size() != EXPECTED_OPEN_WRIST_INDEX_COUNT:
+			_fail("%s forearm wrist end must stay open/embedded instead of exposing a dark cap; index count %d != %d" % [hand_name,indices.size(),EXPECTED_OPEN_WRIST_INDEX_COUNT],scene)
 			return
 		if forearm.material_override == null or forearm.material_override.resource_name != "SleeveFabric":
 			_fail("café forearm should start with soft SleeveFabric",scene)
@@ -106,7 +122,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, curved forearms and single-owner grip choreography stay coherent")
+	print("PASS: reference-scale hands, seamless curved forearms and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
