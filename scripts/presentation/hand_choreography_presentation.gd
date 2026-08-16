@@ -28,7 +28,7 @@ func _process(delta: float) -> void:
 	var safe_delta := clampf(delta if is_finite(delta) else 0.0,0.0,0.1)
 	var venue_id := _venue_id()
 	_stage_support_hand(venue_id,safe_delta)
-	_stage_peel_hand_rest(venue_id,safe_delta)
+	_stage_peel_hand(venue_id,safe_delta)
 
 func _bind() -> void:
 	_parent = get_parent() as Node3D
@@ -64,25 +64,59 @@ func _stage_support_hand(venue_id: String, delta: float) -> void:
 	_left_hand.rotation.y = lerp_angle(_left_hand.rotation.y,desired.y,weight)
 	_left_hand.rotation.z = lerp_angle(_left_hand.rotation.z,desired.z,weight)
 
-func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
+func _stage_peel_hand(venue_id: String, delta: float) -> void:
 	if _right_hand == null or _controller == null:
 		return
 	var state := _controller.get_state_name()
 	var progress := _controller.get_progress()
-	# Once the player has lifted any paper, the gameplay hand target owns the
-	# position. This layer only composes the untouched idle/hover frame so the
-	# peel hand enters from the edge rather than pinching empty air over the label.
-	if progress > 0.001 or state not in ["IDLE","EDGE_HOVER","RELEASED"]:
+	if progress > 0.001 or state in ["PINCHING","PEELING","TEARING"]:
+		_stage_peel_hand_active(venue_id,progress,delta)
 		return
+	if state not in ["IDLE","EDGE_HOVER","RELEASED"]:
+		return
+	_stage_peel_hand_rest(venue_id,delta)
+
+func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
+	# Rest staging owns both position and rotation so the peel hand enters from
+	# the frame edge rather than pinching empty air over the label.
 	var profile := _peel_rest_profile(venue_id)
 	var target: Vector3 = profile["position"]
 	var position_weight := 1.0-exp(-REST_FOLLOW_RATE*delta)
 	_right_hand.position = _right_hand.position.lerp(target,position_weight)
-	var desired: Vector3 = profile["rotation"]
+	_apply_right_hand_rotation(profile["rotation"],delta)
+
+func _stage_peel_hand_active(venue_id: String, progress: float, delta: float) -> void:
+	# Gameplay owns active peel-hand position through HandVisual.set_grip_target().
+	# Presentation owns only the root orientation so the authored Pinch Tight pose
+	# approaches the actual lifted flap edge instead of retaining the idle palm
+	# orientation while the fingertips move. This separation preserves tactile
+	# tracking while making the whole-hand silhouette read as a deliberate pinch.
+	var desired := _active_peel_rotation(venue_id,progress)
+	_apply_right_hand_rotation(desired,delta)
+
+func _apply_right_hand_rotation(desired: Vector3, delta: float) -> void:
 	var rotation_weight := 1.0-exp(-ROTATION_FOLLOW_RATE*delta)
 	_right_hand.rotation.x = lerp_angle(_right_hand.rotation.x,desired.x,rotation_weight)
 	_right_hand.rotation.y = lerp_angle(_right_hand.rotation.y,desired.y,rotation_weight)
 	_right_hand.rotation.z = lerp_angle(_right_hand.rotation.z,desired.z,rotation_weight)
+
+func _active_peel_rotation(venue_id: String, progress: float) -> Vector3:
+	# One reference-derived active gesture per venue; progress only adds a small
+	# pull-through pitch/roll so this is choreography, not a parameter search.
+	var t := clampf(progress,0.0,1.0)
+	var base: Vector3
+	match venue_id:
+		"night_bar":
+			base = Vector3(deg_to_rad(18.0),deg_to_rad(-14.0),deg_to_rad(-47.0))
+		"market_coldcase":
+			base = Vector3(deg_to_rad(17.0),deg_to_rad(-13.0),deg_to_rad(-46.0))
+		_:
+			base = Vector3(deg_to_rad(20.0),deg_to_rad(-12.0),deg_to_rad(-50.0))
+	return Vector3(
+		base.x+deg_to_rad(5.0)*t,
+		base.y+deg_to_rad(3.0)*t,
+		base.z-deg_to_rad(7.0)*t
+	)
 
 func _support_profile(venue_id: String) -> Dictionary:
 	match venue_id:
