@@ -1,0 +1,121 @@
+name: MPFB ContactPose Guided Artist v82
+
+on:
+  push:
+    branches:
+      - spike/contactpose-guided-artist-v82
+    paths:
+      - 'art/mpfb/support-wrap-v82-contactpose-guided-artist.json'
+      - 'tools/build_mpfb_contactpose_ghost_guide_v81.py'
+      - 'tools/apply_mpfb_artist_pose_v78.py'
+      - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
+      - '.github/workflows/mpfb-contactpose-guided-artist-v82.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  singular-artist-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v82/{reports,logs,frames,scene}
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Rebuild v81 native-rig ghost-guide scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_contactpose_ghost_guide_v81.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            art/reference_sources/contactpose-v79-full6-use-hand1.json \
+            artifacts/mpfb_v82/scene \
+            artifacts/mpfb_v82/reports/ghost-guide-v81.json \
+            2>&1 | tee artifacts/mpfb_v82/logs/build-v81.log
+          grep -Fq 'MPFB_CONTACTPOSE_GHOST_GUIDE_V81_SUCCESS' artifacts/mpfb_v82/logs/build-v81.log
+
+      - name: Apply one manually authored whole-hand gesture
+        shell: bash
+        run: |
+          set -euo pipefail
+          scene='artifacts/mpfb_v82/scene/peel-calm-support-grasp-contactpose-guide-v81.blend'
+          test -s "$scene"
+          .preview-tools/blender/blender "$scene" --background --python tools/apply_mpfb_artist_pose_v78.py -- \
+            art/mpfb/support-wrap-v82-contactpose-guided-artist.json \
+            artifacts/mpfb_v82/frames \
+            artifacts/mpfb_v82/reports/artist-pose-v82.json \
+            2>&1 | tee artifacts/mpfb_v82/logs/apply-v82.log
+          grep -Fq 'MPFB_ARTIST_POSE_V78_SUCCESS' artifacts/mpfb_v82/logs/apply-v82.log
+          for f in artifacts/mpfb_v82/frames/support-wrap-v78-*; do
+            [ -e "$f" ] || continue
+            mv "$f" "${f/support-wrap-v78/support-wrap-v82}"
+          done
+          if [ -e artifacts/mpfb_v82/frames/peel-calm-support-grasp-v78.blend ]; then
+            mv artifacts/mpfb_v82/frames/peel-calm-support-grasp-v78.blend artifacts/mpfb_v82/frames/peel-calm-support-grasp-v82.blend
+          fi
+
+      - name: Enforce singular visual-authoring contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          payload=json.load(open('art/mpfb/support-wrap-v82-contactpose-guided-artist.json'))
+          report=json.load(open('artifacts/mpfb_v82/reports/artist-pose-v82.json'))
+          ghost=json.load(open('artifacts/mpfb_v82/reports/ghost-guide-v81.json'))
+          assert payload['staging_only'] and not payload['production_candidate']
+          assert payload['automatic_retarget_used'] is False
+          for k in ['parameter_sweep_used','ccd_used','endpoint_optimizer_used','contact_servo_used','root_orbit_motion_used']:
+              assert payload[k] is False and report[k] is False
+          assert ghost['automatic_retarget_used'] is False and ghost['pose_modified_by_v81'] is False
+          assert report['frozen_wrist_thumb_matrix_max_abs_delta'] <= 1e-6
+          assert len(report['artist_handles']) == 12
+          frames=pathlib.Path('artifacts/mpfb_v82/frames')
+          required=[
+              frames/'support-wrap-v82-thumbnail.png',
+              frames/'support-wrap-v82-with-vessel.png',
+              frames/'support-wrap-v82-anatomy-oblique.png',
+              frames/'support-wrap-v82-anatomy-thumbnail.png',
+              frames/'peel-calm-support-grasp-v82.blend',
+          ]
+          for p in required:
+              assert p.exists() and p.stat().st_size > 1000, p
+          report['candidate_id']='v82_contactpose_guided_artist_single'
+          report['ghost_guidance_source']='ContactPose full6_use hand1 water_bottle annotation; guide-only'
+          report['automatic_retarget_used']=False
+          report['visual_verdict']='UNSET — requires direct Macro/Meso image review; technical PASS cannot promote it'
+          report['failure_rule']='If visually rejected, do not tune this JSON into a parameter sweep; return to direct visual native-rig authoring.'
+          pathlib.Path('artifacts/mpfb_v82/reports/artist-pose-v82.json').write_text(json.dumps(report, indent=2, sort_keys=True))
+          print('MPFB_CONTACTPOSE_GUIDED_ARTIST_V82_CONTRACT_PASS')
+          PY
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-contactpose-guided-artist-v82
+          path: artifacts/mpfb_v82/
+          if-no-files-found: error
+          retention-days: 30
