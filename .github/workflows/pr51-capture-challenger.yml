@@ -1,0 +1,155 @@
+name: PR51 Capture Independent Challenger
+
+on:
+  push:
+    branches: [verify/pr51-capture-challenger-v1]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PR_NUMBER: "51"
+      EXPECTED_HEAD_SHA: "92281a4a834cb596cfa687dc9bd369b814b7f3eb"
+    steps:
+      - name: Checkout verifier definition
+        uses: actions/checkout@v4
+
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact scope and build focused packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main --depth=1
+          current_head="$(git rev-parse HEAD)"
+          test "$current_head" = "$EXPECTED_HEAD_SHA"
+          files="$(git diff --name-only origin/main...HEAD)"
+          test "$files" = "tests/capture_reference_frames.gd" || {
+            echo "Unexpected changed files:" >&2
+            printf '%s\n' "$files" >&2
+            exit 1
+          }
+          if git diff --name-only origin/main...HEAD -- scripts scenes assets project.godot | grep -q .; then
+            echo "Capture-only claim falsified: production/runtime files changed." >&2
+            exit 1
+          fi
+          {
+            echo "=== EXACT DIFF ==="
+            git diff origin/main...HEAD -- tests/capture_reference_frames.gd
+            echo "=== HAND TICK CONTRACT ==="
+            awk '/^func tick\(/,/^func _ensure_anchors\(/' scripts/hands/hand_visual.gd
+            echo "=== POSE SELECTION CONTRACT ==="
+            awk '/^func _apply_pose\(/,/^func _apply_authored_pose\(/' scripts/hands/hand_visual.gd
+            echo "=== FULL CAPTURE STAGING ==="
+            cat tests/capture_reference_frames.gd
+          } > /tmp/focused-packet.txt
+          wc -c /tmp/focused-packet.txt
+          test "$(wc -c < /tmp/focused-packet.txt)" -lt 18000
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  /tmp/godot.zip" | sha256sum -c -
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 ./godot
+          chmod +x ./godot
+
+      - name: Independent deterministic verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit
+          ./godot --headless --path . --script res://tests/test_runner.gd
+          ./godot --headless --path . --script res://tests/smoke_scene.gd
+
+      - name: Install local Ollama runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
+          for _ in {1..40}; do
+            ollama list >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/ollama-server.log
+          exit 1
+
+      - name: Pull independent local model
+        shell: bash
+        run: ollama pull qwen2.5-coder:3b
+
+      - name: Challenge capture-only claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'PROMPT'
+          You are an independent adversarial reviewer. Review ONLY the focused exact-head packet below.
+          The implementation author claims:
+          A. The PR changes only reference-frame staging, not live gameplay.
+          B. Before the PR, _stage_peel set pinch_amount=1.0 but never advanced the smoothed HandVisual pinch because tick(0.0) has zero interpolation weight.
+          C. Advancing one bounded tick(0.1) before reading the pinch anchor makes the screenshot reflect the active authored pinch while preserving the subsequent exact alignment of the pinch anchor to the staged flap.
+          D. The change does not claim that the resulting hand pose is visually reference-quality; it only repairs evidence truthfulness.
+
+          Try to falsify those claims. Check ordering carefully: pose advance, anchor refresh inside tick, world-space alignment, target assignment, final zero-delta tick, and LabelVisual peel staging. Look for any way the 0.1 tick could leak into production behavior or make the screenshot less truthful.
+
+          Respond with exactly four lines:
+          VERDICT: VERIFIED
+          DEFECT: none
+          MIN_TEST: none
+          EVIDENCE: <concise adversarial reason>
+
+          If you find a concrete defect, use VERDICT: NEEDS_FIX and give the exact deterministic reproducer in MIN_TEST.
+          PROMPT
+            cat /tmp/focused-packet.txt
+          } > /tmp/prompt.txt
+          ollama run qwen2.5-coder:3b < /tmp/prompt.txt | tee /tmp/report.txt
+          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/report.txt
+          grep -Eq '^DEFECT:' /tmp/report.txt
+          grep -Eq '^MIN_TEST:' /tmp/report.txt
+          grep -Eq '^EVIDENCE:' /tmp/report.txt
+          test "$(grep -c '^VERDICT:' /tmp/report.txt)" -eq 1
+
+      - name: Publish focused verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### Focused capture Challenger"
+            echo
+            echo "Exact product head: \`$EXPECTED_HEAD_SHA\`"
+            echo
+            echo '```text'
+            if [ -s /tmp/report.txt ]; then
+              cat /tmp/report.txt
+            else
+              echo 'VERDICT: INFRA_FAILURE'
+              echo 'DEFECT: focused local challenger did not produce a conforming report'
+            fi
+            echo '```'
+          } > /tmp/comment.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md
+
+      - name: Enforce verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -qx 'VERDICT: VERIFIED' /tmp/report.txt
