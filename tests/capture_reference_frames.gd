@@ -72,14 +72,17 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# Reference capture previously requested a tight pinch and then advanced the hand with
 	# zero delta. HandVisual intentionally smooths pinch state over time, so zero delta left
 	# the authored asset in Pinch Up and produced misleading open-hand peel evidence. Advance
-	# one bounded presentation step first, then align the resulting tight-pinch anchor exactly
-	# to the staged flap. Live gameplay is unchanged and continues to use frame delta.
+	# one bounded presentation step first.
 	hand.set_pinch_amount(1.0)
 	hand.tick(0.1)
+	# Visual spike only: the bundled XR Tools hand family defines Pinch Flat specifically for
+	# thin planar objects. Force that authored pose for the capture without changing live
+	# gameplay, then refresh the true thumb/index anchor before aligning it to the flap.
+	hand.call("_apply_authored_pose","Pinch Flat")
+	hand.call("_refresh_pinch_anchors")
 	var current_pinch := hand.get_pinch_world_position()
 	hand.position += grip_world-current_pinch
 	hand.set_grip_target(grip_world)
-	hand.tick(0.0)
 	label.set_peel(progress,label.to_local(hand.get_pinch_world_position()))
 	residue.call("set_residue",progress,residue_amount,integrity)
 
