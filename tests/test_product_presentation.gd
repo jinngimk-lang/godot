@@ -9,7 +9,7 @@ func run() -> Array[String]:
 	var product = load(path).new()
 	var cases := [
 		[{"kind":"paper_cup","body_color":Color(0.88,0.82,0.70)},"CupPaperDetails"],
-		[{"kind":"amber_bottle","body_color":Color(0.32,0.10,0.025),"glass_alpha":0.48},"BottleOuterGlass"],
+		[{"kind":"amber_bottle","body_color":Color(0.38,0.11,0.024),"glass_alpha":0.36},"BottleOuterGlass"],
 		[{"kind":"clear_bottle","body_color":Color(0.88,0.96,0.94),"glass_alpha":0.19,"liquid_color":Color(0.92,0.91,0.68)},"BottleOuterGlass"]
 	]
 	for pair in cases:
@@ -29,6 +29,14 @@ func run() -> Array[String]:
 				failures.append("RED: %s must not fall back to stacked BottleShoulder cylinder primitives" % kind)
 			if product.get_node_or_null("BottleHighlight") != null:
 				failures.append("RED: %s must not use rectangular BottleHighlight guide strips" % kind)
+			if kind == "amber_bottle" and outer != null:
+				var outer_mat := outer.material_override as StandardMaterial3D
+				var liquid := product.get_node_or_null("BottleLiquid") as MeshInstance3D
+				var liquid_mat := liquid.material_override as StandardMaterial3D if liquid != null else null
+				if outer_mat == null or outer_mat.albedo_color.a > 0.15:
+					failures.append("RED: amber outer glass must stay translucent enough for shoulder/neck separation")
+				if liquid_mat == null or liquid_mat.albedo_color.a > 0.16:
+					failures.append("RED: amber liquid must not turn the bottle body into an opaque brown mass")
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y,0.7):
 		failures.append("product decoration should follow inspection yaw")
