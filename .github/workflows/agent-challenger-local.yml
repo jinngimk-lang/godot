@@ -57,9 +57,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Checkout already uses fetch-depth: 0. Refresh main without re-shallowing
-          # history so origin/main...HEAD always has the real merge base even when
-          # main advanced after the PR was opened.
           git fetch origin main:refs/remotes/origin/main
           {
             echo "TASK_ID=${{ inputs.task_id }}"
@@ -104,13 +101,13 @@ jobs:
           set -euo pipefail
           ollama pull qwen2.5-coder:3b
 
-      - name: Run independent exact-head challenge
+      - name: Run adversarial analysis
         shell: bash
         run: |
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and try to falsify this batch; do not praise or summarize.
+          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and actively try to falsify this batch. Do not write replacement code unless a concrete defect requires a tiny reproducer.
 
           Required attacks:
           A. Construct at least one concrete boundary/counterexample specific to the changed path.
@@ -121,27 +118,60 @@ jobs:
           F. Check that the tests actually exercise the claimed path and do not only assert internal implementation state.
           G. Do not treat CI green as proof of subjective hand naturalness or reference-image similarity; those remain visual/experiential gates.
 
-          The deterministic Godot wrapper is a separate gate. Your job is adversarial code/test review of this exact diff.
-
-          Respond EXACTLY with these four single-line fields and no markdown/headings:
-          VERDICT: VERIFIED
-          DEFECT: none
-          MIN_TEST: none
-          EVIDENCE: <concise reason the strongest falsification attempt did not break this exact batch>
-
-          If you find a concrete defect, use VERDICT: NEEDS_FIX, name exact function/state transition in DEFECT, and give one deterministic reproducer in MIN_TEST.
+          Produce concise adversarial analysis in prose. End with a provisional conclusion of either VERIFIED or NEEDS_FIX and explain why. A later structured-output pass will normalize your conclusion.
 
           Exact-head packet follows:
           PROMPT
             cat /tmp/review-packet.txt
           } > /tmp/review-prompt.txt
 
-          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-report.txt
-          test -s /tmp/review-report.txt
-          grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt
-          for field in DEFECT MIN_TEST EVIDENCE; do
-            grep -Eq "^${field}:" /tmp/review-report.txt
-          done
+          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-analysis.txt
+          test -s /tmp/review-analysis.txt
+
+      - name: Normalize Challenger verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use Ollama's JSON-schema structured output for the small second pass.
+          # A malformed/free-form first pass can never become VERIFIED merely by
+          # existing; the normalizer must produce all four typed fields.
+          jq -n \
+            --arg analysis "$(head -c 12000 /tmp/review-analysis.txt)" \
+            --arg context "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
+            '{
+              model:"qwen2.5-coder:3b",
+              stream:false,
+              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX. If it explicitly concludes the exact diff survives its falsification attempts, verdict may be VERIFIED. Context:\n" + $context + "\nAnalysis:\n" + $analysis),
+              format:{
+                type:"object",
+                properties:{
+                  verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
+                  defect:{type:"string"},
+                  min_test:{type:"string"},
+                  evidence:{type:"string"}
+                },
+                required:["verdict","defect","min_test","evidence"],
+                additionalProperties:false
+              }
+            }' > /tmp/normalize-request.json
+
+          curl -fsS http://127.0.0.1:11434/api/generate \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/normalize-request.json > /tmp/normalize-response.json
+
+          response="$(jq -er '.response' /tmp/normalize-response.json)"
+          printf '%s' "$response" | jq -e . > /tmp/verdict.json
+          verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
+          defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
+          min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
+          evidence="$(jq -er '.evidence | strings' /tmp/verdict.json)"
+          {
+            printf 'VERDICT: %s\n' "$verdict"
+            printf 'DEFECT: %s\n' "$defect"
+            printf 'MIN_TEST: %s\n' "$min_test"
+            printf 'EVIDENCE: %s\n' "$evidence"
+          } | tee /tmp/review-report.txt
+          test "$(wc -l < /tmp/review-report.txt)" -eq 4
 
       - name: Comment exact-head report on PR
         if: always()
@@ -159,11 +189,13 @@ jobs:
             echo "Exact head: \`$EXPECTED_HEAD_SHA\`"
             echo
             echo '```text'
-            if [ -s /tmp/review-report.txt ]; then
+            if [ -s /tmp/review-report.txt ] && grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt; then
               cat /tmp/review-report.txt
             else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: local model did not produce a conforming report'
+              echo 'DEFECT: local Challenger did not produce a conforming structured verdict'
+              echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
+              echo 'EVIDENCE: no VERIFIED or NEEDS_FIX verdict was accepted'
             fi
             echo '```'
           } > /tmp/pr-comment.md
