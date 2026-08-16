@@ -126,7 +126,7 @@ jobs:
             '{
               model:"qwen2.5-coder:3b",
               stream:false,
-              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis or exact packet. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX only when the packet contains direct evidence for it. For NEEDS_FIX, evidence_anchor MUST be a contiguous 16-240 character verbatim quote from the packet that directly demonstrates the claimed defect; do not use section headings, unrelated pre-existing code, or a quote that contradicts the claim. If no such direct anchor exists, return VERIFIED rather than inventing a defect. For VERIFIED, set evidence_anchor to NO_CONCRETE_DEFECT. Context:\n" + $context + "\nAnalysis:\n" + $analysis + "\nExact packet excerpt:\n" + $packet),
+              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis or exact packet. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX only when the packet contains direct evidence for it. For NEEDS_FIX, evidence_anchor MUST be a contiguous 16-240 character verbatim quote from the packet that directly demonstrates the claimed defect; do not use section headings, unrelated pre-existing code, or a quote that contradicts the claim. If no such direct anchor exists, return VERIFIED rather than inventing a defect. For VERIFIED, set evidence_anchor to NO_CONCRETE_DEFECT. Return only the requested JSON object; no prose and no Markdown fence. Context:\n" + $context + "\nAnalysis:\n" + $analysis + "\nExact packet excerpt:\n" + $packet),
               format:{
                 type:"object",
                 properties:{
@@ -146,7 +146,9 @@ jobs:
             --data-binary @/tmp/normalize-request.json > /tmp/normalize-response.json
 
           response="$(jq -er '.response' /tmp/normalize-response.json)"
-          printf '%s' "$response" | jq -e . > /tmp/verdict.json
+          printf '%s' "$response" > /tmp/verdict-response.txt
+          git show origin/main:tools/extract_local_challenger_json.py > /tmp/extract-local-challenger-json.py
+          python3 /tmp/extract-local-challenger-json.py /tmp/verdict-response.txt /tmp/verdict.json
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
           bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
