@@ -23,6 +23,7 @@ SUCCESS = "MPFB_ARTIST_CONTROL_RESPONSE_V88_SUCCESS"
 ARM = "MPFB_V84_AuthoringRig"
 CAM = "LOCKED_V84_Camera"
 VESSEL = "LOCKED_VesselProxy"
+RESTORE_EPSILON = 1e-7  # Blender Matrix/Euler round-trip is float32-scale; this is far below any visible pose delta.
 
 
 def args():
@@ -117,14 +118,14 @@ def main():
         render(path)
         rendered.append({"label": label, "control": control, "operation": kind, "amount": amount, "file": path.name})
 
-    # Restore exact seed and prove the diagnostic itself is non-mutating.
+    # Restore exact seed and prove the diagnostic itself is non-mutating within Blender's float precision.
     for name, mat in originals.items():
         arm.pose.bones[name].matrix_basis = mat.copy()
     bpy.context.view_layer.update()
     restore_delta = max(max_matrix_delta(arm.pose.bones[name].matrix_basis, originals[name]) for name in controls)
     vessel_delta = max_matrix_delta(bpy.data.objects[VESSEL].matrix_world, vessel_matrix)
     camera_delta = max_matrix_delta(bpy.data.objects[CAM].matrix_world, camera_matrix)
-    if restore_delta > 1e-9 or vessel_delta > 1e-9 or camera_delta > 1e-9:
+    if restore_delta > RESTORE_EPSILON or vessel_delta > RESTORE_EPSILON or camera_delta > RESTORE_EPSILON:
         raise RuntimeError(f"response atlas mutated locked state: controls={restore_delta} vessel={vessel_delta} camera={camera_delta}")
 
     report = {
@@ -140,6 +141,7 @@ def main():
         "parameter_sweep_used": False,
         "optimizer_used": False,
         "automatic_retarget_used": False,
+        "restore_epsilon": RESTORE_EPSILON,
         "control_restore_max_matrix_delta": restore_delta,
         "vessel_matrix_delta": vessel_delta,
         "camera_matrix_delta": camera_delta,
