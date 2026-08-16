@@ -39,7 +39,7 @@ jobs:
           grep -Fq '_assert_staged_peel_survived_settle' tests/capture_reference_frames.gd
           test "$(grep -c '_assert_staged_peel_survived_settle(scene,' tests/capture_reference_frames.gd)" -eq 3
           test "$(grep -c '_resume_hand_choreography(scene)' tests/capture_reference_frames.gd)" -eq 3
-          grep -Fq '_right_hand.set_pinch_amount(_interaction_presentation.derive_pinch_amount(_peel))' scripts/peel_lab.gd
+          grep -Fq '_right_hand.set_pinch_amount(1.0 if pinching else 0.18)' scripts/peel_lab.gd
           grep -Fq '_right_hand.tick(delta)' scripts/peel_lab.gd
 
       - name: Prepare minimal exact-head packet
