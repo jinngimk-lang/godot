@@ -1,0 +1,35 @@
+name: Blender 4.2 Tool Artifact
+
+on:
+  push:
+    branches:
+      - spike/mpfb-relative-digit-depth-v93
+    paths:
+      - '.github/workflows/blender-42-tool-artifact.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact pinned Blender archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/blender-tool
+          curl -L --fail --retry 3 -o artifacts/blender-tool/blender-4.2.0-linux-x64.tar.xz \
+            https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  artifacts/blender-tool/blender-4.2.0-linux-x64.tar.xz' | sha256sum -c -
+      - name: Upload pinned Blender archive for visual authoring environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-4.2.0-linux-x64
+          path: artifacts/blender-tool/blender-4.2.0-linux-x64.tar.xz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
