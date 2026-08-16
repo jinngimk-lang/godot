@@ -9,8 +9,8 @@ func _init() -> void:
 
 func _run() -> void:
 	var packed := load("res://scenes/peel_lab/peel_lab.tscn") as PackedScene
-	var candidate_scene := load(CANDIDATE_PATH) as PackedScene
-	if packed == null or candidate_scene == null:
+	var candidate := _load_runtime_glb(CANDIDATE_PATH)
+	if packed == null or candidate == null:
 		push_error("V88_PRODUCT_CAMERA_RED: scene or generated candidate GLB did not load")
 		quit(1)
 		return
@@ -25,11 +25,6 @@ func _run() -> void:
 		quit(1)
 		return
 
-	var candidate := candidate_scene.instantiate() as Node3D
-	if candidate == null:
-		push_error("V88_PRODUCT_CAMERA_RED: candidate GLB did not instantiate as Node3D")
-		quit(1)
-		return
 	candidate.name = "V88SupportCandidate"
 	scene.add_child(candidate)
 	candidate.visible = false
@@ -65,6 +60,31 @@ func _run() -> void:
 
 	print("PASS: captured same-camera XR/V88 support-hand product staging")
 	quit(0)
+
+# The v88 GLB is created during this CI job, after the checked-out project has
+# already been scanned by Godot. Loading it through ResourceLoader therefore
+# depends on editor import-cache timing. GLTFDocument is the runtime glTF API:
+# read the just-generated source file directly, then generate a Godot scene.
+# This also avoids a global editor import pass trying to import unrelated .blend
+# authoring evidence in headless CI.
+func _load_runtime_glb(path: String) -> Node3D:
+	if not FileAccess.file_exists(path):
+		push_error("V88_PRODUCT_CAMERA_RED: generated GLB source missing: %s" % path)
+		return null
+	var document := GLTFDocument.new()
+	var state := GLTFState.new()
+	var absolute_path := ProjectSettings.globalize_path(path)
+	var error := document.append_from_file(absolute_path,state,0,absolute_path.get_base_dir())
+	if error != OK:
+		push_error("V88_PRODUCT_CAMERA_RED: GLTFDocument append failed (%d): %s" % [error,path])
+		return null
+	var generated := document.generate_scene(state)
+	if not (generated is Node3D):
+		if generated != null:
+			generated.free()
+		push_error("V88_PRODUCT_CAMERA_RED: GLTFDocument did not generate Node3D")
+		return null
+	return generated as Node3D
 
 func _capture(name: String) -> bool:
 	await RenderingServer.frame_post_draw
