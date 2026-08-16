@@ -1,0 +1,155 @@
+name: MPFB V93 Product Camera
+
+on:
+  push:
+    branches:
+      - spike/mpfb-relative-digit-depth-v93
+    paths:
+      - '.github/workflows/mpfb-v93-product-camera.yml'
+      - 'tools/export_mpfb_support_candidate_v93.py'
+      - 'tools/export_mpfb_support_candidate_v92.py'
+      - 'tools/export_mpfb_support_candidate_v88.py'
+      - 'tools/build_mpfb_grip_helper_authoring_panel_v87.py'
+      - 'tools/build_mpfb_grip_helper_authoring_overlay_v86.py'
+      - 'tools/build_mpfb_grip_helper_ghost_v85.py'
+      - 'tools/build_mpfb_grip_helper_authoring_v84.py'
+      - 'tests/capture_v88_product_camera.gd'
+      - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOME: ${{ github.workspace }}/.preview-home
+
+jobs:
+  product-camera-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1 before staging generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME" artifacts/mpfb_v93_product/logs
+          curl -L --fail --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          echo 'c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip' | sha256sum -c -
+          unzip -q godot.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Initialize checked-out Godot project caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --editor --path . --quit 2>&1 | tee artifacts/mpfb_v93_product/logs/project-init.log
+          if grep -E 'SCRIPT ERROR: Parse Error|ERROR: Failed to load script' artifacts/mpfb_v93_product/logs/project-init.log; then
+            exit 1
+          fi
+
+      - name: Install pinned Blender and MPFB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libegl1 xvfb
+          mkdir -p "$HOME" .preview-tools artifacts/mpfb_v93_product/{scene,reports,logs} assets/models/hands/staging artifacts/v88_product_camera
+          curl -L --fail --retry 3 -o .preview-tools/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          echo '4f4fd7646af01f6fee9d420408318381a6e52571268eb7cf9cd5033bd9e7a359  .preview-tools/blender.tar.xz' | sha256sum -c -
+          tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
+          mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
+          curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
+          tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
+          .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
+          mkdir -p .preview-tools/extensions
+          .preview-tools/blender/blender --command extension repo-add mpfb_ci --name 'MPFB CI' --directory "$PWD/.preview-tools/extensions" --clear-all
+          .preview-tools/blender/blender --command extension install-file -r mpfb_ci -e .preview-tools/mpfb.zip
+
+      - name: Rebuild exact v87 authoring scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background --python tools/build_mpfb_grip_helper_authoring_panel_v87.py -- \
+            bl_ext.mpfb_ci.mpfb \
+            art/reference_sources/contactpose-v79-full6-use-hand1.json \
+            artifacts/mpfb_v93_product/scene \
+            artifacts/mpfb_v93_product/reports/v87-build.json \
+            2>&1 | tee artifacts/mpfb_v93_product/logs/v87-build.log
+          grep -Fq 'MPFB_GRIP_HELPER_AUTHORING_PANEL_V87_SUCCESS' artifacts/mpfb_v93_product/logs/v87-build.log
+          test -s artifacts/mpfb_v93_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend
+
+      - name: Export the one v93 relative digit-depth staging candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          .preview-tools/blender/blender --background artifacts/mpfb_v93_product/scene/peel-calm-grip-helper-authoring-panel-v87.blend \
+            --python tools/export_mpfb_support_candidate_v93.py -- \
+            assets/models/hands/staging/support_limb_v88.glb \
+            artifacts/mpfb_v93_product/reports/support-candidate-v93.json \
+            2>&1 | tee artifacts/mpfb_v93_product/logs/export-v93.log
+          grep -Fq 'MPFB_SUPPORT_CANDIDATE_V93_EXPORT_SUCCESS' artifacts/mpfb_v93_product/logs/export-v93.log
+          test -s assets/models/hands/staging/support_limb_v88.glb
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/mpfb_v93_product/reports/support-candidate-v93.json'))
+          assert r['staging_only'] is True, r
+          assert r['production_candidate'] is False, r
+          assert r['single_artist_edit'] is True, r
+          assert r['single_relative_digit_depth_gesture'] is True, r
+          assert r['parameter_sweep_used'] is False, r
+          assert r['optimizer_used'] is False, r
+          assert r['automatic_retarget_used'] is False, r
+          assert r['endpoint_target_used'] is False, r
+          assert r['contact_servo_used'] is False, r
+          assert r['reference_set']==['bar_v1','market_v1'], r
+          assert r['whole_limb_artist_roll_degrees']==-40.0, r
+          assert r['crop_envelope']['palm_radius']==0.058, r
+          assert r['crop_envelope']['wrist_forearm_radius']==0.046, r
+          assert r['crop_envelope']['finger_radius']==0.018, r
+          assert r['candidate_version']=='v93', r
+          assert r['digit_far_depth_degrees']=={'finger2-1.R':4.0,'finger3-1.R':8.0,'finger4-1.R':13.0,'finger5-1.R':18.0}, r
+          d=r['far_depth_delta_meters']
+          vals=[d[str(i)] for i in range(2,6)]
+          assert all(v > 0.00025 for v in vals), r
+          assert vals[0] < vals[1] < vals[2] < vals[3], r
+          assert 'stop code-authored transform guessing' in r['stop_condition'], r
+          print('V93_STAGING_BOUNDARY_PASS')
+          PY
+
+      - name: Validate generated v93 GLB source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --version
+          test -s assets/models/hands/staging/support_limb_v88.glb
+          sha256sum assets/models/hands/staging/support_limb_v88.glb | tee artifacts/mpfb_v93_product/logs/generated-glb.sha256
+
+      - name: Capture same-camera XR versus v93 product frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_v88_product_camera.gd 2>&1 | tee artifacts/mpfb_v93_product/logs/product-camera.log
+          grep -Fq 'PASS: captured same-camera XR/V88 support-hand product staging' artifacts/mpfb_v93_product/logs/product-camera.log
+          for name in bar_xr bar_v88 market_xr market_v88 market_v88_inspect45; do
+            test -s "artifacts/v88_product_camera/${name}.png"
+          done
+          if grep -E '(^|[[:space:]])(SCRIPT )?ERROR:' artifacts/mpfb_v93_product/logs/product-camera.log; then
+            exit 1
+          fi
+
+      - name: Upload exact-head v93 product-camera evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpfb-v93-product-camera
+          path: |
+            artifacts/v88_product_camera/*.png
+            artifacts/mpfb_v93_product/reports/*.json
+            artifacts/mpfb_v93_product/logs/*
+          if-no-files-found: warn
+          retention-days: 14
