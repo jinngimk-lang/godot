@@ -57,7 +57,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main:refs/remotes/origin/main --depth=1
+          # Checkout already uses fetch-depth: 0. Refresh main without re-shallowing
+          # history so origin/main...HEAD always has the real merge base even when
+          # main advanced after the PR was opened.
+          git fetch origin main:refs/remotes/origin/main
           {
             echo "TASK_ID=${{ inputs.task_id }}"
             echo "PR_NUMBER=${{ inputs.pr_number }}"
