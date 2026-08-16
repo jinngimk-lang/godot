@@ -71,7 +71,14 @@ jobs:
             git diff --name-only origin/main...HEAD
             echo '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ==='
             cat scripts/presentation/hand_choreography_presentation.gd
-            cat scripts/hands/hand_visual.gd
+            # The capture bug is about who mutates the peel hand while frames settle.
+            # Keep the packet focused on HandVisual setup/target/tick/pose ownership
+            # instead of spending the review budget on its unrelated procedural mesh.
+            sed -n '1,230p' scripts/hands/hand_visual.gd
+            echo '=== GAMEPLAY HAND OWNERSHIP CONTRACT ==='
+            # PeelLab._process() is the second runtime owner that can overwrite a
+            # capture-owned hand. Include the processing path, not the whole scene builder.
+            sed -n '1,145p' scripts/peel_lab.gd
             echo '=== REFERENCE CAPTURE CONTRACT ==='
             cat tests/capture_reference_frames.gd
             echo '=== HAND REGRESSION CONTRACTS ==='
