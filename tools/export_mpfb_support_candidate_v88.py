@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Export the single visually-authored v88 support-hand candidate for Godot product-camera staging.
+"""Export the single visually-authored v90 support-hand candidate for Godot product-camera staging.
 
 Run this against the exact v87 authoring .blend. The semantic grip deltas plus the whole-limb
 camera-plane roll below are one deliberate native-rig artist edit, not a candidate sweep.
-The result is a cropped, baked static limb centered on the proxy-vessel grip point so Godot
-can stage it against the real amber/clear bottle without changing production hand logic.
+The v90 change is deliberately limited to whole-hand enclosure grammar: preserve the proven
+side-on approach/crop/scale/root contract while increasing common closure and progressive
+index->pinky wrap. The result is a cropped, baked static limb centered on the proxy-vessel
+grip point so Godot can stage it against the real amber/clear bottle without changing
+production hand logic.
 """
 from __future__ import annotations
 
@@ -27,14 +30,19 @@ PALM_ENVELOPE_RADIUS = 0.058
 WRIST_FOREARM_ENVELOPE_RADIUS = 0.046
 FINGER_ENVELOPE_RADIUS = 0.018
 
+# Exactly one reference-derived enclosure correction. v89 already passed side-on approach
+# and wrist-continuity gates but read as an open C-shape. Keep wrist/choreography fixed,
+# increase common enclosure moderately, keep index light, and deepen middle->ring->pinky
+# progressively in the same qualitative order observed in the real water-bottle grasp
+# reference. These are semantic helper controls, not direct phalanx/endpoint optimization.
 POSE_DELTAS_DEG = {
     "wrist.R": {"rx": 10.0},
-    "right_master_grip": {"rx": 8.0},
-    "right_finger2_grip": {"rx": -6.0},
+    "right_master_grip": {"rx": 18.0},
+    "right_finger1_grip": {"rx": 4.0},
+    "right_finger2_grip": {"rx": -8.0},
     "right_finger3_grip": {"rx": 4.0},
-    "right_finger4_grip": {"rx": 4.0},
-    "right_finger5_grip": {"rx": 0.0},
-    "right_finger1_grip": {"rx": 0.0},
+    "right_finger4_grip": {"rx": 10.0},
+    "right_finger5_grip": {"rx": 16.0},
 }
 
 
@@ -117,10 +125,8 @@ def _bake_and_crop(arm, basemesh):
 def _apply_whole_limb_artist_roll(obj, vessel_center: Vector, camera) -> Vector:
     """Rotate the already-authored continuous limb in the camera plane around the vessel.
 
-    The current product-camera evidence shows the forearm entering diagonally from above-right.
-    This single visual correction rotates the complete baked hand/wrist/forearm as one rigid
-    anatomical unit so its approach is side-on. It does not alter finger grip controls, scale,
-    root offset, or run any optimizer/search.
+    Product-camera evidence proved the -40 degree side-on approach. Preserve that complete
+    baked hand/wrist/forearm choreography while v90 changes only semantic enclosure controls.
     """
     view_axis = camera.matrix_world.translation - vessel_center
     if view_axis.length_squared < 1e-12:
@@ -183,14 +189,15 @@ def main() -> None:
         "optimizer_used": False,
         "automatic_retarget_used": False,
         "pose_deltas_degrees": POSE_DELTAS_DEG,
+        "enclosure_edit_reason": "single R1b reference-derived correction: preserve v89 side-on approach and continuous wrist while increasing common closure and progressive index-to-pinky far-side wrap",
         "whole_limb_artist_roll_degrees": WHOLE_LIMB_ARTIST_ROLL_DEG,
         "whole_limb_roll_axis_blender": list(view_axis),
-        "whole_limb_roll_reason": "product-camera Macro evidence: rotate diagonal upper-right approach into a reference-compatible side-on vessel approach without changing grip, scale, or root offset",
+        "whole_limb_roll_reason": "preserved PASS from product-camera Macro evidence: reference-compatible side-on vessel approach",
         "crop_envelope": {
             "palm_radius": PALM_ENVELOPE_RADIUS,
             "wrist_forearm_radius": WRIST_FOREARM_ENVELOPE_RADIUS,
             "finger_radius": FINGER_ENVELOPE_RADIUS,
-            "reason": "single R1a export-geometry correction: preserve more wrist/lowerarm/palm skin to remove the product-camera V-notch while leaving pose, roll, scale, root, yaw and finger envelope unchanged",
+            "reason": "preserved v89 R1a PASS: continuous wrist/lowerarm/palm skin with no product-camera V-notch",
         },
         "cropped_vertices": len(baked.data.vertices),
         "cropped_polygons": len(baked.data.polygons),
@@ -198,7 +205,7 @@ def main() -> None:
         "palm_blender": list(palm),
         "wrist_blender": list(wrist),
         "root_is_proxy_vessel_center": True,
-        "next_gate": "Godot bar/market product-camera A/B versus current XR baseline; no production promotion on technical PASS alone.",
+        "next_gate": "Godot bar/market product-camera A/B versus current XR baseline; reject if enclosure does not materially improve or side-on/wrist/inspect45 regress.",
     }
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
