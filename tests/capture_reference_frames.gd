@@ -2,6 +2,7 @@ extends SceneTree
 
 const OUTPUT_DIR := "res://artifacts/reference_frames"
 const THUMB_SIZE := Vector2i(48,27)
+const CAPTURE_GRIP_META := &"capture_expected_grip_world"
 
 func _init() -> void:
 	call_deferred("_run")
@@ -22,6 +23,7 @@ func _run() -> void:
 	if not await _capture("cafe"): return
 	_stage_peel(scene,0.38,0.05,0.94)
 	await _settle_frames(5)
+	if not _assert_staged_peel_survived_settle(scene,"cafe_peel38"): return
 	if not await _capture("cafe_peel38"): return
 	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",0)
@@ -35,6 +37,7 @@ func _run() -> void:
 	if not await _capture("bar"): return
 	_stage_peel(scene,0.48,0.18,0.78)
 	await _settle_frames(5)
+	if not _assert_staged_peel_survived_settle(scene,"bar_peel48"): return
 	if not await _capture("bar_peel48"): return
 	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",1)
@@ -48,6 +51,7 @@ func _run() -> void:
 	if not await _capture("market"): return
 	_stage_peel(scene,0.45,0.07,0.93)
 	await _settle_frames(5)
+	if not _assert_staged_peel_survived_settle(scene,"market_peel45"): return
 	if not await _capture("market_peel45"): return
 	_resume_hand_choreography(scene)
 	scene.call("debug_select_variant",2)
@@ -87,6 +91,7 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	var current_pinch := hand.get_pinch_world_position()
 	hand.position += grip_world-current_pinch
 	hand.set_grip_target(grip_world)
+	hand.set_meta(CAPTURE_GRIP_META,grip_world)
 	var active_pose := String(hand.get("_last_authored_pose"))
 	if active_pose != "Pinch Tight":
 		push_error("CAPTURE_RED: staged peel did not activate Pinch Tight (got %s)" % active_pose)
@@ -101,7 +106,29 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	label.set_peel(progress,label.to_local(aligned_pinch))
 	residue.call("set_residue",progress,residue_amount,integrity)
 
+func _assert_staged_peel_survived_settle(scene: Node, capture_name: String) -> bool:
+	var hand := scene.get_node("RightHand") as HandVisual
+	if not hand.has_meta(CAPTURE_GRIP_META):
+		push_error("CAPTURE_RED: %s missing staged grip contract" % capture_name)
+		quit(1)
+		return false
+	var active_pose := String(hand.get("_last_authored_pose"))
+	if active_pose != "Pinch Tight":
+		push_error("CAPTURE_RED: %s lost Pinch Tight during settle (got %s)" % [capture_name,active_pose])
+		quit(1)
+		return false
+	var expected_grip := hand.get_meta(CAPTURE_GRIP_META) as Vector3
+	var alignment_error := hand.get_pinch_world_position().distance_to(expected_grip)
+	if alignment_error > 0.0005:
+		push_error("CAPTURE_RED: %s pinch drifted %.6f m during settle" % [capture_name,alignment_error])
+		quit(1)
+		return false
+	return true
+
 func _resume_hand_choreography(scene: Node) -> void:
+	var hand := scene.get_node("RightHand") as HandVisual
+	if hand.has_meta(CAPTURE_GRIP_META):
+		hand.remove_meta(CAPTURE_GRIP_META)
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
 	if choreography != null:
 		choreography.set_process(true)
