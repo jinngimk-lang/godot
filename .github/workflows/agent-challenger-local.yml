@@ -145,6 +145,8 @@ jobs:
 
           response="$(jq -er '.response' /tmp/normalize-response.json)"
           printf '%s' "$response" | jq -e . > /tmp/verdict.json
+          git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
+          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
           defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
           min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
@@ -177,9 +179,9 @@ jobs:
               cat /tmp/review-report.txt
             else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: local Challenger did not produce a conforming structured verdict'
+              echo 'DEFECT: local Challenger did not produce a grounded structured verdict'
               echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
-              echo 'EVIDENCE: no VERIFIED or NEEDS_FIX verdict was accepted'
+              echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
             fi
             echo '```'
           } > /tmp/pr-comment.md
