@@ -122,19 +122,21 @@ jobs:
           jq -n \
             --arg analysis "$(head -c 12000 /tmp/review-analysis.txt)" \
             --arg context "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
+            --arg packet "$(head -c 26000 /tmp/review-packet.txt)" \
             '{
               model:"qwen2.5-coder:3b",
               stream:false,
-              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX. If it explicitly concludes the exact diff survives its falsification attempts, verdict may be VERIFIED. Context:\n" + $context + "\nAnalysis:\n" + $analysis),
+              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis or exact packet. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX only when the packet contains direct evidence for it. For NEEDS_FIX, evidence_anchor MUST be a contiguous 16-240 character verbatim quote from the packet that directly demonstrates the claimed defect; do not use section headings, unrelated pre-existing code, or a quote that contradicts the claim. If no such direct anchor exists, return VERIFIED rather than inventing a defect. For VERIFIED, set evidence_anchor to NO_CONCRETE_DEFECT. Context:\n" + $context + "\nAnalysis:\n" + $analysis + "\nExact packet excerpt:\n" + $packet),
               format:{
                 type:"object",
                 properties:{
                   verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
                   defect:{type:"string"},
                   min_test:{type:"string"},
-                  evidence:{type:"string"}
+                  evidence:{type:"string"},
+                  evidence_anchor:{type:"string"}
                 },
-                required:["verdict","defect","min_test","evidence"],
+                required:["verdict","defect","min_test","evidence","evidence_anchor"],
                 additionalProperties:false
               }
             }' > /tmp/normalize-request.json
@@ -145,15 +147,18 @@ jobs:
 
           response="$(jq -er '.response' /tmp/normalize-response.json)"
           printf '%s' "$response" | jq -e . > /tmp/verdict.json
+          git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
+          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
           defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
           min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
           evidence="$(jq -er '.evidence | strings' /tmp/verdict.json)"
+          evidence_anchor="$(jq -er '.evidence_anchor | strings' /tmp/verdict.json)"
           {
             printf 'VERDICT: %s\n' "$verdict"
             printf 'DEFECT: %s\n' "$defect"
             printf 'MIN_TEST: %s\n' "$min_test"
-            printf 'EVIDENCE: %s\n' "$evidence"
+            printf 'EVIDENCE: %s | ANCHOR: %s\n' "$evidence" "$evidence_anchor"
           } | tee /tmp/review-report.txt
           test "$(wc -l < /tmp/review-report.txt)" -eq 4
 
@@ -177,9 +182,9 @@ jobs:
               cat /tmp/review-report.txt
             else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: local Challenger did not produce a conforming structured verdict'
+              echo 'DEFECT: local Challenger did not produce a grounded structured verdict'
               echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
-              echo 'EVIDENCE: no VERIFIED or NEEDS_FIX verdict was accepted'
+              echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
             fi
             echo '```'
           } > /tmp/pr-comment.md

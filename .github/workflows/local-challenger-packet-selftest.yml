@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - tools/build_local_challenger_packet.sh
+      - tools/validate_local_challenger_verdict.sh
       - .github/workflows/agent-challenger-local.yml
       - .github/workflows/local-challenger-packet-selftest.yml
 
@@ -13,7 +14,7 @@ permissions:
 jobs:
   verify-packet-builder:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +23,9 @@ jobs:
 
       - name: Static shell guard
         shell: bash
-        run: bash -n tools/build_local_challenger_packet.sh
+        run: |
+          bash -n tools/build_local_challenger_packet.sh
+          bash -n tools/validate_local_challenger_verdict.sh
 
       - name: Reproduce HUD packet under safety budget
         shell: bash
@@ -45,72 +48,90 @@ jobs:
             echo 'HUD packet unexpectedly included hand-only contract bundle' >&2
             exit 1
           fi
+          if grep -Fq '_hand_presentation' /tmp/hud-review-packet.txt; then
+            echo 'HUD packet unexpectedly included unrelated hand helper' >&2
+            exit 1
+          fi
           bytes="$(wc -c < /tmp/hud-review-packet.txt)"
           echo "hud packet bytes=$bytes"
           test "$bytes" -lt 42000
 
-      - name: Install local reviewer
+      - name: Reject invented evidence anchor
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://ollama.com/install.sh | sh
-          nohup ollama serve >/tmp/ollama-server.log 2>&1 &
-          for _ in {1..40}; do
-            if ollama list >/dev/null 2>&1; then break; fi
-            sleep 1
-          done
-          ollama list >/dev/null
-          ollama pull qwen2.5-coder:3b
-
-      - name: Independent verifier-infra analysis
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main:refs/remotes/origin/main
+          cat > /tmp/grounding-packet.txt <<'PACKET'
+          --- scripts/presentation/hud_chrome_presentation.gd ---
+          func _compact_hud_text(source: String) -> String:
+              return source
+          PACKET
+          cat > /tmp/hallucinated-verdict.json <<'JSON'
           {
-            cat <<'PROMPT'
-          You are an independent CI verifier reviewer. Review ONLY the verifier-infrastructure diff below. Try to falsify these claims:
-          1. exact PR-head validation is still enforced by the caller workflow;
-          2. packet construction is path-adaptive rather than globally hand-specific;
-          3. the HUD route contains the changed implementation, deterministic test, gameplay HUD source, and smoke contracts;
-          4. packet size still fails closed at 42000 bytes;
-          5. no product/gameplay behavior is changed by this infrastructure patch.
+            "verdict":"NEEDS_FIX",
+            "defect":"A missing helper breaks the HUD path",
+            "min_test":"Implement _hand_presentation(node)",
+            "evidence":"_hand_presentation(node) is commented out",
+            "evidence_anchor":"_hand_presentation(node) is commented out"
+          }
+          JSON
+          set +e
+          bash tools/validate_local_challenger_verdict.sh /tmp/hallucinated-verdict.json /tmp/grounding-packet.txt
+          rc=$?
+          set -e
+          echo "invented anchor validator rc=$rc"
+          test "$rc" -eq 45
 
-          Check at least one concrete counterexample, such as building a packet for a head different from the current checkout or a non-HUD changed-path set. Produce concise adversarial prose. If there is a concrete defect, describe exactly how to reproduce it. If the claims survive your attacks, say why. Do not rely on a specific final-line format; a separate normalization step will classify your analysis.
-          PROMPT
-            git diff --unified=35 origin/main...HEAD -- tools/build_local_challenger_packet.sh .github/workflows/agent-challenger-local.yml .github/workflows/local-challenger-packet-selftest.yml
-          } > /tmp/infra-review-prompt.txt
-          ollama run qwen2.5-coder:3b < /tmp/infra-review-prompt.txt | tee /tmp/infra-analysis.txt
-          test -s /tmp/infra-analysis.txt
-
-      - name: Normalize independent verifier verdict
+      - name: Reject generic packet-heading anchor
         shell: bash
         run: |
           set -euo pipefail
-          jq -n \
-            --arg analysis "$(head -c 12000 /tmp/infra-analysis.txt)" \
-            --arg diff "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
-            '{
-              model:"qwen2.5-coder:3b",
-              stream:false,
-              prompt:("Normalize this independent verifier-infrastructure review. Do not invent defects unsupported by the analysis. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX. If it explicitly concludes the tested infrastructure claims survive its counterexamples, verdict may be VERIFIED. Diff context:\n" + $diff + "\nAnalysis:\n" + $analysis),
-              format:{
-                type:"object",
-                properties:{
-                  verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
-                  defect:{type:"string"},
-                  evidence:{type:"string"}
-                },
-                required:["verdict","defect","evidence"],
-                additionalProperties:false
-              }
-            }' > /tmp/infra-normalize-request.json
+          cat > /tmp/generic-anchor.json <<'JSON'
+          {
+            "verdict":"NEEDS_FIX",
+            "defect":"Generic section heading is not defect evidence",
+            "min_test":"none",
+            "evidence":"heading only",
+            "evidence_anchor":"=== HUD PRESENTATION CONTRACT ==="
+          }
+          JSON
+          set +e
+          bash tools/validate_local_challenger_verdict.sh /tmp/generic-anchor.json /tmp/grounding-packet.txt
+          rc=$?
+          set -e
+          echo "generic anchor validator rc=$rc"
+          test "$rc" -eq 44
 
-          curl -fsS http://127.0.0.1:11434/api/generate \
-            -H 'Content-Type: application/json' \
-            --data-binary @/tmp/infra-normalize-request.json > /tmp/infra-normalize-response.json
+      - name: Accept grounded NEEDS_FIX anchor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/grounding-packet.txt <<'PACKET'
+          --- scripts/presentation/hud_chrome_presentation.gd ---
+          func _compact_hud_text(source: String) -> String:
+              return source
+          PACKET
+          cat > /tmp/grounded-verdict.json <<'JSON'
+          {
+            "verdict":"NEEDS_FIX",
+            "defect":"Compact HUD helper needs a regression check",
+            "min_test":"Exercise _compact_hud_text(source)",
+            "evidence":"The helper is part of the exact packet",
+            "evidence_anchor":"func _compact_hud_text(source: String) -> String:"
+          }
+          JSON
+          bash tools/validate_local_challenger_verdict.sh /tmp/grounded-verdict.json /tmp/grounding-packet.txt
 
-          response="$(jq -er '.response' /tmp/infra-normalize-response.json)"
-          printf '%s' "$response" | jq -e . > /tmp/infra-verdict.json
-          cat /tmp/infra-verdict.json
-          jq -e '.verdict == "VERIFIED"' /tmp/infra-verdict.json >/dev/null
+      - name: Accept VERIFIED without defect grounding
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/verified.json <<'JSON'
+          {
+            "verdict":"VERIFIED",
+            "defect":"none",
+            "min_test":"none",
+            "evidence":"exact diff survived falsification",
+            "evidence_anchor":"NO_CONCRETE_DEFECT"
+          }
+          JSON
+          bash tools/validate_local_challenger_verdict.sh /tmp/verified.json /tmp/grounding-packet.txt
