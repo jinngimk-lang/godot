@@ -173,9 +173,12 @@ func _build_curve_mesh(start: Vector3, control: Vector3, end: Vector3) -> ArrayM
 	return mesh
 
 func _radius_profile(t: float) -> float:
+	# Keep the procedural bridge subordinate to the hero hands. The previous
+	# 0.155→0.285 profile occupied a large low-frequency band across all three
+	# reference scenes and read as a straight beam at thumbnail scale.
 	var p := clampf(t,0.0,1.0)
-	var base := lerpf(0.155,0.285,smoothstep(0.0,1.0,p))
-	return base*(1.0+0.065*sin(p*PI))
+	var base := lerpf(0.130,0.200,smoothstep(0.0,1.0,p))
+	return base*(1.0+0.030*sin(p*PI))
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
