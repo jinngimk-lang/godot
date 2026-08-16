@@ -95,18 +95,17 @@ jobs:
           chmod +x godot
           ./godot --version
 
-      - name: Import generated v88 GLB
+      - name: Validate generated v88 GLB source
         shell: bash
         run: |
           set -euo pipefail
-          # `--import` waits for newly generated source assets to finish importing
-          # before exiting. A plain editor `--quit` can terminate after the scan
-          # but before the runtime-imported GLB has a usable remap/cache entry.
-          ./godot --headless --path . --import 2>&1 | tee artifacts/mpfb_v88_product/logs/godot-import.log
-          if grep -E 'SCRIPT ERROR: Parse Error|ERROR: Failed to load script' artifacts/mpfb_v88_product/logs/godot-import.log; then
-            exit 1
-          fi
-          test -s assets/models/hands/staging/support_limb_v88.glb.import
+          # Do not run a global editor import here: this staging branch contains
+          # authoring .blend evidence, which makes a headless full-project import
+          # depend on Blender editor settings unrelated to the generated GLB.
+          # capture_v88_product_camera.gd uses GLTFDocument to read this source
+          # file directly at runtime and generate the candidate scene in memory.
+          test -s assets/models/hands/staging/support_limb_v88.glb
+          sha256sum assets/models/hands/staging/support_limb_v88.glb | tee artifacts/mpfb_v88_product/logs/generated-glb.sha256
 
       - name: Capture same-camera XR versus v88 product frames
         shell: bash
@@ -129,6 +128,6 @@ jobs:
           path: |
             artifacts/v88_product_camera/*.png
             artifacts/mpfb_v88_product/reports/*.json
-            artifacts/mpfb_v88_product/logs/*.log
+            artifacts/mpfb_v88_product/logs/*
           if-no-files-found: warn
           retention-days: 14
