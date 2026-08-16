@@ -78,10 +78,12 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	# bend readable in a single screenshot; gameplay still uses live pointer input.
 	var grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_world := label.to_global(grip_local)
-	# This test stages peel state directly rather than driving PeelController. Keep
-	# hand choreography paused until the screenshot is written; otherwise the idle
-	# controller state overwrites the staged hand during settle frames and publishes
-	# a frame that is neither the requested Pinch Tight pose nor exact flap contact.
+	# This capture stages peel state directly rather than driving PeelController.
+	# Freeze both owners that can mutate the peel hand during settle frames: the
+	# scene's gameplay _process() (which ticks HandVisual from idle controller
+	# state) and the presentation choreography layer. Resume both immediately
+	# after the screenshot so later variants exercise normal runtime ownership.
+	scene.set_process(false)
 	if choreography != null:
 		choreography.set_process(false)
 	hand.set_pinch_amount(1.0)
@@ -117,7 +119,7 @@ func _assert_staged_peel_survived_settle(scene: Node, capture_name: String) -> b
 		push_error("CAPTURE_RED: %s lost Pinch Tight during settle (got %s)" % [capture_name,active_pose])
 		quit(1)
 		return false
-	var expected_grip := hand.get_meta(CAPTURE_GRIP_META) as Vector3
+	var expected_grip: Vector3 = hand.get_meta(CAPTURE_GRIP_META)
 	var alignment_error := hand.get_pinch_world_position().distance_to(expected_grip)
 	if alignment_error > 0.0005:
 		push_error("CAPTURE_RED: %s pinch drifted %.6f m during settle" % [capture_name,alignment_error])
@@ -132,6 +134,7 @@ func _resume_hand_choreography(scene: Node) -> void:
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
 	if choreography != null:
 		choreography.set_process(true)
+	scene.set_process(true)
 
 func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
