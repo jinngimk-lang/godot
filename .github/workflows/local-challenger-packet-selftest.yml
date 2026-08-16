@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - tools/build_local_challenger_packet.sh
+      - tools/validate_local_challenger_verdict.sh
       - .github/workflows/agent-challenger-local.yml
       - .github/workflows/local-challenger-packet-selftest.yml
 
@@ -22,7 +23,9 @@ jobs:
 
       - name: Static shell guard
         shell: bash
-        run: bash -n tools/build_local_challenger_packet.sh
+        run: |
+          bash -n tools/build_local_challenger_packet.sh
+          bash -n tools/validate_local_challenger_verdict.sh
 
       - name: Reproduce HUD packet under safety budget
         shell: bash
@@ -49,6 +52,37 @@ jobs:
           echo "hud packet bytes=$bytes"
           test "$bytes" -lt 42000
 
+      - name: Reject hallucinated NEEDS_FIX symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/hallucinated-verdict.json <<'JSON'
+          {
+            "verdict":"NEEDS_FIX",
+            "defect":"A missing helper breaks the HUD path",
+            "min_test":"Implement _hand_presentation(node)",
+            "evidence":"_hand_presentation(node) is commented out"
+          }
+          JSON
+          if bash tools/validate_local_challenger_verdict.sh /tmp/hallucinated-verdict.json /tmp/hud-review-packet.txt; then
+            echo 'hallucinated NEEDS_FIX unexpectedly passed grounding validation' >&2
+            exit 1
+          fi
+
+      - name: Accept grounded NEEDS_FIX symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/grounded-verdict.json <<'JSON'
+          {
+            "verdict":"NEEDS_FIX",
+            "defect":"Compact HUD helper needs a regression check",
+            "min_test":"Exercise _compact_hud_text(source)",
+            "evidence":"func _compact_hud_text(source: String) -> String:"
+          }
+          JSON
+          bash tools/validate_local_challenger_verdict.sh /tmp/grounded-verdict.json /tmp/hud-review-packet.txt
+
       - name: Install local reviewer
         shell: bash
         run: |
@@ -74,11 +108,12 @@ jobs:
           2. packet construction is path-adaptive rather than globally hand-specific;
           3. the HUD route contains the changed implementation, deterministic test, gameplay HUD source, and smoke contracts;
           4. packet size still fails closed at 42000 bytes;
-          5. no product/gameplay behavior is changed by this infrastructure patch.
+          5. NEEDS_FIX verdicts that cite nonexistent function/file symbols fail closed before they can block product work;
+          6. no product/gameplay behavior is changed by this infrastructure patch.
 
-          Check at least one concrete counterexample, such as building a packet for a head different from the current checkout or a non-HUD changed-path set. Produce concise adversarial prose. If there is a concrete defect, describe exactly how to reproduce it. If the claims survive your attacks, say why. Do not rely on a specific final-line format; a separate normalization step will classify your analysis.
+          Check at least one concrete counterexample. Produce concise adversarial prose. If there is a concrete defect, describe exactly how to reproduce it. If the claims survive your attacks, say why. Do not rely on a specific final-line format; a separate normalization step will classify your analysis.
           PROMPT
-            git diff --unified=35 origin/main...HEAD -- tools/build_local_challenger_packet.sh .github/workflows/agent-challenger-local.yml .github/workflows/local-challenger-packet-selftest.yml
+            git diff --unified=35 origin/main...HEAD -- tools/build_local_challenger_packet.sh tools/validate_local_challenger_verdict.sh .github/workflows/agent-challenger-local.yml .github/workflows/local-challenger-packet-selftest.yml
           } > /tmp/infra-review-prompt.txt
           ollama run qwen2.5-coder:3b < /tmp/infra-review-prompt.txt | tee /tmp/infra-analysis.txt
           test -s /tmp/infra-analysis.txt
