@@ -6,12 +6,13 @@ on:
       - spike/mpfb-grip-web-viewport-v88
       - spike/mpfb-grip-web-crop-v89
       - spike/mpfb-grip-enclosure-v90
+      - spike/mpfb-whole-hand-spatial-v91
     paths:
       - '.github/workflows/mpfb-v88-product-camera.yml'
       - 'tools/export_mpfb_support_candidate_v88.py'
       - 'tools/build_mpfb_grip_helper_authoring_panel_v87.py'
       - 'tools/build_mpfb_grip_helper_authoring_overlay_v86.py'
-      - 'tools/build_mpfb_grip_helper_ghost_v85.py'
+      - 'tools/build_mpfb_grip-helper-ghost-v85.py'
       - 'tools/build_mpfb_grip_helper_authoring_v84.py'
       - 'tests/capture_v88_product_camera.gd'
       - 'art/reference_sources/contactpose-v79-full6-use-hand1.json'
@@ -63,6 +64,7 @@ jobs:
           tar -xJf .preview-tools/blender.tar.xz -C .preview-tools
           mv .preview-tools/blender-4.2.0-linux-x64 .preview-tools/blender
           curl -L --fail --retry 3 -o .preview-tools/mpfb.tar.gz https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.17.tar.gz
+          echo '92409ef66fa1108fae?PLACEHOLDER' >/dev/null
           echo '92409ef66fa1108fa13a9b842048e0568a5a7dec5983cc5ccb728e0696195bbe  .preview-tools/mpfb.tar.gz' | sha256sum -c -
           tar -xzf .preview-tools/mpfb.tar.gz -C .preview-tools
           .preview-tools/blender/blender --command extension build --source-dir .preview-tools/mpfb2-2.0.17/src/mpfb --output-filepath .preview-tools/mpfb.zip --valid-tags=""
@@ -108,7 +110,6 @@ jobs:
           assert r['crop_envelope']['palm_radius']==0.058, r
           assert r['crop_envelope']['wrist_forearm_radius']==0.046, r
           assert r['crop_envelope']['finger_radius']==0.018, r
-          # v90 is one fixed R1b enclosure correction, not a parameter sweep.
           expected={
             'wrist.R': {'rx': 10.0},
             'right_master_grip': {'rx': 18.0},
@@ -119,8 +120,9 @@ jobs:
             'right_finger5_grip': {'rx': 16.0},
           }
           assert r['pose_deltas_degrees']==expected, r
-          assert 'R1b' in r['enclosure_edit_reason'], r
-          print('V90_STAGING_BOUNDARY_PASS')
+          assert r['whole_hand_spatial_yaw_degrees']==16.0, r
+          assert 'abstraction change' in r['enclosure_edit_reason'], r
+          print('V91_STAGING_BOUNDARY_PASS')
           PY
 
       - name: Validate generated v88 GLB source
