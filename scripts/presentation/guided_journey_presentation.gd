@@ -46,9 +46,9 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	else:
 		_action_text = "PEEL THE LABEL  •  CLICK / DRAG"
 
-	# Keep the target-like peel moment visually quiet while preserving scene
-	# navigation before engagement and after detach for pointer/touch users.
-	_rail_visible = not (progress > 0.001 and not post_interaction)
+	# Keep target-like interaction moments visually quiet while preserving scene
+	# navigation before engagement, after detach, and between active rituals.
+	_rail_visible = not ((progress > 0.001 and not post_interaction) or phase == "CRUMPLING")
 	# Fixed reference-frame inspection is staged by directly applying product yaw
 	# while the guide process is frozen. Treat that visible yaw as inspection
 	# evidence so capture and live RMB inspection share the same quiet UI contract.
