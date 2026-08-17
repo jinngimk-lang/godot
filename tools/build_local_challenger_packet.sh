@@ -8,6 +8,8 @@ TASK_ID_VALUE="${TASK_ID_VALUE:-unknown}"
 PR_NUMBER_VALUE="${PR_NUMBER_VALUE:-unknown}"
 EXPECTED_HEAD_VALUE="${EXPECTED_HEAD_VALUE:-$HEAD_REF}"
 ROUND_VALUE="${ROUND_VALUE:-unknown}"
+MAX_PACKET_BYTES=42000
+GENERIC_EXCERPT_BYTES=3200
 
 changed_paths="$(git diff --name-only "$BASE_REF...$HEAD_REF")"
 
@@ -46,9 +48,6 @@ append_hud_contracts() {
       end=$((start + 78))
       printf '%s\n' "$peel_lab" | sed -n "${start},${end}p"
     fi
-    # Keep smoke evidence tight around the HUD assertions. A wider excerpt used
-    # to pull the unrelated _hand_presentation helper into HUD review packets,
-    # which gave the small local reviewer irrelevant material to hallucinate on.
     echo '=== PLAYABLE HUD SMOKE ==='
     printf '%s\n' "$smoke_scene" | grep -n -B 4 -A 8 -E 'player HUD|hud_text|reset and pause affordances' || true
     echo '=== REFERENCE HUD SMOKE ==='
@@ -80,7 +79,11 @@ append_generic_contracts() {
         scripts/*.gd|scripts/**/*.gd|tests/*.gd|tests/**/*.gd)
           if git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
             echo "--- $path ---"
-            show_file "$path" | head -c 6500
+            # `head -c` intentionally closes the pipe once the evidence budget
+            # is reached. Under `set -o pipefail`, git-show then receives
+            # SIGPIPE (141), so explicitly accept that expected bounded-read
+            # termination while still retaining evidence from every file.
+            show_file "$path" | head -c "$GENERIC_EXCERPT_BYTES" || true
             echo
           fi
           ;;
@@ -101,7 +104,7 @@ fi
 
 bytes="$(wc -c < "$OUT")"
 echo "review packet bytes=$bytes"
-if [ "$bytes" -ge 42000 ]; then
-  echo "review packet exceeds 42000-byte safety budget" >&2
+if [ "$bytes" -ge "$MAX_PACKET_BYTES" ]; then
+  echo "review packet exceeds ${MAX_PACKET_BYTES}-byte safety budget" >&2
   exit 1
 fi
