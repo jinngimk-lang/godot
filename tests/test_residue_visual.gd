@@ -62,6 +62,21 @@ func run() -> Array[String]:
 				failures.append("RED: fibrous backing should read more opaque than the glue film")
 	if not residue.has_layered_residue():
 		failures.append("RED: damaged residue state should report layered adhesive + fiber presentation")
+
+	# Torn backing must read as a few broad irregular islands, not a row of tiny
+	# square cells. The drawing path consumes these exact deterministic spans.
+	if not residue.has_method("get_fiber_island_spans"):
+		failures.append("RESIDUE_SHAPE_RED: damaged residue needs deterministic broad fiber-island spans")
+	else:
+		var islands: PackedVector2Array = residue.get_fiber_island_spans(0.62)
+		if islands.size() < 3 or islands.size() > 5:
+			failures.append("RESIDUE_SHAPE_RED: torn backing should use 3..5 broad islands, got %d" % islands.size())
+		for island in islands:
+			var width := island.y-island.x
+			if island.x < -0.0001 or island.y > 0.6201 or width < 0.085:
+				failures.append("RESIDUE_SHAPE_RED: fiber island must stay inside peeled span and be visibly broad, got [%.3f, %.3f]" % [island.x,island.y])
+				break
+
 	var low_damage_fiber: float = float(residue.get_fiber_strength())
 	residue.set_residue(0.62, 0.34, 0.32)
 	var high_damage_fiber: float = float(residue.get_fiber_strength())
