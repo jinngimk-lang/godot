@@ -16,7 +16,7 @@ func run() -> Array[String]:
 	if not print_methods.has("set_order"):
 		failures.append("LabelPrint must expose set_order")
 
-	var print_view := print_script.new()
+	var print_view: SubViewport = print_script.new()
 	print_view._ready()
 	print_view.set_order("M03", "YUZU")
 	var market_note := print_view.get_node_or_null("PrintRoot/Note") as Label
