@@ -133,11 +133,13 @@ func _base_transform_for(index: int, count: int) -> Transform3D:
 	var inner_radius := _inner_radius(dims)
 	var denominator := maxf(float(count - 1) * 0.5, 1.0)
 	var spread := (float(index) - float(count - 1) * 0.5) / denominator
-	# Bias the small payload into the back half of the open vessel so the ice
-	# remains readable from the fixed product camera without escaping bounds.
+	# Bias the small payload into the back half of the vessel so the ice remains
+	# readable from the fixed product camera. Paper cups can stage near the rim;
+	# glass bottles can configure a lower body/liquid ceiling so cubes never
+	# float into the shoulder/neck and masquerade as a closure.
 	var x := spread * inner_radius * 0.48
 	var z := -inner_radius * (0.20 + 0.08 * float(index % 2))
-	var top_limit := dims.z * 0.5 - _cube_size * 0.10
+	var top_limit := _content_top_limit(dims)
 	var y := top_limit - _cube_size * 0.04 * float(index % 2)
 	var position := _clamp_position(Vector3(x, y, z), dims)
 	var rotation := Vector3(
@@ -194,13 +196,22 @@ func _dimensions() -> Vector3:
 func _inner_radius(dims: Vector3) -> float:
 	return maxf(minf(dims.x, dims.y) - _cube_size * 0.60, 0.01)
 
+func _content_top_limit(dims: Vector3) -> float:
+	var bottom_limit := -dims.z * 0.5 + _cube_size * 0.75
+	var default_top := dims.z * 0.5 - _cube_size * 0.10
+	var contents: Dictionary = _profile.get("contents_profile", {})
+	var configured := float(contents.get("max_center_y", default_top))
+	if not is_finite(configured):
+		return default_top
+	return clampf(configured, bottom_limit, default_top)
+
 func _clamp_position(position: Vector3, dims: Vector3) -> Vector3:
 	var inner_radius := _inner_radius(dims)
 	var radial := Vector2(position.x, position.z)
 	if radial.length() > inner_radius:
 		radial = radial.normalized() * inner_radius
 	var bottom_limit := -dims.z * 0.5 + _cube_size * 0.75
-	var top_limit := dims.z * 0.5 - _cube_size * 0.10
+	var top_limit := _content_top_limit(dims)
 	return Vector3(radial.x, clampf(position.y, bottom_limit, top_limit), radial.y)
 
 func _ice_material(index: int) -> StandardMaterial3D:
