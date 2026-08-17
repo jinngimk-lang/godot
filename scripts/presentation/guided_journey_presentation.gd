@@ -4,7 +4,6 @@ class_name GuidedJourneyPresentation
 signal scene_requested(index: int)
 
 const SCENE_NAMES := ["WINDOW CAFÉ", "AMBER BAR", "MARKET COOLER"]
-const SCENE_SHORT := ["CAFÉ", "BAR", "MARKET"]
 
 var _built := false
 var _active_scene_index := 0
@@ -13,6 +12,8 @@ var _scene_status: Label
 var _action: Label
 var _buttons: Array[Button] = []
 var _parent_connected := false
+var _reward: Label
+var _continue_button: Button
 
 func _ready() -> void:
 	_ensure_ui()
@@ -22,6 +23,7 @@ func _process(_delta: float) -> void:
 	_ensure_ui()
 	_connect_parent_navigation()
 	_pull_runtime_state()
+	_refresh_existing_hud()
 
 func set_state(scene_index: int, phase_name: String, post_action: String, peel_progress: float, detached: bool) -> void:
 	_ensure_ui()
@@ -35,8 +37,6 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 			_action_text = "LABEL OFF  •  OPTIONAL SQUEEZE  •  CONTINUE"
 		else:
 			_action_text = "LABEL OFF  •  INSPECT RESIDUE  •  CONTINUE"
-	elif phase == "DETACHING":
-		_action_text = "FINISH THE RELEASE"
 	elif progress > 0.001:
 		_action_text = "PEEL THE LABEL  •  %d%%" % int(round(progress * 100.0))
 	else:
@@ -89,6 +89,10 @@ func _ensure_ui() -> void:
 	var layer := lab.get_node_or_null("HUD") as CanvasLayer
 	if layer == null:
 		return
+
+	_reward = layer.get_node_or_null("Reward") as Label
+	_continue_button = layer.get_node_or_null("Continue") as Button
+	_style_existing_hud()
 
 	var guide := Panel.new()
 	guide.name = "JourneyGuide"
@@ -156,6 +160,50 @@ func _ensure_ui() -> void:
 
 	_built = true
 	_apply_state_to_ui()
+	_refresh_existing_hud()
+
+func _style_existing_hud() -> void:
+	if _reward != null:
+		_reward.position = Vector2(18, 126)
+		_reward.size = Vector2(310, 24)
+		_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_reward.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_reward.add_theme_font_size_override("font_size", 10)
+		_reward.add_theme_color_override("font_color", Color(0.98, 0.91, 0.76, 0.78))
+	if _continue_button != null:
+		_continue_button.anchor_left = 0.5
+		_continue_button.anchor_top = 1.0
+		_continue_button.anchor_right = 0.5
+		_continue_button.anchor_bottom = 1.0
+		_continue_button.offset_left = 302.0
+		_continue_button.offset_top = -62.0
+		_continue_button.offset_right = 494.0
+		_continue_button.offset_bottom = -12.0
+		_continue_button.add_theme_font_size_override("font_size", 11)
+		_continue_button.add_theme_stylebox_override("normal", _button_style(Color(0.10, 0.075, 0.045, 0.76), Color(1.0, 0.84, 0.60, 0.18)))
+		_continue_button.add_theme_stylebox_override("hover", _button_style(Color(0.20, 0.13, 0.065, 0.86), Color(1.0, 0.86, 0.61, 0.34)))
+		_continue_button.add_theme_stylebox_override("pressed", _button_style(Color(0.26, 0.15, 0.065, 0.92), Color(1.0, 0.88, 0.63, 0.46)))
+
+func _refresh_existing_hud() -> void:
+	if _reward == null or _continue_button == null:
+		var lab := get_parent()
+		var layer := lab.get_node_or_null("HUD") as CanvasLayer if lab != null else null
+		if layer != null:
+			_reward = layer.get_node_or_null("Reward") as Label
+			_continue_button = layer.get_node_or_null("Continue") as Button
+			_style_existing_hud()
+	if _reward != null and not _reward.text.is_empty():
+		_reward.text = _compact_reward(_reward.text)
+
+func _compact_reward(source: String) -> String:
+	var upper := source.to_upper()
+	if upper.contains("CLEAN RELEASE"):
+		return "CLEAN RELEASE  •  NEXT SCENE READY"
+	if upper.contains("TEXTURED RELEASE"):
+		return "TEXTURED RELEASE  •  NEXT SCENE READY"
+	if upper.contains("GENTLE CRUMPLE"):
+		return "GENTLE CRUMPLE  •  CONTINUE WHEN READY"
+	return source.get_slice("\n", 0).strip_edges()
 
 func _request_scene(index: int) -> void:
 	scene_requested.emit(clampi(index, 0, SCENE_NAMES.size() - 1))
