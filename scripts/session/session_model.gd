@@ -21,7 +21,7 @@ const VARIANTS := [
 		"label_profile":{
 			"substrate":"thermal_paper",
 			"roughness":0.94,
-			"front_fill":0.20,
+			"front_fill":0.25,
 			"thickness_scale":0.92,
 			"fiber_scale":0.82,
 			"edge_tint":Color(0.78,0.74,0.64),
