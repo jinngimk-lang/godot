@@ -3,6 +3,7 @@ extends SceneTree
 const OUTPUT_DIR := "res://artifacts/reference_frames"
 const THUMB_SIZE := Vector2i(48,27)
 const CAPTURE_GRIP_META := &"capture_expected_grip_world"
+const CAPTURE_GUIDE_WAS_PROCESSING := &"capture_guide_was_processing"
 
 func _init() -> void:
 	call_deferred("_run")
@@ -21,11 +22,13 @@ func _run() -> void:
 	scene.call("debug_select_variant",0)
 	await _settle_frames(8)
 	if not await _capture("cafe"): return
-	_stage_peel(scene,0.38,0.05,0.94)
+	# Clean café peel: prove the pressure-sensitive contact film without
+	# fabricating torn backing fibers.
+	_stage_peel(scene,0.38,0.0,1.0,"clean")
 	await _settle_frames(5)
-	if not _assert_staged_peel_survived_settle(scene,"cafe_peel38"): return
+	if not _assert_staged_peel_survived_settle(scene,"cafe_peel38","clean"): return
 	if not await _capture("cafe_peel38"): return
-	_resume_hand_choreography(scene)
+	_resume_staged_capture(scene)
 	scene.call("debug_select_variant",0)
 	await _settle_frames(4)
 	_stage_crumple(scene,0.55)
@@ -35,45 +38,50 @@ func _run() -> void:
 	scene.call("debug_select_variant",1)
 	await _settle_frames(8)
 	if not await _capture("bar"): return
-	_stage_peel(scene,0.48,0.18,0.78)
+	# Bar is intentionally the damaged/fibrous fixture: it must show the clean
+	# glue film plus a separate dry backing layer.
+	_stage_peel(scene,0.48,0.18,0.78,"damaged")
 	await _settle_frames(5)
-	if not _assert_staged_peel_survived_settle(scene,"bar_peel48"): return
+	if not _assert_staged_peel_survived_settle(scene,"bar_peel48","damaged"): return
 	if not await _capture("bar_peel48"): return
-	_resume_hand_choreography(scene)
+	_resume_staged_capture(scene)
 	scene.call("debug_select_variant",1)
 	await _settle_frames(4)
 	_stage_inspect(scene,0.58,0.22,0.78)
 	await _settle_frames(8)
 	if not _assert_staged_inspect_survived_settle(scene,"bar_inspect"): return
 	if not await _capture("bar_inspect"): return
-	_resume_hand_choreography(scene)
+	_resume_staged_capture(scene)
 
 	scene.call("debug_select_variant",2)
 	await _settle_frames(8)
 	if not await _capture("market"): return
-	_stage_peel(scene,0.45,0.07,0.93)
+	# Clean coated-market peel: lower-tack contact film, no torn paper layer.
+	_stage_peel(scene,0.45,0.0,1.0,"clean")
 	await _settle_frames(5)
-	if not _assert_staged_peel_survived_settle(scene,"market_peel45"): return
+	if not _assert_staged_peel_survived_settle(scene,"market_peel45","clean"): return
 	if not await _capture("market_peel45"): return
-	_resume_hand_choreography(scene)
+	_resume_staged_capture(scene)
 	scene.call("debug_select_variant",2)
 	await _settle_frames(4)
 	_stage_inspect(scene,-0.62,0.10,0.90)
 	await _settle_frames(8)
 	if not _assert_staged_inspect_survived_settle(scene,"market_inspect"): return
 	if not await _capture("market_inspect"): return
-	_resume_hand_choreography(scene)
+	_resume_staged_capture(scene)
 
 	scene.queue_free()
 	await process_frame
-	print("PASS: captured base + peel + crumple/inspect visual-convergence frames")
+	print("PASS: captured base + explicit clean-glue/damaged-fiber peel + crumple/inspect evidence")
 	quit(0)
 
-func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity: float) -> void:
+func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity: float, evidence_kind: String) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var hand := scene.get_node("RightHand") as HandVisual
-	var residue := scene.get_node("ResidueVisual")
+	var residue := scene.get_node("ResidueVisual") as ResidueVisual
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
+	var session = scene.get("_session")
 	label.visible = true
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
@@ -92,9 +100,14 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 		push_error("CAPTURE_RED: effective hand target misses rendered flap tip by %.6f m" % hand_to_flap_error)
 		quit(1)
 		return
+
 	scene.set_process(false)
 	if choreography != null:
 		choreography.set_process(false)
+	if guide != null:
+		guide.set_meta(CAPTURE_GUIDE_WAS_PROCESSING,guide.is_processing())
+		guide.set_process(false)
+
 	hand.set_pinch_amount(1.0)
 	hand.set("_pinch_amount",1.0)
 	hand.call("_apply_pose")
@@ -115,10 +128,37 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 		quit(1)
 		return
 	label.set_peel(progress,label.to_local(aligned_pinch))
-	residue.call("set_residue",progress,residue_amount,integrity)
+	residue.set_residue(progress,residue_amount,integrity)
 
-func _assert_staged_peel_survived_settle(scene: Node, capture_name: String) -> bool:
+	# Staged visual evidence must tell the same state story as the image. Keep
+	# the capture-only pose isolated from gameplay authority, but update the
+	# player-facing status to the exact staged progress instead of showing 0%.
+	scene.call("_update_hud","PEELING","PEELING",progress)
+	if guide != null and session != null:
+		var variant: Dictionary = session.current_variant()
+		guide.set_state(int(session.get_variant_index()),"PEELING",String(variant.get("post_peel_action","inspect")),progress,false)
+
+	if not residue.has_adhesive_trace():
+		push_error("CAPTURE_RED: staged %s peel did not produce an adhesive trace" % evidence_kind)
+		quit(1)
+		return
+	var surfaces := residue.mesh.get_surface_count() if residue.mesh != null else 0
+	if evidence_kind == "clean":
+		if surfaces != 1 or residue.get_fiber_strength() > 0.02:
+			push_error("CAPTURE_RED: clean peel must show exactly one glue-film surface and no torn fibers (surfaces=%d fiber=%.3f)" % [surfaces,residue.get_fiber_strength()])
+			quit(1)
+			return
+	elif evidence_kind == "damaged":
+		if surfaces < 2 or not residue.has_layered_residue():
+			push_error("CAPTURE_RED: damaged peel must show separate glue + fibrous backing surfaces (surfaces=%d)" % surfaces)
+			quit(1)
+			return
+
+func _assert_staged_peel_survived_settle(scene: Node, capture_name: String, evidence_kind: String) -> bool:
 	var hand := scene.get_node("RightHand") as HandVisual
+	var residue := scene.get_node("ResidueVisual") as ResidueVisual
+	var hud := scene.get_node_or_null("HUD/Instructions") as Label
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
 	if not hand.has_meta(CAPTURE_GRIP_META):
 		push_error("CAPTURE_RED: %s missing staged grip contract" % capture_name)
 		quit(1)
@@ -132,6 +172,28 @@ func _assert_staged_peel_survived_settle(scene: Node, capture_name: String) -> b
 	var alignment_error := hand.get_pinch_world_position().distance_to(expected_grip)
 	if alignment_error > 0.0005:
 		push_error("CAPTURE_RED: %s pinch drifted %.6f m during settle" % [capture_name,alignment_error])
+		quit(1)
+		return false
+	if residue == null or not residue.has_adhesive_trace():
+		push_error("CAPTURE_RED: %s lost adhesive trace during settle" % capture_name)
+		quit(1)
+		return false
+	var surfaces := residue.mesh.get_surface_count() if residue.mesh != null else 0
+	if evidence_kind == "clean" and surfaces != 1:
+		push_error("CAPTURE_RED: %s clean evidence drifted to %d residue surfaces" % [capture_name,surfaces])
+		quit(1)
+		return false
+	if evidence_kind == "damaged" and surfaces < 2:
+		push_error("CAPTURE_RED: %s damaged evidence lost layered residue" % capture_name)
+		quit(1)
+		return false
+	var expected_percent := capture_name.trim_prefix("cafe_peel").trim_prefix("bar_peel").trim_prefix("market_peel")
+	if hud == null or not hud.text.contains("Peel %s%%" % expected_percent):
+		push_error("CAPTURE_RED: %s HUD does not match staged peel progress" % capture_name)
+		quit(1)
+		return false
+	if guide != null and not guide.get_action_text().contains("%s%%" % expected_percent):
+		push_error("CAPTURE_RED: %s JourneyGuide does not match staged peel progress" % capture_name)
 		quit(1)
 		return false
 	return true
@@ -149,25 +211,40 @@ func _assert_staged_inspect_survived_settle(scene: Node, capture_name: String) -
 		return false
 	return true
 
-func _resume_hand_choreography(scene: Node) -> void:
+func _resume_staged_capture(scene: Node) -> void:
 	var hand := scene.get_node("RightHand") as HandVisual
 	if hand.has_meta(CAPTURE_GRIP_META):
 		hand.remove_meta(CAPTURE_GRIP_META)
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
 	if choreography != null:
 		choreography.set_process(true)
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
+	if guide != null:
+		var should_process := bool(guide.get_meta(CAPTURE_GUIDE_WAS_PROCESSING,true))
+		guide.set_process(should_process)
+		if guide.has_meta(CAPTURE_GUIDE_WAS_PROCESSING):
+			guide.remove_meta(CAPTURE_GUIDE_WAS_PROCESSING)
 	scene.set_process(true)
 
 func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var residue := scene.get_node("ResidueVisual") as ResidueVisual
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
+	var session = scene.get("_session")
 	scene.set_process(false)
 	if choreography != null:
 		choreography.set_process(false)
+	if guide != null:
+		guide.set_meta(CAPTURE_GUIDE_WAS_PROCESSING,guide.is_processing())
+		guide.set_process(false)
 	label.visible = false
 	residue.set_residue(0.88,residue_amount,integrity)
 	scene.call("_apply_inspection_yaw",yaw)
+	scene.call("_update_hud","HELD","HELD",1.0)
+	if guide != null and session != null:
+		var variant: Dictionary = session.current_variant()
+		guide.set_state(int(session.get_variant_index()),"HELD",String(variant.get("post_peel_action","inspect")),1.0,true)
 
 func _stage_crumple(scene: Node, amount: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
