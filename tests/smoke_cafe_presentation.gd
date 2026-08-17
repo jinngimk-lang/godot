@@ -31,6 +31,24 @@ func _run() -> void:
 		if ground_shadow == null or ground_shadow.mesh == null or ground_shadow.material_override == null:
 			failures.append("CAFE_RED: missing soft cup GroundShadow")
 
+		var lid_sip_tab := presentation.get_node_or_null("LidSipTab") as MeshInstance3D
+		if lid_sip_tab == null or not (lid_sip_tab.mesh is CylinderMesh) or lid_sip_tab.material_override == null:
+			failures.append("CAFE_RED: black café lid needs a molded LidSipTab instead of reading as stacked flat discs")
+		else:
+			var sip_mesh := lid_sip_tab.mesh as CylinderMesh
+			if sip_mesh.top_radius < 0.055 or sip_mesh.top_radius > 0.095 or sip_mesh.height < 0.008 or sip_mesh.height > 0.028:
+				failures.append("CAFE_RED: LidSipTab must stay a subtle molded drinking feature")
+			if lid_sip_tab.position.z < 0.12:
+				failures.append("CAFE_RED: LidSipTab must sit toward the camera-facing drinking edge")
+
+		var lid_vent := presentation.get_node_or_null("LidVentDimple") as MeshInstance3D
+		if lid_vent == null or not (lid_vent.mesh is CylinderMesh) or lid_vent.material_override == null:
+			failures.append("CAFE_RED: black café lid needs a small LidVentDimple for molded depth")
+		else:
+			var vent_mesh := lid_vent.mesh as CylinderMesh
+			if vent_mesh.top_radius > 0.035 or vent_mesh.height > 0.018:
+				failures.append("CAFE_RED: LidVentDimple must remain quiet secondary lid detail")
+
 		var seam := presentation.get_node_or_null("CupPaperSeam") as MeshInstance3D
 		if seam == null or not (seam.mesh is ArrayMesh) or seam.material_override == null:
 			failures.append("CAFE_RED: missing tapered CupPaperSeam presentation geometry")
@@ -100,7 +118,7 @@ func _run() -> void:
 		failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
 
 	if failures.is_empty():
-		print("PASS: cafe backdrop, soft grounding, paper-cup structure and receipt print layout")
+		print("PASS: cafe backdrop, molded lid, soft grounding, paper-cup structure and receipt print layout")
 		scene.queue_free()
 		await process_frame
 		quit(0)
