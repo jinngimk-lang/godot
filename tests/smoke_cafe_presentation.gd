@@ -55,8 +55,6 @@ func _run() -> void:
 		elif not (lip_shadow.material_override is StandardMaterial3D):
 			failures.append("CAFE_RED: CupLipShadow must use a controllable semantic material")
 
-		# Presentation colors must follow the current tactile cup palette instead of
-		# remaining hard-coded to the first warm-paper variant.
 		var cup := scene.get_node_or_null("Cup") as MeshInstance3D
 		if cup == null:
 			failures.append("CAFE_RED: missing production Cup for palette-sync contract")
@@ -74,6 +72,27 @@ func _run() -> void:
 			if after_seam.r >= probe_material.albedo_color.r or after_fold.r >= probe_material.albedo_color.r:
 				failures.append("CAFE_RED: seam/base paper details should remain a subtle darker structural variation of the Cup palette")
 
+	var label_print := scene.get_node_or_null("LabelPrint") as SubViewport
+	if label_print == null:
+		failures.append("CAFE_RED: missing LabelPrint")
+	else:
+		var print_aspect := float(label_print.size.x)/maxf(float(label_print.size.y),1.0)
+		if print_aspect > 1.35:
+			failures.append("CAFE_RED: Café LabelPrint must use a near-square receipt layout, aspect %.2f" % print_aspect)
+		var print_root := label_print.get_node_or_null("PrintRoot") as Control
+		if print_root == null:
+			failures.append("CAFE_RED: missing receipt PrintRoot")
+		else:
+			var order_label := print_root.get_node_or_null("OrderLabel") as Label
+			var drink_label := print_root.get_node_or_null("DrinkLabel") as Label
+			var note := print_root.get_node_or_null("Note") as Label
+			if order_label == null or not order_label.text.contains("COCOA CLOUD"):
+				failures.append("CAFE_RED: Café receipt needs COCOA CLOUD as the hero printed identity")
+			if drink_label == null or not drink_label.text.contains("MOCHA LATTE"):
+				failures.append("CAFE_RED: Café receipt needs a smaller drink-detail line beneath the hero name")
+			if note == null or not note.text.contains("OAT"):
+				failures.append("CAFE_RED: Café receipt needs tactile order-detail copy rather than generic PICKUP")
+
 	var key := scene.get_node_or_null("KeyLight") as DirectionalLight3D
 	if key == null:
 		failures.append("CAFE_RED: missing KeyLight")
@@ -81,7 +100,7 @@ func _run() -> void:
 		failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
 
 	if failures.is_empty():
-		print("PASS: cafe backdrop, soft grounding, paper-cup structure and palette sync")
+		print("PASS: cafe backdrop, soft grounding, paper-cup structure and receipt print layout")
 		scene.queue_free()
 		await process_frame
 		quit(0)
