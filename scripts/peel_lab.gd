@@ -13,6 +13,7 @@ var _left_hand: HandVisual
 var _audio: PeelAudio
 var _hud: Label
 var _reward: Label
+var _continue_button: Button
 var _edge_marker: MeshInstance3D
 var _session: SessionModel
 var _ritual: RitualFlow
@@ -142,7 +143,7 @@ func _process_crumple_pointer(state: PointerState) -> void:
 	if pulse > 0.0:
 		_audio.trigger_crumple(pulse)
 	if _crumple.is_complete() and _ritual.mark_crumple_complete() and _ritual.consume_reward_event():
-		_reward.text = "%s\nStay a moment • R Next" % _crumple_feedback_text()
+		_reward.text = "%s\nStay a moment • Continue when ready" % _crumple_feedback_text()
 
 func _build_world() -> void:
 	_camera = Camera3D.new()
@@ -277,10 +278,23 @@ func _build_hud() -> void:
 	_reward.add_theme_font_size_override("font_size",24)
 	_reward.add_theme_color_override("font_color",Color(0.98,0.92,0.76,0.98))
 	layer.add_child(_reward)
+	_continue_button = Button.new()
+	_continue_button.name = "Continue"
+	_continue_button.text = "Continue"
+	_continue_button.position = Vector2(1048,638)
+	_continue_button.size = Vector2(204,48)
+	_continue_button.focus_mode = Control.FOCUS_NONE
+	_continue_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_continue_button.add_theme_font_size_override("font_size",18)
+	_continue_button.visible = false
+	_continue_button.pressed.connect(_on_continue_pressed)
+	layer.add_child(_continue_button)
 
 func _update_hud(state_name: String, phase_name: String, progress: float) -> void:
 	if _session == null:
 		return
+	if _continue_button != null:
+		_continue_button.disabled = _paused
 	var variant := _session.current_variant()
 	var scene_id := String((variant.get("scene_profile",{}) as Dictionary).get("id","cafe_window"))
 	var venue_name := {"cafe_window":"WINDOW CAFÉ","night_bar":"AMBER BAR","market_coldcase":"MARKET COOLER"}.get(scene_id,"WINDOW CAFÉ")
@@ -294,14 +308,14 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 		_hud.text = "%s  •  PAUSED\nEsc Resume  •  R Reset  •  Q/E Scene  •  1/2/3" % venue_name
 		return
 	if phase_name == "DETACHING": hint = "last adhesive fibers releasing…"
-	elif phase_name == "HELD": hint = "label released • RMB inspect the surface"
+	elif phase_name == "HELD": hint = "label released • inspect or Continue"
 	elif state_name == "PEELING": hint = "steady pull • ease off if the paper starts to tear"
 	elif state_name == "RELEASED": hint = "re-grab anywhere on the visible label"
 	if _uses_crumple() and _ritual != null and _ritual.get_phase_name() in ["CRUMPLE_READY","CRUMPLING","RITUAL_COMPLETE"]:
 		var crumple_percent := int(round((_crumple.get_progress() if _crumple != null else 0.0)*100.0))
-		hint = "optional squeeze %d%% • or R Next" % crumple_percent
+		hint = "optional squeeze %d%% • Continue when ready" % crumple_percent
 	elif post_action == "inspect" and phase_name == "HELD":
-		hint = "RMB drag to inspect residue • Q/E changes scene"
+		hint = "RMB drag to inspect residue • Continue when ready"
 	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Peel anywhere  •  RMB Inspect  •  Q/E Scene  •  1/2/3  •  Esc Pause  •  R Reset" % [
 		venue_name,String(variant.get("name","Peel Calm")),percent,grade,int(round(residue*100.0)),hint
 	]
@@ -326,17 +340,44 @@ func _handle_detached_label() -> void:
 	var grade := _quality_grade(_controller.get_integrity(),_controller.get_residue())
 	var reward_text := "CLEAN RELEASE" if grade in ["A","B"] else "TEXTURED RELEASE"
 	if bool(progress_result.get("unlocked_new",false)):
-		reward_text += "\nnew tactile profile unlocked"
-	elif _uses_crumple():
-		reward_text += "\noptional squeeze • or R Next"
+		reward_text += "\nnext scene unlocked"
+	if _uses_crumple():
+		reward_text += "\noptional squeeze • Continue when ready"
 	else:
-		reward_text += "\nRMB inspect • Q/E next scene"
+		reward_text += "\nRMB inspect • Continue when ready"
 	_reward.text = reward_text
 	_reset_timer = -1.0
 	_advance_after_reset = false
 	if _uses_crumple():
 		_ritual.on_label_detached()
+	_show_continue_button()
 	_pointer.quarantine_current_press()
+
+func _show_continue_button() -> void:
+	if _continue_button == null or _session == null:
+		return
+	match _session.get_variant_index():
+		0:
+			_continue_button.text = "Continue to Bar"
+		1:
+			_continue_button.text = "Continue to Market"
+		_:
+			_continue_button.text = "Continue to Café"
+	_continue_button.disabled = _paused
+	_continue_button.visible = true
+
+func _on_continue_pressed() -> void:
+	if _paused or not _detach_reward_recorded or _session == null:
+		return
+	if _inspection != null:
+		_inspection.end()
+	if _uses_crumple():
+		if _crumple != null:
+			_crumple.end_gesture()
+		if _ritual != null and _ritual.request_next():
+			_consume_next_request()
+		return
+	_advance_to_next_item()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _inspection == null:
@@ -379,11 +420,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_apply_current_variant()
 			_reset_session()
 			return
-		var ritual_phase := _ritual.get_phase_name() if _ritual != null else "PEEL"
-		if _uses_crumple() and ritual_phase in ["PEEL_SETTLE","CRUMPLE_READY","CRUMPLING","RITUAL_COMPLETE"]:
-			if _crumple != null: _crumple.end_gesture()
-			if _ritual.request_next(): _consume_next_request()
-			return
+		if _crumple != null:
+			_crumple.end_gesture()
 		_reset_session()
 
 func _select_showcase_relative(direction: int) -> void:
@@ -478,6 +516,9 @@ func _reset_session() -> void:
 	_advance_after_reset = false
 	_detach_reward_recorded = false
 	if _reward != null: _reward.text = ""
+	if _continue_button != null:
+		_continue_button.visible = false
+		_continue_button.disabled = false
 	if _residue != null: _residue.set_residue(0.0,0.0,1.0)
 	var fresh_grip_world := Vector3.ZERO
 	var has_fresh_grip := false
