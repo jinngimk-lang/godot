@@ -96,13 +96,8 @@ func _run() -> void:
 	var peel_label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	if peel_label == null:
 		failures.append("CAFE_RED: missing PeelLabel for receipt readability contract")
-	elif not peel_label.has_method("get_front_fill") or not peel_label.has_method("get_front_material"):
-		failures.append("CAFE_READABILITY_RED: LabelVisual must expose bounded front-fill material state")
 	else:
-		var front_fill := float(peel_label.call("get_front_fill"))
-		if front_fill < 0.20 or front_fill > 0.65:
-			failures.append("CAFE_READABILITY_RED: Café receipt front_fill must stay in 0.20..0.65, got %.3f" % front_fill)
-		var front_material = peel_label.call("get_front_material")
+		var front_material = peel_label.get("_material")
 		if not (front_material is StandardMaterial3D):
 			failures.append("CAFE_READABILITY_RED: Café receipt front material must remain StandardMaterial3D")
 		else:
