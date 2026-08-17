@@ -19,6 +19,22 @@ func run() -> Array[String]:
 			failures.append("product should activate %s" % kind)
 		if product.get_node_or_null(String(pair[1])) == null:
 			failures.append("%s missing semantic presentation node %s" % [kind,String(pair[1])])
+
+		var contact_shadow := product.get_node_or_null("ProductContactShadow") as MeshInstance3D
+		if contact_shadow == null:
+			failures.append("RED: %s needs a presentation-only soft contact shadow to stop the product floating above the table" % kind)
+		else:
+			if not (contact_shadow.mesh is QuadMesh):
+				failures.append("RED: %s contact shadow must stay one cheap bounded quad" % kind)
+			if contact_shadow.position.y < -0.645 or contact_shadow.position.y > -0.625:
+				failures.append("RED: %s contact shadow must sit just above the table top; y=%.3f" % [kind,contact_shadow.position.y])
+			if not (contact_shadow.material_override is ShaderMaterial):
+				failures.append("RED: %s contact shadow needs a radial-alpha ShaderMaterial" % kind)
+			else:
+				var shadow_mat := contact_shadow.material_override as ShaderMaterial
+				if shadow_mat.shader == null or "smoothstep" not in shadow_mat.shader.code or "UV" not in shadow_mat.shader.code:
+					failures.append("RED: %s contact shadow must feather radially instead of drawing a hard disk" % kind)
+
 		if kind in ["amber_bottle","clear_bottle"]:
 			var outer := product.get_node_or_null("BottleOuterGlass") as MeshInstance3D
 			if outer == null or not (outer.mesh is ArrayMesh):
