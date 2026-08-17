@@ -13,7 +13,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 
-	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual","CupContentsPresentation","CupCrumplePresentation"]:
+	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual","CupContentsPresentation","CupCrumplePresentation","GuidedJourneyPresentation"]:
 		if scene.get_node_or_null(path) == null:
 			_fail("missing integrated node: %s" % path,scene)
 			return
@@ -22,10 +22,15 @@ func _run() -> void:
 	var product: Node = scene.get_node("ProductPresentation")
 	var contents: Node = scene.get_node("CupContentsPresentation")
 	var crumple: Node = scene.get_node("CupCrumplePresentation")
+	var guide: Node = scene.get_node("GuidedJourneyPresentation")
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var cup := scene.get_node("Cup") as MeshInstance3D
 	var hud: Label = scene.get_node("HUD/Instructions") as Label
 	var edge: MeshInstance3D = scene.get_node("PeelEdge") as MeshInstance3D
+	var rail := scene.get_node_or_null("HUD/JourneyRail") as Control
+	var cafe_button := scene.get_node_or_null("HUD/JourneyRail/Scene0") as Button
+	var bar_button := scene.get_node_or_null("HUD/JourneyRail/Scene1") as Button
+	var market_button := scene.get_node_or_null("HUD/JourneyRail/Scene2") as Button
 
 	if venue.call("get_active_profile_id") != "cafe_window":
 		_fail("initial scene should be cafe_window",scene)
@@ -53,17 +58,30 @@ func _run() -> void:
 		_fail("legacy gold hotspot must remain hidden",scene)
 		return
 	var hud_text := hud.text.to_lower() if hud != null else ""
-	if hud == null or not hud_text.contains("mouse") or not hud_text.contains("touch") or not hud_text.contains("rmb inspect") or not hud_text.contains("q/e scene"):
-		_fail("reference HUD is missing touch-safe peel/inspect/navigation affordances",scene)
+	if hud == null or not hud_text.contains("mouse") or not hud_text.contains("touch") or not hud_text.contains("rmb inspect"):
+		_fail("reference HUD is missing touch-safe peel/inspect affordances",scene)
+		return
+	if hud_text.contains("q/e scene") or hud_text.contains("1/2/3"):
+		_fail("primary HUD should not require expert keyboard scene navigation",scene)
+		return
+	if rail == null or cafe_button == null or bar_button == null or market_button == null:
+		_fail("reference scene must expose a three-destination pointer/touch JourneyRail",scene)
+		return
+	if int(guide.call("get_active_scene_index")) != 0:
+		_fail("journey guide should start on café scene 1",scene)
 		return
 
 	# Reproduce the visual-capture failure mode: a completed presentation stage
-	# may temporarily hide the label. Fresh item selection must always restore it.
+	# may temporarily hide the label. Pointer navigation must always restore the
+	# destination's fresh item just like the expert keyboard shortcuts do.
 	label.visible = false
-	scene.call("debug_select_variant",1)
+	bar_button.emit_signal("pressed")
 	await process_frame
 	if venue.call("get_active_profile_id") != "night_bar" or product.call("get_active_kind") != "amber_bottle":
-		_fail("variant 2 must switch to amber bottle bar",scene)
+		_fail("JourneyRail Bar control must switch to amber bottle bar",scene)
+		return
+	if int(guide.call("get_active_scene_index")) != 1:
+		_fail("journey guide must highlight scene 2 after Bar navigation",scene)
 		return
 	if not label.visible:
 		_fail("fresh amber bottle must restore attached label visibility",scene)
@@ -83,7 +101,7 @@ func _run() -> void:
 		_fail("amber bottle must render the continuous glass shell",scene)
 		return
 	if venue.get_node_or_null("BarBackShelf") == null or not (venue.get_node("BarBackShelf") as Node3D).visible:
-		_fail("bar landmark should be visible after direct navigation",scene)
+		_fail("bar landmark should be visible after JourneyRail navigation",scene)
 		return
 	var lid: MeshInstance3D = scene.get_node("Lid") as MeshInstance3D
 	if lid == null or lid.visible:
@@ -94,10 +112,13 @@ func _run() -> void:
 		return
 
 	label.visible = false
-	scene.call("debug_select_variant",2)
+	market_button.emit_signal("pressed")
 	await process_frame
 	if venue.call("get_active_profile_id") != "market_coldcase" or product.call("get_active_kind") != "clear_bottle":
-		_fail("variant 3 must switch to clear market bottle",scene)
+		_fail("JourneyRail Market control must switch to clear market bottle",scene)
+		return
+	if int(guide.call("get_active_scene_index")) != 2:
+		_fail("journey guide must highlight scene 3 after Market navigation",scene)
 		return
 	if not label.visible:
 		_fail("fresh market bottle must restore attached label visibility",scene)
@@ -110,7 +131,7 @@ func _run() -> void:
 		_fail("market bottle must render the continuous clear glass shell",scene)
 		return
 	if venue.get_node_or_null("MarketCooler") == null or not (venue.get_node("MarketCooler") as Node3D).visible:
-		_fail("market landmark should be visible after direct navigation",scene)
+		_fail("market landmark should be visible after JourneyRail navigation",scene)
 		return
 	if product.get_node_or_null("BottleLiquid") == null:
 		_fail("clear market bottle should expose visible liquid core",scene)
@@ -120,10 +141,13 @@ func _run() -> void:
 		return
 
 	label.visible = false
-	scene.call("debug_select_variant",0)
+	cafe_button.emit_signal("pressed")
 	await process_frame
 	if venue.call("get_active_profile_id") != "cafe_window" or product.call("get_active_kind") != "paper_cup":
-		_fail("navigation back to cafe should restore paper cup",scene)
+		_fail("JourneyRail Café control must restore paper cup",scene)
+		return
+	if int(guide.call("get_active_scene_index")) != 0:
+		_fail("journey guide must highlight scene 1 after Café navigation",scene)
 		return
 	if not label.visible or not cup.visible or not bool(crumple.call("is_enabled_for_profile")):
 		_fail("navigation back to café must restore paper cup/label/crumple ownership",scene)
@@ -132,7 +156,7 @@ func _run() -> void:
 		_fail("navigation back to cafe must clear market ice",scene)
 		return
 
-	print("PASS: reference café/bar/market visibility ownership + V6 contents smoke")
+	print("PASS: guided pointer journey + reference café/bar/market visibility ownership + V6 contents smoke")
 	scene.queue_free()
 	await process_frame
 	quit(0)
