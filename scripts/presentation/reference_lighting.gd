@@ -11,9 +11,11 @@ func _process(_delta: float) -> void:
 	if venue == null or not venue.has_method("get_active_profile_id"):
 		return
 	var next_id := String(venue.call("get_active_profile_id"))
-	if next_id == _active_id:
-		return
 	_active_id = next_id
+	# VenuePresentation owns semantic scene switching and can be reapplied by the
+	# gameplay parent after child _ready(). Lighting is the final presentation
+	# authority, so reassert the small three-light profile instead of allowing
+	# that later venue write to leave the hero product permanently orange.
 	_apply(root,next_id)
 
 func _apply(root: Node, venue_id: String) -> void:
