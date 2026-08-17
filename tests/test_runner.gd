@@ -25,6 +25,7 @@ func _init() -> void:
 		"res://tests/test_label_print_contract.gd",
 		"res://tests/test_hand_visual.gd",
 		"res://tests/test_authored_hand_asset.gd",
+		"res://tests/test_support_hand_scale_semantics.gd",
 		"res://tests/test_peel_foley_router.gd",
 		"res://tests/test_session_model.gd",
 		"res://tests/test_post_peel_progression.gd",
