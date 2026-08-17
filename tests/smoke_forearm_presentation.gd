@@ -7,7 +7,6 @@ const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 const MIN_WRIST_OVERLAP_AUTHORED := 0.009
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
-const CAP_EXIT_MARGIN_PX := 4.0
 const FOREARM_RING_SIDES := 32
 
 func _init() -> void:
@@ -95,8 +94,9 @@ func _run() -> void:
 		if forearm.material_override == null or forearm.material_override.resource_name != "HandSkin":
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
-		if not _forearm_terminal_ring_is_offscreen(scene,forearm):
-			_fail("bar %s bare forearm terminal ring must be fully outside the viewport instead of forming a visible pointed stump" % hand_name,scene)
+		var exit_ratio := _forearm_terminal_clearance_ratio(scene,forearm)
+		if exit_ratio < 1.0:
+			_fail("bar %s bare forearm terminus is too close to the viewport edge (%.2f projected diameters); the frame is clipping the taper instead of mid-shaft" % [hand_name,exit_ratio],scene)
 			return
 
 	# Support-root choreography has one owner. ForearmPresentation owns geometry
@@ -126,8 +126,9 @@ func _run() -> void:
 		if forearm.material_override == null or forearm.material_override.resource_name != "HandSkin":
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
-		if not _forearm_terminal_ring_is_offscreen(scene,forearm):
-			_fail("market %s bare forearm terminal ring must be fully outside the viewport instead of forming a visible pointed stump" % hand_name,scene)
+		var exit_ratio := _forearm_terminal_clearance_ratio(scene,forearm)
+		if exit_ratio < 1.0:
+			_fail("market %s bare forearm terminus is too close to the viewport edge (%.2f projected diameters); the frame is clipping the taper instead of mid-shaft" % [hand_name,exit_ratio],scene)
 			return
 
 	print("PASS: reference-scale hands, seamless curved forearms and single-owner grip choreography stay coherent")
@@ -135,25 +136,42 @@ func _run() -> void:
 	await process_frame
 	quit(0)
 
-func _forearm_terminal_ring_is_offscreen(scene: Node,forearm: MeshInstance3D) -> bool:
+func _forearm_terminal_clearance_ratio(scene: Node,forearm: MeshInstance3D) -> float:
 	var camera := scene.get_node_or_null("Camera") as Camera3D
 	if camera == null or forearm == null or not (forearm.mesh is ArrayMesh):
-		return false
+		return -1.0
 	var arrays := (forearm.mesh as ArrayMesh).surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	if vertices.size() < FOREARM_RING_SIDES+1:
-		return false
-	var viewport_size := camera.get_viewport().get_visible_rect().size
+		return -1.0
 	var terminal_ring_start := vertices.size()-1-FOREARM_RING_SIDES
-	for vertex_index in range(terminal_ring_start,vertices.size()):
+	var min_screen := Vector2(INF,INF)
+	var max_screen := Vector2(-INF,-INF)
+	for vertex_index in range(terminal_ring_start,vertices.size()-1):
 		var world := forearm.to_global(vertices[vertex_index])
 		if camera.is_position_behind(world):
-			continue
+			return -1.0
 		var screen := camera.unproject_position(world)
-		var outside := screen.x <= -CAP_EXIT_MARGIN_PX or screen.x >= viewport_size.x+CAP_EXIT_MARGIN_PX or screen.y <= -CAP_EXIT_MARGIN_PX or screen.y >= viewport_size.y+CAP_EXIT_MARGIN_PX
-		if not outside:
-			return false
-	return true
+		min_screen.x = minf(min_screen.x,screen.x)
+		min_screen.y = minf(min_screen.y,screen.y)
+		max_screen.x = maxf(max_screen.x,screen.x)
+		max_screen.y = maxf(max_screen.y,screen.y)
+	var projected_diameter := maxf(max_screen.x-min_screen.x,max_screen.y-min_screen.y)
+	if projected_diameter <= 0.001:
+		return -1.0
+	var viewport_size := camera.get_viewport().get_visible_rect().size
+	var clearance := -INF
+	if max_screen.x < 0.0:
+		clearance = maxf(clearance,-max_screen.x)
+	if min_screen.x > viewport_size.x:
+		clearance = maxf(clearance,min_screen.x-viewport_size.x)
+	if max_screen.y < 0.0:
+		clearance = maxf(clearance,-max_screen.y)
+	if min_screen.y > viewport_size.y:
+		clearance = maxf(clearance,min_screen.y-viewport_size.y)
+	if not is_finite(clearance):
+		return 0.0
+	return clearance/projected_diameter
 
 func _fail(message: String, scene: Node = null) -> void:
 	push_error("FOREARM_RED: %s" % message)
