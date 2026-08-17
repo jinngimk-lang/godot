@@ -63,6 +63,8 @@ func run() -> Array[String]:
 
 	var support_home := support.position
 	var peel_home := peel.position
+	var support_home_global := support.global_position
+	var peel_home_global := peel.global_position
 	source.set_crumple(0.60, -1, 0.70)
 	var shell := source.get_node_or_null("CrumpledCup") as MeshInstance3D
 	if shell == null or not (shell.mesh is ArrayMesh):
@@ -93,10 +95,14 @@ func run() -> Array[String]:
 		var support_contact_drift := support_last_contact.distance_to(support_target)
 		var peel_contact_drift := peel_last_contact.distance_to(peel_target)
 		var contact_weight: float = staging.get("_last_contact_weight")
+		var support_entry_offset := support_entry_global.distance_to(support_home_global)
+		var peel_entry_offset := peel_entry_global.distance_to(peel_home_global)
+		var support_home_drift := (staging.get("_support_home") as Vector3).distance_to(support_home)
+		var peel_home_drift := (staging.get("_peel_home") as Vector3).distance_to(peel_home)
 		if support_gap > MAX_CONTACT_GAP:
-			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f weight=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_target_delta.length(), support_transform_error, support_placement_error, support_contact_drift, contact_weight, str(staging.get("_active"))])
+			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f entry_offset=%.3f root_delta=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f home_drift=%.3f weight=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_entry_offset, support_root_delta.length(), support_target_delta.length(), support_transform_error, support_placement_error, support_contact_drift, support_home_drift, contact_weight, str(staging.get("_active"))])
 		if peel_gap > MAX_CONTACT_GAP:
-			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f weight=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_target_delta.length(), peel_transform_error, peel_placement_error, peel_contact_drift, contact_weight, str(staging.get("_active"))])
+			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f entry_offset=%.3f root_delta=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f home_drift=%.3f weight=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_entry_offset, peel_root_delta.length(), peel_target_delta.length(), peel_transform_error, peel_placement_error, peel_contact_drift, peel_home_drift, contact_weight, str(staging.get("_active"))])
 
 	source.reset_visual()
 	if not support.position.is_equal_approx(support_home):
