@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq p7zip-full blender
+          sudo apt-get install -y -qq p7zip-full blender python3-numpy
           blender --version | head -1
       - name: Download CC0 source and inspect archive
         run: |
@@ -33,85 +33,66 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/eval_arms.py <<'PY'
-          import bpy, os, math, glob, json
+          import bpy, os, glob, json
           from mathutils import Vector
 
           root='/tmp/oga-arms'
           out='/tmp/oga-eval'
           fbx=sorted(glob.glob(root+'/**/*.fbx', recursive=True))
           if not fbx:
-              raise SystemExit('no FBX found')
-          # Prefer a T-pose/rest source when filenames expose one.
-          pick=next((p for p in fbx if 't' in os.path.basename(p).lower() and 'pose' in os.path.basename(p).lower()), fbx[0])
+              raise RuntimeError('no FBX found')
+          pick=next((p for p in fbx if 'pose' in os.path.basename(p).lower()), fbx[0])
           bpy.ops.wm.read_factory_settings(use_empty=True)
           bpy.ops.import_scene.fbx(filepath=pick)
           meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
           arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']
-          if not meshes:
-              raise SystemExit('FBX imported no meshes')
-          verts=sum(len(o.data.vertices) for o in meshes)
-          polys=sum(len(o.data.polygons) for o in meshes)
-          mats=sorted({slot.material.name for o in meshes for slot in o.material_slots if slot.material})
-          images=sorted({img.name for img in bpy.data.images if img.name!='Render Result'})
-          bones=sum(len(a.data.bones) for a in arms)
+          if not meshes or not arms:
+              raise RuntimeError('candidate must import both mesh and armature')
           report={
               'selected_fbx':pick,
               'mesh_objects':[o.name for o in meshes],
-              'vertices':verts,
-              'polygons':polys,
+              'vertices':sum(len(o.data.vertices) for o in meshes),
+              'polygons':sum(len(o.data.polygons) for o in meshes),
               'armatures':[a.name for a in arms],
-              'bones':bones,
-              'materials':mats,
-              'images':images,
+              'bones':sum(len(a.data.bones) for a in arms),
+              'materials':sorted({slot.material.name for o in meshes for slot in o.material_slots if slot.material}),
+              'images':sorted({img.name for img in bpy.data.images if img.name!='Render Result'}),
               'actions':[a.name for a in bpy.data.actions],
           }
           with open(out+'/report.json','w') as f: json.dump(report,f,indent=2)
           with open(out+'/report.txt','w') as f:
               for k,v in report.items(): f.write(f'{k}: {v}\n')
-
-          # Export a portable GLB without changing the source pose.
           bpy.ops.export_scene.gltf(filepath=out+'/candidate.glb', export_format='GLB', export_animations=True)
 
-          # World bounds.
-          corners=[]
-          for o in meshes:
-              corners += [o.matrix_world @ Vector(c) for c in o.bound_box]
+          corners=[o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
           mins=Vector((min(c.x for c in corners),min(c.y for c in corners),min(c.z for c in corners)))
           maxs=Vector((max(c.x for c in corners),max(c.y for c in corners),max(c.z for c in corners)))
           center=(mins+maxs)*0.5
-          size=maxs-mins
-          radius=max(size.length*0.55,0.5)
+          radius=max((maxs-mins).length*0.55,0.5)
 
-          world=bpy.data.worlds.new('EvalWorld')
-          world.color=(0.055,0.055,0.055)
-          bpy.context.scene.world=world
-          bpy.context.scene.render.engine='BLENDER_EEVEE_NEXT' if hasattr(bpy.types,'EEVEE_NEXT') else 'BLENDER_EEVEE'
-          bpy.context.scene.render.resolution_x=768
-          bpy.context.scene.render.resolution_y=768
-          bpy.context.scene.render.resolution_percentage=100
+          world=bpy.data.worlds.new('EvalWorld'); world.color=(0.055,0.055,0.055); bpy.context.scene.world=world
+          try: bpy.context.scene.render.engine='BLENDER_EEVEE_NEXT'
+          except Exception: bpy.context.scene.render.engine='BLENDER_EEVEE'
+          bpy.context.scene.render.resolution_x=768; bpy.context.scene.render.resolution_y=768; bpy.context.scene.render.resolution_percentage=100
           bpy.context.scene.render.image_settings.file_format='PNG'
-          bpy.context.scene.view_settings.look='AgX - Medium High Contrast' if 'AgX - Medium High Contrast' in [i.name for i in bpy.types.ColorManagedViewSettings.bl_rna.properties['look'].enum_items] else bpy.context.scene.view_settings.look
 
           key=bpy.data.lights.new('Key','AREA'); key.energy=900; key.shape='DISK'; key.size=radius*1.2
-          keyo=bpy.data.objects.new('Key',key); bpy.context.collection.objects.link(keyo); keyo.location=center+Vector((radius*1.0,-radius*1.2,radius*1.4))
+          keyo=bpy.data.objects.new('Key',key); bpy.context.collection.objects.link(keyo); keyo.location=center+Vector((radius,-radius*1.2,radius*1.4))
           fill=bpy.data.lights.new('Fill','AREA'); fill.energy=500; fill.size=radius*1.4
           fillo=bpy.data.objects.new('Fill',fill); bpy.context.collection.objects.link(fillo); fillo.location=center+Vector((-radius*1.3,-radius*0.5,radius*0.8))
-
-          def point(obj, target):
-              obj.rotation_euler=(Vector(target)-obj.location).to_track_quat('-Z','Y').to_euler()
+          def point(obj,target): obj.rotation_euler=(Vector(target)-obj.location).to_track_quat('-Z','Y').to_euler()
           point(keyo,center); point(fillo,center)
           camd=bpy.data.cameras.new('Camera'); cam=bpy.data.objects.new('Camera',camd); bpy.context.collection.objects.link(cam); bpy.context.scene.camera=cam; camd.lens=58
-          views={
-              'front':Vector((0,-1,0.12)),
-              'three_quarter':Vector((0.8,-1,0.45)),
-              'side':Vector((1,0,0.12)),
-          }
-          for name,d in views.items():
+          for name,d in {'front':Vector((0,-1,0.12)),'three_quarter':Vector((0.8,-1,0.45)),'side':Vector((1,0,0.12))}.items():
               d.normalize(); cam.location=center+d*(radius*2.25); point(cam,center)
-              bpy.context.scene.render.filepath=out+f'/{name}.png'
-              bpy.ops.render.render(write_still=True)
+              bpy.context.scene.render.filepath=out+f'/{name}.png'; bpy.ops.render.render(write_still=True)
           PY
-          blender -b --python /tmp/eval_arms.py 2>&1 | tee /tmp/oga-eval/blender.log
+          blender -b --python-exit-code 1 --python /tmp/eval_arms.py 2>&1 | tee /tmp/oga-eval/blender.log
+          test -s /tmp/oga-eval/report.json
+          test -s /tmp/oga-eval/candidate.glb
+          test -s /tmp/oga-eval/front.png
+          test -s /tmp/oga-eval/three_quarter.png
+          test -s /tmp/oga-eval/side.png
       - uses: actions/upload-artifact@v4
         with:
           name: oga-cc0-makehuman-arms-eval
