@@ -13,6 +13,7 @@ var _action: Label
 var _buttons: Array[Button] = []
 var _rail: Panel
 var _rail_visible := true
+var _inspection_active := false
 var _parent_connected := false
 var _reward: Label
 var _continue_button: Button
@@ -48,6 +49,17 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	# Keep the target-like peel moment visually quiet while preserving scene
 	# navigation before engagement and after detach for pointer/touch users.
 	_rail_visible = not (progress > 0.001 and not post_interaction)
+	# Fixed reference-frame inspection is staged by directly applying product yaw
+	# while the guide process is frozen. Treat that visible yaw as inspection
+	# evidence so capture and live RMB inspection share the same quiet UI contract.
+	var lab := get_parent()
+	var cup := lab.get_node_or_null("Cup") as Node3D if lab != null else null
+	if cup != null and absf(cup.rotation.y) > 0.001:
+		_inspection_active = true
+	_apply_state_to_ui()
+
+func set_inspection_active(active: bool) -> void:
+	_inspection_active = active
 	_apply_state_to_ui()
 
 func get_active_scene_index() -> int:
@@ -74,6 +86,8 @@ func _pull_runtime_state() -> void:
 	var phase := ritual_phase if ritual_phase != "PEEL" else lifecycle_phase
 	var detached := bool(lab.get("_detach_reward_recorded"))
 	set_state(index, phase, String(variant.get("post_peel_action", "inspect")), progress, detached)
+	var inspection = lab.get("_inspection")
+	set_inspection_active(inspection != null and inspection.has_method("is_active") and bool(inspection.is_active()))
 
 func _connect_parent_navigation() -> void:
 	if _parent_connected:
@@ -208,7 +222,7 @@ func _apply_state_to_ui() -> void:
 	_scene_status.text = "SCENE %d / %d  •  %s" % [_active_scene_index + 1, SCENE_NAMES.size(), SCENE_NAMES[_active_scene_index]]
 	_action.text = _action_text
 	if _rail != null:
-		_rail.visible = _rail_visible
+		_rail.visible = _rail_visible and not _inspection_active
 	for i in range(_buttons.size()):
 		_buttons[i].button_pressed = i == _active_scene_index
 
