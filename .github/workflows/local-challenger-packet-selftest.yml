@@ -33,7 +33,7 @@ jobs:
           bash -n tools/should_retry_local_challenger.sh
           python3 -m py_compile tools/extract_local_challenger_json.py
 
-      - name: Accept raw and fenced model JSON only
+      - name: Normalize one model JSON envelope
         shell: bash
         run: |
           set -euo pipefail
@@ -52,14 +52,22 @@ jobs:
           jq -e '.evidence_anchor == "NO_CONCRETE_DEFECT"' /tmp/fenced-normalized.json
 
           cat > /tmp/prose-wrapped-model.txt <<'MODEL'
-          Here is the result:
+          Here is the grounded result after re-evaluation:
           {"verdict":"VERIFIED","defect":"none","min_test":"none","evidence":"ok","evidence_anchor":"NO_CONCRETE_DEFECT"}
+          This is the only structured verdict object.
+          MODEL
+          python3 tools/extract_local_challenger_json.py /tmp/prose-wrapped-model.txt /tmp/prose-normalized.json
+          jq -e '.verdict == "VERIFIED"' /tmp/prose-normalized.json
+
+          cat > /tmp/multiple-model.txt <<'MODEL'
+          {"verdict":"VERIFIED"}
+          another candidate {"verdict":"NEEDS_FIX"}
           MODEL
           set +e
-          python3 tools/extract_local_challenger_json.py /tmp/prose-wrapped-model.txt /tmp/should-not-exist.json
+          python3 tools/extract_local_challenger_json.py /tmp/multiple-model.txt /tmp/should-not-exist.json
           rc=$?
           set -e
-          echo "prose wrapped extractor rc=$rc"
+          echo "multiple envelope extractor rc=$rc"
           test "$rc" -eq 4
 
       - name: Retry only strict grounding failures
