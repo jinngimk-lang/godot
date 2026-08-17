@@ -23,6 +23,7 @@ func _run() -> void:
 	var support_hand := scene.get_node_or_null("LeftHand") as Node3D
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
 	var reward := scene.get_node_or_null("HUD/Reward") as Label
+	var continue_button := scene.get_node_or_null("HUD/Continue") as Button
 	var presentation := scene.get_node_or_null("CupCrumplePresentation")
 	if ritual == null:
 		failures.append("RITUAL_RED: PeelLab must own RitualFlow")
@@ -30,6 +31,8 @@ func _run() -> void:
 		failures.append("RITUAL_RED: PeelLab must own CupCrumpleModel")
 	if session == null or pointer == null or audio == null or support_hand == null or hud == null or reward == null or presentation == null:
 		failures.append("RITUAL_RED: real scene missing ritual/session/pointer/audio/support-hand/HUD/presentation contract")
+	if continue_button == null:
+		failures.append("POST_PEEL_RED: HUD must expose a pointer/touch Continue control after a completed peel")
 	if not failures.is_empty():
 		_finish(scene, failures)
 		return
@@ -41,6 +44,8 @@ func _run() -> void:
 		failures.append("RITUAL_RED: real crumple needs a machine-observable Foley pulse signal")
 		_finish(scene, failures)
 		return
+	if continue_button.visible:
+		failures.append("POST_PEEL_RED: Continue must stay hidden before label completion")
 	var crumple_audio_events := [0]
 	audio.connect("crumple_pulse_played", func(_strength): crumple_audio_events[0] += 1)
 	var support_home := support_hand.position
@@ -53,13 +58,20 @@ func _run() -> void:
 	if session.get_clean_peels() != 1:
 		failures.append("RITUAL_RED: duplicate detach must record base ritual progression exactly once")
 	if session.get_total_score() != 0:
-		failures.append("RITUAL_RED: V5 base progression must not depend on public score accumulation")
+		failures.append("RITUAL_RED: base progression must not depend on public score accumulation")
+	if session.get_unlocked_count() != 2:
+		failures.append("POST_PEEL_RED: first café completion must unlock amber bar immediately")
 	if float(scene.get("_reset_timer")) >= 0.0:
 		failures.append("RITUAL_RED: detached label must not start the old automatic next-cup timer")
 	if ritual.get_phase_name() != "PEEL_SETTLE":
 		failures.append("RITUAL_RED: detached label should enter PEEL_SETTLE")
 	if pointer.state.pressed or not bool(pointer.get("_awaiting_release")):
 		failures.append("RITUAL_RED: detach-to-crumple boundary must quarantine a held peel press")
+	if not continue_button.visible:
+		failures.append("POST_PEEL_RED: Continue must become visible as soon as the label is detached")
+	var continue_text := continue_button.text.to_lower()
+	if not (continue_text.contains("continue") or continue_text.contains("next")):
+		failures.append("POST_PEEL_RED: post-peel button must clearly say Continue/Next")
 
 	ritual.update(0.46)
 	if ritual.get_phase_name() != "CRUMPLE_READY":
@@ -128,30 +140,38 @@ func _run() -> void:
 	var hud_lower := hud.text.to_lower()
 	if hud_lower.contains("score") or hud_lower.contains("feels"):
 		failures.append("RITUAL_RED: primary HUD must de-emphasize Score/Feels counters")
-	if not hud_lower.contains("squeeze") or not hud_lower.contains("r next"):
-		failures.append("RITUAL_RED: post-peel HUD should communicate the optional tactile action without debug jargon")
+	if not hud_lower.contains("squeeze") or not hud_lower.contains("continue"):
+		failures.append("POST_PEEL_RED: post-peel HUD should communicate optional squeeze plus explicit Continue")
 
-	var before_id := String(session.current_variant().get("id", ""))
-	var next_key := InputEventKey.new()
-	next_key.pressed = true
-	next_key.keycode = KEY_R
-	scene.call("_unhandled_key_input", next_key)
+	continue_button.emit_signal("pressed")
+	await process_frame
 	if session.get_clean_peels() != 1:
-		failures.append("RITUAL_RED: next-cup action must not double-count progression")
-	if float(crumple.get_progress()) != 0.0:
-		failures.append("RITUAL_RED: next item must reset accumulated cup deformation")
+		failures.append("POST_PEEL_RED: Continue must not double-count progression")
+	if String(session.current_variant().get("id", "")) != "silky_long":
+		failures.append("POST_PEEL_RED: Continue after café must enter amber bar")
 	if ritual.get_phase_name() != "PEEL":
-		failures.append("RITUAL_RED: next item must return ritual authority to PEEL")
-	if String(session.current_variant().get("id", "")) != before_id:
-		failures.append("RITUAL_RED: with one tactile profile unlocked, next should cycle calmly to the same profile")
-	if support_hand.position.distance_to(support_home) > 0.001:
-		failures.append("RITUAL_RED: next item must restore exact support-hand staging baseline")
+		failures.append("POST_PEEL_RED: next scene must reset ritual authority to PEEL")
+	if continue_button.visible:
+		failures.append("POST_PEEL_RED: Continue must hide again on the fresh next scene")
+	if float(crumple.get_progress()) != 0.0:
+		failures.append("POST_PEEL_RED: next scene must reset accumulated cup deformation")
+
+	var reset_variant := String(session.current_variant().get("id", ""))
+	var reset_key := InputEventKey.new()
+	reset_key.pressed = true
+	reset_key.keycode = KEY_R
+	scene.call("_unhandled_key_input", reset_key)
+	if String(session.current_variant().get("id", "")) != reset_variant:
+		failures.append("POST_PEEL_RED: R must only reset the current item; it must never act as Next")
+	var controller = scene.get("_controller")
+	if controller == null or not is_zero_approx(float(controller.get_progress())):
+		failures.append("POST_PEEL_RED: R reset must restore fresh peel progress")
 
 	_finish(scene, failures)
 
 func _finish(scene: Node, failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("PASS: detach -> no-timer settle -> repeated hand-driven crumple/Foley -> calm reward -> deliberate next")
+		print("PASS: detach -> optional tactile ritual -> explicit Continue -> café/bar progression -> R reset")
 		scene.queue_free()
 		await process_frame
 		quit(0)
