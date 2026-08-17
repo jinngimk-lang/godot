@@ -130,13 +130,14 @@ func _sync_open_top_for_contents(has_ice: bool) -> void:
 
 func _base_transform_for(index: int, count: int) -> Transform3D:
 	var dims := _dimensions()
+	if _is_glass_cluster():
+		return _glass_cluster_transform(index, count, dims)
+
 	var inner_radius := _inner_radius(dims)
 	var denominator := maxf(float(count - 1) * 0.5, 1.0)
 	var spread := (float(index) - float(count - 1) * 0.5) / denominator
-	# Bias the small payload into the back half of the vessel so the ice remains
-	# readable from the fixed product camera. Paper cups can stage near the rim;
-	# glass bottles can configure a lower body/liquid ceiling so cubes never
-	# float into the shoulder/neck and masquerade as a closure.
+	# Paper-cup reward ice remains biased into the camera-readable back half and
+	# close to the rim. Glass bottles use a different body-cluster layout below.
 	var x := spread * inner_radius * 0.48
 	var z := -inner_radius * (0.20 + 0.08 * float(index % 2))
 	var top_limit := _content_top_limit(dims)
@@ -148,6 +149,44 @@ func _base_transform_for(index: int, count: int) -> Transform3D:
 		0.08 * spread
 	)
 	return Transform3D(Basis.from_euler(rotation), position)
+
+func _glass_cluster_transform(index: int, count: int, dims: Vector3) -> Transform3D:
+	var inner_radius := _inner_radius(dims)
+	var top_limit := _content_top_limit(dims)
+	# Three deliberately staggered chunks form a small triangular cluster in the
+	# bottle body. Screen-space X/Y separation matters more than packing density:
+	# the previous near-coplanar row collapsed into one cyan rectangle through
+	# the transparent bottle shell.
+	var presets := [
+		Vector3(-0.50, -0.78, -0.12),
+		Vector3(0.00, -0.12, -0.40),
+		Vector3(0.50, -0.62, 0.12)
+	]
+	var rotations := [
+		Vector3(0.34, -0.28, -0.20),
+		Vector3(-0.22, 0.38, 0.26),
+		Vector3(0.27, 0.18, -0.34)
+	]
+	if index < presets.size():
+		var preset: Vector3 = presets[index]
+		var position := Vector3(
+			preset.x * inner_radius,
+			top_limit + preset.y * _cube_size,
+			preset.z * inner_radius
+		)
+		return Transform3D(Basis.from_euler(rotations[index]), _clamp_position(position, dims))
+
+	# Defensive fallback if a future profile asks for more than the current three
+	# authored bottle chunks: keep extra pieces distributed in a lower helix.
+	var denominator := maxf(float(count - 1), 1.0)
+	var t := float(index) / denominator
+	var angle := TAU * (t + 0.13)
+	var position := Vector3(
+		cos(angle) * inner_radius * 0.48,
+		top_limit - _cube_size * (0.30 + 0.62 * t),
+		sin(angle) * inner_radius * 0.42
+	)
+	return Transform3D(Basis.from_euler(Vector3(0.24 + 0.11 * t, angle * 0.35, -0.20 + 0.18 * t)), _clamp_position(position, dims))
 
 func _apply_motion() -> void:
 	if _container == null or _base_transforms.is_empty():
@@ -214,8 +253,30 @@ func _clamp_position(position: Vector3, dims: Vector3) -> Vector3:
 	var top_limit := _content_top_limit(dims)
 	return Vector3(radial.x, clampf(position.y, bottom_limit, top_limit), radial.y)
 
+func _is_glass_cluster() -> bool:
+	var contents: Dictionary = _profile.get("contents_profile", {})
+	return String(contents.get("layout", "")) == "glass_cluster"
+
 func _ice_material(index: int) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
+	if _is_glass_cluster():
+		# Near-neutral translucent ice survives the nested transparent bottle better
+		# than the old saturated opaque blue while still keeping readable edges.
+		var lift := 0.012 * float(index % 3)
+		material.albedo_color = Color(0.87 + lift, 0.93 + lift * 0.45, 0.97, 0.52)
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.roughness = 0.13
+		material.metallic = 0.0
+		material.metallic_specular = 0.72
+		material.rim_enabled = true
+		material.rim = 0.48
+		material.rim_tint = 0.34
+		material.clearcoat_enabled = true
+		material.clearcoat = 0.62
+		material.clearcoat_roughness = 0.08
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		return material
+
 	var lift := 0.025 * float(index % 3)
 	material.albedo_color = Color(0.76 + lift, 0.90 + lift * 0.5, 0.96, 1.0)
 	material.roughness = 0.28
