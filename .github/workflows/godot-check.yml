@@ -128,6 +128,13 @@ jobs:
           test -f tests/smoke_cup_crumple_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_cup_crumple_presentation.gd
 
+      - name: Crumple shell hand-contact smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/smoke_crumple_shell_contact.gd
+          ./godot --headless --path . --script res://tests/smoke_crumple_shell_contact.gd
+
       - name: Cup contents presentation smoke
         shell: bash
         run: |
