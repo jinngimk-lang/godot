@@ -29,6 +29,17 @@ func run() -> Array[String]:
 				failures.append("RED: %s must not fall back to stacked BottleShoulder cylinder primitives" % kind)
 			if product.get_node_or_null("BottleHighlight") != null:
 				failures.append("RED: %s must not use rectangular BottleHighlight guide strips" % kind)
+			if product.get_node_or_null("BottleLip") != null:
+				failures.append("RED: %s must not render the old solid BottleLip disk that reads as a plastic cap" % kind)
+			var mouth := product.get_node_or_null("BottleMouthRim") as MeshInstance3D
+			if mouth == null:
+				failures.append("RED: %s must expose a hollow BottleMouthRim" % kind)
+			elif not (mouth.mesh is CylinderMesh):
+				failures.append("%s BottleMouthRim must use a cylindrical glass rim" % kind)
+			else:
+				var mouth_mesh := mouth.mesh as CylinderMesh
+				if mouth_mesh.cap_top or mouth_mesh.cap_bottom:
+					failures.append("RED: %s BottleMouthRim must stay open instead of drawing a cyan/opaque cap disk" % kind)
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y,0.7):
 		failures.append("product decoration should follow inspection yaw")
