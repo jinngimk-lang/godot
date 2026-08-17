@@ -124,7 +124,8 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
 	outer.mesh = outer_mesh
-	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.62),roughness)
+	var outer_color := body_color.lightened(0.10) if amber else body_color
+	outer.material_override = _glass_mat(outer_color,source_alpha*(0.30 if amber else 0.62),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
 
@@ -142,7 +143,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var inner := MeshInstance3D.new()
 	inner.name = "BottleInnerGlass"
 	inner.mesh = _build_lathe_mesh(inner_profile,false,false)
-	inner.material_override = _glass_mat(body_color.lightened(0.16),source_alpha*0.10,0.023)
+	inner.material_override = _glass_mat(body_color.lightened(0.26 if amber else 0.16),source_alpha*0.10,0.023)
 	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(inner)
 
@@ -150,8 +151,8 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	liquid.name = "BottleLiquid"
 	liquid.mesh = _build_lathe_mesh(_liquid_profile(amber),true,true)
 	var liquid_mat := StandardMaterial3D.new()
-	liquid_mat.albedo_color = Color(0.52,0.17,0.025,0.22) if amber else Color(profile.get("liquid_color",Color(0.91,0.93,0.70,0.40)))
-	liquid_mat.albedo_color.a = 0.22 if amber else 0.40
+	liquid_mat.albedo_color = Color(0.60,0.22,0.035,0.14) if amber else Color(profile.get("liquid_color",Color(0.91,0.93,0.70,0.40)))
+	liquid_mat.albedo_color.a = 0.14 if amber else 0.40
 	liquid_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	liquid_mat.roughness = 0.08
 	liquid_mat.metallic_specular = 0.56
