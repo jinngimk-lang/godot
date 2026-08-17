@@ -75,26 +75,54 @@ func _build_backdrop() -> void:
 	add_child(backsplash)
 
 func _build_lid_detail() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var lid := parent.get_node_or_null("Lid") as MeshInstance3D
+	if lid == null or not (lid.mesh is CylinderMesh):
+		return
+	var lid_mesh := lid.mesh as CylinderMesh
+	var base_radius := maxf(lid_mesh.top_radius, 0.10)
+	var lid_top_y := lid.position.y + lid_mesh.height * 0.5
+
+	# Build the silhouette from the actual production lid rather than the old
+	# fixed world-space dimensions. The outer flare is deliberately shallow:
+	# enough to read as molded black plastic at thumbnail scale without turning
+	# into a decorative halo.
+	var ridge := MeshInstance3D.new()
+	ridge.name = "LidOuterRidge"
+	var ridge_mesh := CylinderMesh.new()
+	ridge_mesh.top_radius = base_radius + 0.016
+	ridge_mesh.bottom_radius = base_radius + 0.012
+	ridge_mesh.height = 0.026
+	ridge_mesh.radial_segments = 64
+	ridge.mesh = ridge_mesh
+	ridge.position = Vector3(lid.position.x, lid_top_y + 0.004, lid.position.z)
+	ridge.material_override = _material(Color(0.050, 0.046, 0.043, 1.0), 0.44)
+	add_child(ridge)
+
 	var inset := MeshInstance3D.new()
 	inset.name = "LidInset"
 	var inset_mesh := CylinderMesh.new()
-	inset_mesh.top_radius = 0.445
-	inset_mesh.bottom_radius = 0.455
+	inset_mesh.top_radius = base_radius * 0.82
+	inset_mesh.bottom_radius = base_radius * 0.84
 	inset_mesh.height = 0.022
+	inset_mesh.radial_segments = 64
 	inset.mesh = inset_mesh
-	inset.position = Vector3(0.0, 0.881, 0.0)
-	inset.material_override = _material(Color(0.105, 0.095, 0.088, 1.0), 0.50)
+	inset.position = Vector3(lid.position.x, lid_top_y + 0.018, lid.position.z)
+	inset.material_override = _material(Color(0.086, 0.078, 0.072, 1.0), 0.50)
 	add_child(inset)
 
 	var lid_center := MeshInstance3D.new()
 	lid_center.name = "LidCenter"
 	var center_mesh := CylinderMesh.new()
-	center_mesh.top_radius = 0.315
-	center_mesh.bottom_radius = 0.325
-	center_mesh.height = 0.012
+	center_mesh.top_radius = base_radius * 0.58
+	center_mesh.bottom_radius = base_radius * 0.60
+	center_mesh.height = 0.014
+	center_mesh.radial_segments = 64
 	lid_center.mesh = center_mesh
-	lid_center.position = Vector3(0.0, 0.895, 0.0)
-	lid_center.material_override = _material(Color(0.145, 0.130, 0.118, 1.0), 0.46)
+	lid_center.position = Vector3(lid.position.x, lid_top_y + 0.033, lid.position.z)
+	lid_center.material_override = _material(Color(0.115, 0.103, 0.094, 1.0), 0.48)
 	add_child(lid_center)
 
 func _build_ground_shadow() -> void:
