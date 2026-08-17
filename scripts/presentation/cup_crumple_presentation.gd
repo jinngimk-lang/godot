@@ -5,7 +5,7 @@ signal crumple_changed(progress: float)
 
 const RINGS := 7
 const SEGMENTS := 16
-const VISUAL_COMPRESSION_GAIN := 1.85
+const VISUAL_COMPRESSION_GAIN := 2.20
 const HEIGHT_SHORTENING_GAIN := 0.24
 
 var _cup: MeshInstance3D
