@@ -44,7 +44,9 @@ func _run() -> void:
 	await _settle_frames(4)
 	_stage_inspect(scene,0.58,0.22,0.78)
 	await _settle_frames(8)
+	if not _assert_staged_inspect_survived_settle(scene,"bar_inspect"): return
 	if not await _capture("bar_inspect"): return
+	_resume_hand_choreography(scene)
 
 	scene.call("debug_select_variant",2)
 	await _settle_frames(8)
@@ -58,7 +60,9 @@ func _run() -> void:
 	await _settle_frames(4)
 	_stage_inspect(scene,-0.62,0.10,0.90)
 	await _settle_frames(8)
+	if not _assert_staged_inspect_survived_settle(scene,"market_inspect"): return
 	if not await _capture("market_inspect"): return
+	_resume_hand_choreography(scene)
 
 	scene.queue_free()
 	await process_frame
@@ -74,15 +78,9 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
 	var front := label.get_front_position(progress)
-	# Exaggerate the requested staging pull enough to make the lifted flap and
-	# adhesive bend readable, then resolve it through the same reachable-paper
-	# contract as gameplay before moving the hand.
 	var desired_grip_local := front+Vector3(-0.95,0.11,0.56)
 	var grip_local := label.get_effective_grip(progress,desired_grip_local)
 	var grip_world := label.to_global(grip_local)
-	# LabelGeometry resolves the same desired pull while constructing the mesh.
-	# The hand must pinch that rendered endpoint rather than the unreachable raw
-	# request, otherwise capture can be technically aligned while visually empty.
 	var flap_points := label.get_sample_points(progress,desired_grip_local)
 	if flap_points.is_empty():
 		push_error("CAPTURE_RED: staged peel produced no label points")
@@ -94,11 +92,6 @@ func _stage_peel(scene: Node, progress: float, residue_amount: float, integrity:
 		push_error("CAPTURE_RED: effective hand target misses rendered flap tip by %.6f m" % hand_to_flap_error)
 		quit(1)
 		return
-	# This capture stages peel state directly rather than driving PeelController.
-	# Freeze both owners that can mutate the peel hand during settle frames: the
-	# scene's gameplay _process() (which ticks HandVisual from idle controller
-	# state) and the presentation choreography layer. Resume both immediately
-	# after the screenshot so later variants exercise normal runtime ownership.
 	scene.set_process(false)
 	if choreography != null:
 		choreography.set_process(false)
@@ -143,6 +136,19 @@ func _assert_staged_peel_survived_settle(scene: Node, capture_name: String) -> b
 		return false
 	return true
 
+func _assert_staged_inspect_survived_settle(scene: Node, capture_name: String) -> bool:
+	var label := scene.get_node("PeelLabel") as LabelVisual
+	var residue := scene.get_node("ResidueVisual") as ResidueVisual
+	if label.visible:
+		push_error("CAPTURE_RED: %s inspection evidence regrew the label during settle" % capture_name)
+		quit(1)
+		return false
+	if residue == null or residue.mesh == null or residue.mesh.get_surface_count() <= 0:
+		push_error("CAPTURE_RED: %s inspection evidence lost residue geometry during settle" % capture_name)
+		quit(1)
+		return false
+	return true
+
 func _resume_hand_choreography(scene: Node) -> void:
 	var hand := scene.get_node("RightHand") as HandVisual
 	if hand.has_meta(CAPTURE_GRIP_META):
@@ -154,9 +160,13 @@ func _resume_hand_choreography(scene: Node) -> void:
 
 func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
-	var residue := scene.get_node("ResidueVisual")
+	var residue := scene.get_node("ResidueVisual") as ResidueVisual
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	scene.set_process(false)
+	if choreography != null:
+		choreography.set_process(false)
 	label.visible = false
-	residue.call("set_residue",0.88,residue_amount,integrity)
+	residue.set_residue(0.88,residue_amount,integrity)
 	scene.call("_apply_inspection_yaw",yaw)
 
 func _stage_crumple(scene: Node, amount: float) -> void:
