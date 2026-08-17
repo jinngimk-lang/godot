@@ -14,7 +14,6 @@ if outer_mat == null or outer_mat.albedo_color.a > 0.15:
     failures.append("RED: amber outer glass must stay translucent enough for shoulder/neck separation")
 EOF
 
-# A path-only anchor is metadata, not evidence. The validator must reject it.
 cat > "$tmp/path-only.json" <<'EOF'
 {
   "verdict":"NEEDS_FIX",
@@ -29,7 +28,24 @@ if bash "$validator" "$tmp/path-only.json" "$packet" >/dev/null 2>&1; then
   exit 1
 fi
 
-# A real contiguous code quote from the exact packet remains valid evidence.
+cat > "$tmp/speculative.json" <<'EOF'
+{
+  "verdict":"NEEDS_FIX",
+  "defect":"The alpha threshold could potentially hide a future visual issue.",
+  "min_test":"Add a future visual check.",
+  "evidence":"The current threshold may become too permissive.",
+  "evidence_anchor":"outer_mat.albedo_color.a > 0.15"
+}
+EOF
+set +e
+bash "$validator" "$tmp/speculative.json" "$packet" >/dev/null 2>&1
+speculative_rc=$?
+set -e
+if [ "$speculative_rc" -ne 47 ]; then
+  echo "RED: speculative NEEDS_FIX must fail closed with rc=47, got $speculative_rc" >&2
+  exit 1
+fi
+
 cat > "$tmp/code-quote.json" <<'EOF'
 {
   "verdict":"NEEDS_FIX",
@@ -41,7 +57,6 @@ cat > "$tmp/code-quote.json" <<'EOF'
 EOF
 bash "$validator" "$tmp/code-quote.json" "$packet"
 
-# VERIFIED never requires a defect anchor.
 cat > "$tmp/verified.json" <<'EOF'
 {
   "verdict":"VERIFIED",
@@ -55,6 +70,4 @@ bash "$validator" "$tmp/verified.json" "$packet"
 
 echo "Local Challenger verdict validator self-test PASS"
 
-# Keep the packet builder inside the same permanent CI guard so a normal
-# multi-file product PR cannot silently outgrow the local review budget again.
 bash tools/test_build_local_challenger_packet.sh
