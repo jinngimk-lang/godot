@@ -2,7 +2,8 @@
 
 Date: 2026-08-17
 Base product main: `90d225fcd124cbd80f2fe2d84222584ee4324a3a`
-Candidate binary commit: `5d586b52cfe94df04cc8e15df21a860f9717a997`
+Initial candidate binary commit: `5d586b52cfe94df04cc8e15df21a860f9717a997`
+Reference-envelope rescale commit: `8f12fe57c835e03f85a0177a75722e03b95f5355`
 Authoring branch: `spike/cc0-makehuman-support-hand-v94`
 
 ## Why this spike exists
@@ -14,6 +15,35 @@ This v94 spike changes the *source structure* rather than tuning the old pose. I
 ## Non-negotiable stop condition
 
 This spike does not authorize CCD, endpoint chasing, wrist/orbit/yaw/translation sweeps, per-finger numeric grids, or other disguised pose search. One fixed source-rig Cup pose is tested in the current runtime. If the source normalization is clearly mirrored or axis-inverted, one evidence-driven structural sign/basis correction is allowed; a grid is not.
+
+## Build receipts before Godot visual acceptance
+
+### Structural source build
+
+The successful source-normalization build produced a left-only GLB with:
+
+- selected substantial source component: 2,049 vertices / 2,038 polygons;
+- 1,621 vertices / 1,609 polygons after arm-side crop;
+- 50-bone armature;
+- semantic actions `Default pose`, `Pinch Up`, `Cup`, `Pinch Tight`;
+- 20 real fingertip polygons on `HandNail`;
+- maximum distal-bone-tail to selected real fingertip-surface distance about `0.028423` source units.
+
+The first Godot candidate passed import, default launch, and deterministic unit tests, including the authored-hand asset contract, but failed `Scene smoke`: runtime support-hand mesh extent was `1.719`, above the existing `<=1.40` hero-hand presentation envelope. The tests were not changed.
+
+### One structural scale correction
+
+The candidate was not position/rotation/finger tuned. `tools/build_cc0_support_hand.py` was changed once to derive export scale from the actual cropped mesh envelope:
+
+- fixed `HandVisual` authored-root multiplier: `2.25`;
+- cropped source max extent before export scale: `2.0975327491760254`;
+- target runtime max extent: `1.20`;
+- derived export pre-scale: `0.2542669875084634`;
+- predicted runtime extent after the fixed 2.25× presentation multiplier: `1.20`.
+
+The target is deliberately below the existing `1.40` smoke ceiling and below the Café cup height (~`1.40`), matching the locked composition where the visible support hand is shorter than the cup. No pose, position, rotation, CCD, endpoint, or per-finger values changed in this correction.
+
+The rebuilt GLB was committed at `8f12fe57c835e03f85a0177a75722e03b95f5355`. This document update exists to trigger the exact-head Godot 4.7.1 recheck after the bot-authored binary commit.
 
 ## Machine gate
 
