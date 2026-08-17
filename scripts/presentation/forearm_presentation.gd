@@ -6,6 +6,21 @@ const RING_SIDES := 32
 const AUTHORED_HAND_SCALE := 4.15
 const AUTHORED_WRIST_END_Z := 0.026
 const WRIST_OVERLAP_AUTHORED := 0.012
+const SLEEVE_FABRIC_SHADER := """shader_type spatial;
+render_mode cull_back;
+uniform vec4 cloth_color : source_color = vec4(0.145, 0.142, 0.138, 1.0);
+uniform float weave_strength = 0.014;
+
+void fragment() {
+	float warp = sin(UV.x * 92.0 * 6.2831853);
+	float weft = sin(UV.y * 128.0 * 6.2831853);
+	float weave = warp * weft;
+	float long_fold = sin(UV.y * 13.0 + sin(UV.x * 6.2831853) * 0.45);
+	ALBEDO = clamp(cloth_color.rgb + vec3(long_fold * 0.003), vec3(0.0), vec3(1.0));
+	ROUGHNESS = clamp(0.955 + abs(weave) * weave_strength, 0.94, 0.99);
+	SPECULAR = 0.09;
+}
+"""
 
 var _applied := false
 var _forearms: Dictionary = {}
@@ -142,16 +157,20 @@ func _path_tangent_deflection_degrees(outward_sign: float) -> float:
 	var cosine := clampf(start_tangent.normalized().dot(end_tangent.normalized()),-1.0,1.0)
 	return rad_to_deg(acos(cosine))
 
-func _make_cafe_cloth() -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
+func _make_cafe_cloth() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = SLEEVE_FABRIC_SHADER
+	var material := ShaderMaterial.new()
 	material.resource_name = "SleeveFabric"
-	material.albedo_color = Color(0.16,0.155,0.15,1.0)
-	material.roughness = 0.97
+	material.shader = shader
+	material.set_shader_parameter("cloth_color",Color(0.145,0.142,0.138,1.0))
+	material.set_shader_parameter("weave_strength",0.014)
 	return material
 
 func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, end: Vector3) -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
 	for ring_index in range(CURVE_RINGS):
 		var t := float(ring_index)/float(CURVE_RINGS-1)
@@ -164,15 +183,20 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 			helper = Vector3.RIGHT
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
-		var radius := _radius_profile(t)
-		var oval_height := lerpf(0.66,0.76,t)
 		for side_index in range(RING_SIDES):
 			var angle := TAU*float(side_index)/float(RING_SIDES)
-			var cos_a := cos(angle)
-			var sin_a := sin(angle)
-			var radial := ring_x*cos_a*radius+ring_y*sin_a*radius*oval_height
+			var cross_section := _sleeve_cross_section(t,angle)
+			var radial := ring_x*cross_section.x+ring_y*cross_section.y
 			vertices.append(point+radial)
-			normals.append((ring_x*cos_a+ring_y*sin_a/oval_height).normalized())
+			var delta_angle := TAU/float(RING_SIDES)*0.35
+			var before := _sleeve_cross_section(t,angle-delta_angle)
+			var after := _sleeve_cross_section(t,angle+delta_angle)
+			var cross_tangent := ring_x*(after.x-before.x)+ring_y*(after.y-before.y)
+			var normal := cross_tangent.cross(tangent).normalized()
+			if normal.dot(radial)<0.0:
+				normal = -normal
+			normals.append(normal)
+			uvs.append(Vector2(float(side_index)/float(RING_SIDES),t))
 	for ring_index in range(CURVE_RINGS-1):
 		var current := ring_index*RING_SIDES
 		var next := (ring_index+1)*RING_SIDES
@@ -189,6 +213,7 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 	var end_center := vertices.size()
 	vertices.append(end)
 	normals.append(_cubic_tangent(start,control_a,control_b,end,1.0).normalized())
+	uvs.append(Vector2(0.5,1.0))
 	var end_ring := (CURVE_RINGS-1)*RING_SIDES
 	for side_index in range(RING_SIDES):
 		var side_next := (side_index+1)%RING_SIDES
@@ -197,18 +222,28 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	return mesh
 
-func _radius_profile(t: float) -> float:
-	# Keep the procedural bridge subordinate to the hero hands. The previous
-	# 0.155→0.285 profile occupied a large low-frequency band across all three
-	# reference scenes and read as a straight beam at thumbnail scale.
+func _sleeve_cross_section(t: float, angle: float) -> Vector2:
 	var p := clampf(t,0.0,1.0)
-	var base := lerpf(0.130,0.200,smoothstep(0.0,1.0,p))
-	return base*(1.0+0.030*sin(p*PI))
+	var radius := _radius_profile(p)
+	var vertical_ratio := lerpf(0.58,0.66,p)
+	# A restrained deterministic multi-lobe modulation breaks the hose-like
+	# extrusion without making a visible star edge at the 720p acceptance scale.
+	var fold := 1.0+0.030*sin(angle*3.0+p*1.7)+0.018*cos(angle*5.0-p*1.15)
+	var vertical_fold := 1.0+0.015*sin(angle*2.0-p*2.2)
+	return Vector2(cos(angle)*radius*fold,sin(angle)*radius*vertical_ratio*fold*vertical_fold)
+
+func _radius_profile(t: float) -> float:
+	# The reference sleeve stays subordinate to hand/paper contact. Broaden only
+	# toward the crop edge; a slimmer 0.112→0.168 bridge reduces the old tube band.
+	var p := clampf(t,0.0,1.0)
+	var base := lerpf(0.112,0.168,smoothstep(0.0,1.0,p))
+	return base*(1.0+0.025*sin(p*PI))
 
 func _active_venue_id() -> String:
 	var parent := get_parent()
