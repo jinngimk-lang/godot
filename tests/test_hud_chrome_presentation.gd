@@ -39,17 +39,15 @@ func run() -> Array[String]:
 	var lines := label.text.split("\n", false)
 	if lines.size() > 2:
 		failures.append("RED: normal reference HUD must use at most two persistent lines, got %d" % lines.size())
-	for debug_fragment in ["Quality", "residue", "1/2/3"]:
+	for debug_fragment in ["Quality", "residue", "1/2/3", "Q/E Scene", "q/e scene"]:
 		if label.text.contains(debug_fragment):
-			failures.append("RED: reference HUD must not persist debug/status-wall fragment: %s" % debug_fragment)
+			failures.append("GUIDE_RED: primary HUD must not persist expert-only scene-navigation fragment: %s" % debug_fragment)
 	if not label.text.contains("Peel 48%"):
 		failures.append("compact HUD must preserve peel progress")
 	if not label.text.contains("Mouse / touch peel"):
 		failures.append("compact HUD must preserve input-neutral peel discoverability")
 	if not label.text.contains("RMB inspect"):
 		failures.append("compact HUD must preserve inspect discoverability")
-	if not label.text.to_lower().contains("q/e scene"):
-		failures.append("compact HUD must preserve scene navigation")
 	if not label.text.contains("Esc Pause") or not label.text.contains("R Reset"):
 		failures.append("compact HUD must preserve pause and reset affordances")
 
