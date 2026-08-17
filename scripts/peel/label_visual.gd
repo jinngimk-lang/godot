@@ -21,18 +21,54 @@ var _cup_bottom_radius := 0.0
 var _cup_top_radius := 0.0
 var _cup_height := 0.0
 var _cup_center_y := 0.0
+var _substrate := "thermal_paper"
+var _surface_roughness := 0.90
+var _thickness_scale := 1.0
+var _fiber_scale := 1.0
+var _edge_tint := Color(0.76,0.72,0.63,1.0)
 
 func _ready() -> void:
 	mesh = _mesh
 	_material.albedo_color = Color(0.97,0.955,0.90,1.0)
-	_material.roughness = 0.90
+	_material.roughness = _surface_roughness
+	_material.metallic = 0.0
+	_material.metallic_specular = 0.16
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	_edge_material.albedo_color = Color(0.76,0.72,0.63,1.0)
+	_edge_material.albedo_color = _edge_tint
 	_edge_material.roughness = 0.98
+	_edge_material.metallic = 0.0
+	_edge_material.metallic_specular = 0.08
 	_edge_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
+
+func apply_profile(profile: Dictionary) -> void:
+	_substrate = String(profile.get("substrate",_substrate))
+	_surface_roughness = clampf(float(profile.get("roughness",_surface_roughness)),0.35,1.0)
+	_thickness_scale = clampf(float(profile.get("thickness_scale",_thickness_scale)),0.55,1.55)
+	_fiber_scale = clampf(float(profile.get("fiber_scale",_fiber_scale)),0.45,1.60)
+	var tint_value = profile.get("edge_tint",_edge_tint)
+	if tint_value is Color:
+		_edge_tint = tint_value
+	_material.roughness = _surface_roughness
+	# Coated market stock gets a tighter, slightly brighter specular lobe while
+	# the uncoated bar paper stays diffuse. This changes material identity without
+	# replacing the print texture or adding decorative geometry.
+	_material.metallic_specular = lerpf(0.10,0.28,clampf((0.96-_surface_roughness)/0.36,0.0,1.0))
+	_edge_material.albedo_color = _edge_tint
+	_edge_material.roughness = clampf(_surface_roughness+0.08,0.0,1.0)
+	if mesh != null:
+		var grip := _last_grip
+		if grip.length_squared() <= 0.000001:
+			grip = get_front_position(_last_progress)
+		set_peel(_last_progress,grip)
+
+func get_substrate_signature() -> String:
+	return "%s/%.3f/%.3f/%.3f" % [_substrate,_surface_roughness,_thickness_scale,_fiber_scale]
+
+func get_surface_roughness() -> float:
+	return _surface_roughness
 
 func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
 	_cup_bottom_radius = maxf(bottom_radius,0.001)
@@ -101,20 +137,24 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 	return LabelGeometry.peeling_points(p,desired_grip,label_width,center_radius,label_y,surface_offset,segments)
 
 func get_paper_thickness() -> float:
-	return clampf(label_height * 0.014, 0.0032, 0.0060)
+	var base := clampf(label_height * 0.014,0.0032,0.0060)
+	return clampf(base*_thickness_scale,0.0024,0.0075)
 
 func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var fringe := PackedVector2Array()
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
 	if p <= 0.025:
 		return fringe
+	# Keep count stable for silhouette readability; substrate identity changes the
+	# individual protrusion length/jitter instead of turning coated stock into a
+	# noisy comb or making fibrous bar stock disappear at small scale.
 	var fiber_count := 7
 	for i in range(fiber_count):
 		var t := float(i+1)/float(fiber_count+1)
-		var y_jitter := _edge_noise(i,41)*label_height*0.026
+		var y_jitter := _edge_noise(i,41)*label_height*0.026*_fiber_scale
 		var y_offset := lerpf(-label_height*0.42,label_height*0.42,t)+y_jitter
 		var length_noise := (_edge_noise(i,47)+1.0)*0.5
-		var length := 0.0085+length_noise*0.0115
+		var length := (0.0085+length_noise*0.0115)*_fiber_scale
 		fringe.append(Vector2(y_offset,length))
 	return fringe
 
@@ -129,9 +169,10 @@ func get_edge_offsets(progress: float) -> PackedVector2Array:
 		var boundary := exp(-(distance*distance)) * p
 		var top_noise := _edge_noise(i,3)
 		var bottom_noise := _edge_noise(i,11)
-		var amplitude := 0.0012 + 0.0058*peeled_weight + 0.0075*boundary
-		var notch_top := boundary * (0.0022 + 0.0034*absf(bottom_noise))
-		var notch_bottom := boundary * (0.0020 + 0.0032*absf(top_noise))
+		var fiber_factor := lerpf(0.80,1.16,clampf((_fiber_scale-0.45)/1.15,0.0,1.0))
+		var amplitude := (0.0012 + 0.0058*peeled_weight + 0.0075*boundary)*fiber_factor
+		var notch_top := boundary * (0.0022 + 0.0034*absf(bottom_noise))*fiber_factor
+		var notch_bottom := boundary * (0.0020 + 0.0032*absf(top_noise))*fiber_factor
 		var top_offset := clampf(top_noise*amplitude-notch_top,-0.016,0.012)
 		var bottom_offset := clampf(bottom_noise*amplitude+notch_bottom,-0.012,0.016)
 		result.append(Vector2(top_offset,bottom_offset))
@@ -215,9 +256,9 @@ func _draw_torn_front_fringe(points: PackedVector3Array, progress: float) -> voi
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_edge_material)
 	for i in range(fringe.size()):
 		var fiber := fringe[i]
-		var half_width := 0.0018+0.0010*float(i%3)
+		var half_width := (0.0018+0.0010*float(i%3))*clampf(_fiber_scale,0.65,1.35)
 		var base_center := boundary_center+Vector3.UP*fiber.x+normal*0.0015
-		var tip := base_center+peel_direction*fiber.y+Vector3.UP*_edge_noise(i,59)*0.0028
+		var tip := base_center+peel_direction*fiber.y+Vector3.UP*_edge_noise(i,59)*0.0028*_fiber_scale
 		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(0.0,0.0))
 		_mesh.surface_add_vertex(base_center+Vector3.UP*half_width)
