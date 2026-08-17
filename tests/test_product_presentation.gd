@@ -40,6 +40,29 @@ func run() -> Array[String]:
 				var mouth_mesh := mouth.mesh as CylinderMesh
 				if mouth_mesh.cap_top or mouth_mesh.cap_bottom:
 					failures.append("RED: %s BottleMouthRim must stay open instead of drawing a cyan/opaque cap disk" % kind)
+
+			# The reference bottles are read primarily by continuous grazing-angle
+			# reflections around the real silhouette. A second lathed shell with a
+			# view-dependent shader provides that cue without resurrecting the old
+			# rectangular fake-highlight guides.
+			var edge := product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
+			if edge == null:
+				failures.append("RED: %s must expose a continuous BottleEdgeFresnel shell" % kind)
+			else:
+				if not (edge.mesh is ArrayMesh):
+					failures.append("RED: %s edge response must follow the continuous lathed bottle profile" % kind)
+				if not (edge.material_override is ShaderMaterial):
+					failures.append("RED: %s edge response must use a view-dependent ShaderMaterial" % kind)
+				else:
+					var shader_mat := edge.material_override as ShaderMaterial
+					if shader_mat.shader == null:
+						failures.append("%s BottleEdgeFresnel shader is missing" % kind)
+					else:
+						var code := shader_mat.shader.code
+						if "dot(NORMAL, VIEW)" not in code:
+							failures.append("RED: %s edge shader must react to view angle with NORMAL·VIEW" % kind)
+						if "ALPHA" not in code or "ROUGHNESS" not in code:
+							failures.append("RED: %s edge shader must control transparent optical edge response" % kind)
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y,0.7):
 		failures.append("product decoration should follow inspection yaw")
