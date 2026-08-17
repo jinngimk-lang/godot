@@ -14,7 +14,7 @@ func run() -> Array[String]:
 	var methods: Array[String] = []
 	for method in script.get_script_method_list():
 		methods.append(String(method.get("name", "")))
-	for required_method in ["set_state", "get_active_scene_index", "get_action_text"]:
+	for required_method in ["set_state", "set_inspection_active", "get_active_scene_index", "get_action_text"]:
 		if not methods.has(required_method):
 			failures.append("GUIDE_RED: journey presentation missing %s" % required_method)
 	if not failures.is_empty():
@@ -88,6 +88,13 @@ func run() -> Array[String]:
 		failures.append("GUIDE_RED: market must report scene 3 / 3")
 	if not rail.visible:
 		failures.append("GUIDE_RED: journey rail must remain available before peeling starts")
+
+	guide.set_inspection_active(true)
+	if rail.visible:
+		failures.append("GUIDE_RED: bottom journey rail must hide while RMB inspection is active so the product silhouette owns the frame")
+	guide.set_inspection_active(false)
+	if not rail.visible:
+		failures.append("GUIDE_RED: journey rail must return after inspection ends when peel has not started")
 
 	var requested: Array[int] = [-1]
 	if not guide.has_signal("scene_requested"):
