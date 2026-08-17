@@ -63,9 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          # The verifier implementation belongs to current main, while product
-          # contracts/diff belong to the exact candidate. This keeps old PR
-          # heads reviewable after verifier infrastructure evolves.
+          # Verifier implementation belongs to current main, while product
+          # contracts/diff belong to the exact candidate. This keeps older
+          # exact product heads reviewable after verifier infrastructure moves.
           git show origin/main:tools/build_local_challenger_packet.sh > /tmp/build-local-challenger-packet.sh
           bash /tmp/build-local-challenger-packet.sh origin/main HEAD /tmp/review-packet.txt
 
@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
           {
             cat <<'PROMPT'
-          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and actively try to falsify this batch. Do not write replacement code unless a concrete defect requires a tiny reproducer.
+          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and actively try to falsify this batch. The exact packet is the only source of truth. Do not invent functions, classes, files, code, tests, or behavior that do not appear in the packet. Do not write replacement implementation code.
 
           Required attacks:
           A. Construct at least one concrete boundary/counterexample specific to the changed path.
@@ -102,10 +102,24 @@ jobs:
           C. Check presentation/gameplay authority: test-only staging must not become gameplay authority, and production presentation must not own progression.
           D. Check reset/scene-switch/process-state cleanup when the touched code can pause, resume, replace, or stage nodes.
           E. Check coordinate-space and pose/contact assertions for false positives when relevant.
-          F. Check that the tests actually exercise the claimed path and do not only assert internal implementation state.
+          F. Check that tests actually exercise the claimed path and do not only assert internal implementation state.
           G. Do not treat CI green as proof of subjective hand naturalness or reference-image similarity; those remain visual/experiential gates.
 
-          Produce concise adversarial analysis in prose. End with a provisional conclusion of either VERIFIED or NEEDS_FIX and explain why. A later structured-output pass will normalize your conclusion.
+          You may reason concisely in prose first. Then your LAST FIVE NON-EMPTY LINES MUST be exactly this protocol, with no prose after it and no other PROVISIONAL_VERDICT line earlier:
+          PROVISIONAL_VERDICT: VERIFIED
+          DEFECT: NONE
+          MIN_TEST: NONE
+          EVIDENCE: <one concise sentence explaining why no concrete defect survived>
+          EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT
+
+          OR, only if a concrete defect is directly proven by the exact packet:
+          PROVISIONAL_VERDICT: NEEDS_FIX
+          DEFECT: <one concrete reproducible defect>
+          MIN_TEST: <one concrete falsifiable regression check; never a number or vague request>
+          EVIDENCE: <one concise explanation tied to packet content>
+          EVIDENCE_ANCHOR: <a contiguous 16-240 character verbatim quote copied from implementation/test content in the exact packet>
+
+          For NEEDS_FIX, if you cannot copy a direct exact-packet quote that proves the defect, you MUST use VERIFIED instead. Do not use a filename, packet heading, or invented symbol as the anchor.
 
           Exact-head packet follows:
           PROMPT
@@ -115,24 +129,24 @@ jobs:
           ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-analysis.txt
           test -s /tmp/review-analysis.txt
 
-      - name: Normalize Challenger verdict
+      - name: Parse and ground Challenger verdict
         shell: bash
         run: |
           set -euo pipefail
-          # Normalization/grounding logic belongs to current main so verifier
-          # fixes can review an unchanged older product candidate safely.
-          git show origin/main:tools/extract_local_challenger_json.py > /tmp/extract-local-challenger-json.py
+          # Parsing/grounding logic belongs to current main so verifier fixes
+          # can review an unchanged older product candidate safely. There is no
+          # second model call: the independent review is converted to JSON by a
+          # deterministic protocol parser and then checked against the packet.
+          git show origin/main:tools/extract_local_challenger_report.py > /tmp/extract-local-challenger-report.py
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
-          git show origin/main:tools/should_retry_local_challenger.sh > /tmp/should-retry-local-challenger.sh
-          git show origin/main:tools/normalize_local_challenger_verdict.sh > /tmp/normalize-local-challenger-verdict.sh
-          chmod +x /tmp/validate-local-challenger-verdict.sh /tmp/should-retry-local-challenger.sh /tmp/normalize-local-challenger-verdict.sh
-          EXTRACTOR=/tmp/extract-local-challenger-json.py \
-          VALIDATOR=/tmp/validate-local-challenger-verdict.sh \
-          RETRY_CLASSIFIER=/tmp/should-retry-local-challenger.sh \
-            bash /tmp/normalize-local-challenger-verdict.sh \
-              /tmp/review-analysis.txt \
-              /tmp/review-packet.txt \
-              /tmp/verdict.json
+          chmod +x /tmp/validate-local-challenger-verdict.sh
+
+          python3 /tmp/extract-local-challenger-report.py \
+            /tmp/review-analysis.txt \
+            /tmp/verdict.json
+          bash /tmp/validate-local-challenger-verdict.sh \
+            /tmp/verdict.json \
+            /tmp/review-packet.txt
 
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
           defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
@@ -167,7 +181,7 @@ jobs:
               cat /tmp/review-report.txt
             else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: local Challenger did not produce a grounded structured verdict'
+              echo 'DEFECT: local Challenger did not produce a grounded deterministic verdict'
               echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
               echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
             fi
