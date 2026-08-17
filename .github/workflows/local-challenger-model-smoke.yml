@@ -5,43 +5,58 @@ on:
     paths:
       - .github/workflows/agent-challenger-local.yml
       - .github/workflows/local-challenger-model-smoke.yml
-      - tools/extract_local_challenger_report.py
+      - tools/extract_local_challenger_json.py
       - tools/validate_local_challenger_verdict.sh
+      - tools/test_validate_local_challenger_verdict.sh
 
 permissions:
   contents: read
 
 jobs:
-  qwen7b-protocol:
+  qwen3b-schema-protocol:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: Install Ollama and pull reviewer
+
+      - name: Deterministic grounding self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/test_validate_local_challenger_verdict.sh
+
+      - name: Install Ollama and pull compact reviewer
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL https://ollama.com/install.sh | sh
           nohup ollama serve >/tmp/ollama.log 2>&1 &
           for _ in {1..50}; do ollama list >/dev/null 2>&1 && break; sleep 1; done
-          ollama pull qwen2.5-coder:7b
-      - name: Require five-field bounded protocol from real model
+          ollama pull qwen2.5-coder:3b
+
+      - name: Require grounded schema JSON from real model
         shell: bash
         run: |
           set -euo pipefail
-          packet='--- scripts/example.gd ---
+          cat > /tmp/packet.txt <<'PACKET'
+          === EXACT PR DIFF (BOUNDED PER CHANGED FILE) ===
+          --- EXACT DIFF: scripts/example.gd ---
           func clamp_value(value: float) -> float:
               return clampf(value, 0.0, 1.0)
-          --- tests/test_example.gd ---
+          --- EXACT DIFF: tests/test_example.gd ---
           if clamp_value(2.0) != 1.0:
-              failures.append("upper clamp failed")'
-          prompt='Review only the exact packet. Return ONLY five labelled lines: PROVISIONAL_VERDICT, DEFECT, MIN_TEST, EVIDENCE, EVIDENCE_ANCHOR. There is no concrete defect in this fixture, so use VERIFIED, DEFECT NONE, MIN_TEST NONE, and EVIDENCE_ANCHOR NO_CONCRETE_DEFECT. Do not output prose or code.'
-          jq -n --arg prompt "$prompt\n\n$packet" '{model:"qwen2.5-coder:7b",stream:false,prompt:$prompt,options:{temperature:0,num_predict:220,num_ctx:4096}}' >/tmp/request.json
-          curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/request.json >/tmp/response.json
-          jq -er '.response' /tmp/response.json >/tmp/analysis.txt
-          cat /tmp/analysis.txt
-          python3 tools/extract_local_challenger_report.py /tmp/analysis.txt /tmp/verdict.json
+              failures.append("upper clamp failed")
+          PACKET
+          packet="$(cat /tmp/packet.txt)"
+          prompt='Review only the exact packet. There is no concrete defect in this fixture. Return one short JSON object matching the supplied schema. Use VERIFIED, defect NONE, min_test NONE, and evidence_anchor NO_CONCRETE_DEFECT. Never invent code or output prose.'
+          schema='{"type":"object","properties":{"verdict":{"type":"string","enum":["VERIFIED","NEEDS_FIX"]},"defect":{"type":"string","maxLength":160},"min_test":{"type":"string","maxLength":150},"evidence":{"type":"string","maxLength":160},"evidence_anchor":{"type":"string","maxLength":150}},"required":["verdict","defect","min_test","evidence","evidence_anchor"],"additionalProperties":false}'
+          jq -n --arg prompt "$prompt\n\n$packet" --argjson schema "$schema" \
+            '{model:"qwen2.5-coder:3b",stream:false,prompt:$prompt,format:$schema,options:{temperature:0,num_predict:180,num_ctx:4096}}' > /tmp/request.json
+          curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/request.json > /tmp/response.json
+          jq -er '.response' /tmp/response.json | tee /tmp/analysis.json
+          python3 tools/extract_local_challenger_json.py /tmp/analysis.json /tmp/verdict.json
+          bash tools/validate_local_challenger_verdict.sh /tmp/verdict.json /tmp/packet.txt
           jq -e '.verdict == "VERIFIED" and .evidence_anchor == "NO_CONCRETE_DEFECT"' /tmp/verdict.json >/dev/null
