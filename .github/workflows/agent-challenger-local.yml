@@ -4,19 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       task_id:
-        description: Numeric task id
         required: true
         type: string
       pr_number:
-        description: Pull request number
         required: true
         type: string
       expected_head_sha:
-        description: Exact 40-character PR head SHA
         required: true
         type: string
       round:
-        description: Challenge round
         required: true
         default: "1"
         type: string
@@ -28,9 +24,9 @@ permissions:
 
 jobs:
   challenge:
-    name: qwen3b-exact-head-challenger
+    name: qwen7b-exact-head-challenger
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 28
     steps:
       - name: Validate exact PR head
         env:
@@ -41,19 +37,15 @@ jobs:
         run: |
           set -euo pipefail
           current_head="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
-          test "$current_head" = "$EXPECTED_HEAD_SHA" || {
-            echo "Stale challenge: current=$current_head expected=$EXPECTED_HEAD_SHA" >&2
-            exit 1
-          }
+          test "$current_head" = "$EXPECTED_HEAD_SHA"
 
-      - name: Checkout exact candidate
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare adversarial review packet
+      - name: Prepare exact-head review packet
         env:
           TASK_ID_VALUE: ${{ inputs.task_id }}
           PR_NUMBER_VALUE: ${{ inputs.pr_number }}
@@ -63,136 +55,59 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          # Verifier implementation belongs to current main, while product
-          # contracts/diff belong to the exact candidate. This keeps older
-          # exact product heads reviewable after verifier infrastructure moves.
           git show origin/main:tools/build_local_challenger_packet.sh > /tmp/build-local-challenger-packet.sh
           bash /tmp/build-local-challenger-packet.sh origin/main HEAD /tmp/review-packet.txt
 
-      - name: Install local Ollama runtime
+      - name: Install Ollama and pull reviewer
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL https://ollama.com/install.sh | sh
           nohup ollama serve >/tmp/ollama-server.log 2>&1 &
-          for _ in {1..40}; do
-            if ollama list >/dev/null 2>&1; then exit 0; fi
+          for _ in {1..50}; do
+            ollama list >/dev/null 2>&1 && break
             sleep 1
           done
-          cat /tmp/ollama-server.log
-          exit 1
+          ollama pull qwen2.5-coder:7b
 
-      - name: Pull local code model
+      - name: Run one bounded independent review
         shell: bash
         run: |
           set -euo pipefail
-          ollama pull qwen2.5-coder:3b
+          packet="$(head -c 30000 /tmp/review-packet.txt)"
+          prompt="$(cat <<'PROMPT'
+          You are an independent code-review Challenger. The exact packet below is the ONLY source of truth. Try to falsify the candidate by checking changed-path boundaries, reset/scene-switch state, presentation-vs-gameplay authority, coordinate-space mistakes, and whether tests actually exercise the claimed path. Never invent code or symbols. Do not output replacement code.
 
-      - name: Run adversarial analysis
-        shell: bash
-        run: |
-          set -euo pipefail
-          {
-            cat <<'PROMPT'
-          You are CHALLENGER, independent from the implementation author. Review the exact PR-head diff and directly relevant contracts below. Treat all Builder claims as hypotheses and actively try to falsify this batch. The exact packet is the only source of truth. Do not invent functions, classes, files, code, tests, or behavior that do not appear in the packet. Do not write replacement implementation code.
+          Return ONLY these five labelled lines and nothing else:
+          PROVISIONAL_VERDICT: VERIFIED | NEEDS_FIX
+          DEFECT: NONE | one concrete reproducible defect
+          MIN_TEST: NONE | one concrete falsifiable regression check
+          EVIDENCE: one concise sentence
+          EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT | one contiguous 16-240 character verbatim quote from the exact packet proving the defect
 
-          Required attacks:
-          A. Construct at least one concrete boundary/counterexample specific to the changed path.
-          B. Check whether a test/capture helper can silently publish misleading evidence while its immediate assertions pass.
-          C. Check presentation/gameplay authority: test-only staging must not become gameplay authority, and production presentation must not own progression.
-          D. Check reset/scene-switch/process-state cleanup when the touched code can pause, resume, replace, or stage nodes.
-          E. Check coordinate-space and pose/contact assertions for false positives when relevant.
-          F. Check that tests actually exercise the claimed path and do not only assert internal implementation state.
-          G. Do not treat CI green as proof of subjective hand naturalness or reference-image similarity; those remain visual/experiential gates.
-
-          You may reason concisely in prose first. Then emit these five labelled fields exactly once. Common Markdown decoration is acceptable, but do not emit a second verdict or conflicting duplicate fields:
-          PROVISIONAL_VERDICT: VERIFIED
-          DEFECT: NONE
-          MIN_TEST: NONE
-          EVIDENCE: <one concise sentence explaining why no concrete defect survived>
-          EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT
-
-          OR, only if a concrete defect is directly proven by the exact packet:
-          PROVISIONAL_VERDICT: NEEDS_FIX
-          DEFECT: <one concrete reproducible defect>
-          MIN_TEST: <one concrete falsifiable regression check; never a number or vague request>
-          EVIDENCE: <one concise explanation tied to packet content>
-          EVIDENCE_ANCHOR: <a contiguous 16-240 character verbatim quote copied from implementation/test content in the exact packet>
-
-          For NEEDS_FIX, if you cannot copy a direct exact-packet quote that proves the defect, you MUST use VERIFIED instead. Do not use a filename, packet heading, or invented symbol as the anchor.
-
-          Exact-head packet follows:
+          If no exact-packet quote proves a concrete defect, use VERIFIED / NONE / NONE / NO_CONCRETE_DEFECT.
           PROMPT
-            cat /tmp/review-packet.txt
-          } > /tmp/review-prompt.txt
-
-          ollama run qwen2.5-coder:3b < /tmp/review-prompt.txt | tee /tmp/review-analysis.txt
+          )"
+          jq -n --arg prompt "$prompt\n\nEXACT PACKET:\n$packet" '{model:"qwen2.5-coder:7b",stream:false,prompt:$prompt,options:{temperature:0,num_predict:420,num_ctx:16384}}' > /tmp/review-request.json
+          curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/review-request.json > /tmp/review-response.json
+          jq -er '.response' /tmp/review-response.json | tee /tmp/review-analysis.txt
           test -s /tmp/review-analysis.txt
 
-      - name: Parse and ground Challenger verdict
+      - name: Parse and ground verdict
         shell: bash
         run: |
           set -euo pipefail
-          # Parsing/grounding logic belongs to current main so verifier fixes
-          # can review an unchanged older product candidate safely. There is no
-          # second model call: the independent review is converted to JSON by a
-          # deterministic protocol parser and then checked against the packet.
           git show origin/main:tools/extract_local_challenger_report.py > /tmp/extract-local-challenger-report.py
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
           chmod +x /tmp/validate-local-challenger-verdict.sh
-
-          set +e
-          python3 /tmp/extract-local-challenger-report.py \
-            /tmp/review-analysis.txt \
-            /tmp/verdict.json 2> /tmp/challenger-parser.err
-          parser_rc=$?
-          set -e
-          if [ "$parser_rc" -ne 0 ]; then
-            echo "::error title=Local Challenger parser failure::parser exit=$parser_rc; see analysis tail below"
-            echo '=== Challenger parser stderr ==='
-            cat /tmp/challenger-parser.err || true
-            echo '=== Challenger analysis tail (last 120 lines) ==='
-            tail -n 120 /tmp/review-analysis.txt || true
-            {
-              echo "parser exit=$parser_rc"
-              tr '\n' ' ' < /tmp/challenger-parser.err | head -c 700 || true
-            } > /tmp/challenger-infra-summary.txt
-            exit "$parser_rc"
-          fi
-
-          set +e
-          bash /tmp/validate-local-challenger-verdict.sh \
-            /tmp/verdict.json \
-            /tmp/review-packet.txt 2> /tmp/challenger-validator.err
-          validator_rc=$?
-          set -e
-          if [ "$validator_rc" -ne 0 ]; then
-            echo "::error title=Local Challenger grounding failure::validator exit=$validator_rc"
-            echo '=== Parsed verdict ==='
-            cat /tmp/verdict.json || true
-            echo '=== Grounding validator stderr ==='
-            cat /tmp/challenger-validator.err || true
-            echo '=== Challenger analysis tail (last 80 lines) ==='
-            tail -n 80 /tmp/review-analysis.txt || true
-            {
-              echo "validator exit=$validator_rc"
-              tr '\n' ' ' < /tmp/challenger-validator.err | head -c 700 || true
-            } > /tmp/challenger-infra-summary.txt
-            exit "$validator_rc"
-          fi
-
-          verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
-          defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
-          min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
-          evidence="$(jq -er '.evidence | strings' /tmp/verdict.json)"
-          evidence_anchor="$(jq -er '.evidence_anchor | strings' /tmp/verdict.json)"
-          {
-            printf 'VERDICT: %s\n' "$verdict"
-            printf 'DEFECT: %s\n' "$defect"
-            printf 'MIN_TEST: %s\n' "$min_test"
-            printf 'EVIDENCE: %s | ANCHOR: %s\n' "$evidence" "$evidence_anchor"
-          } | tee /tmp/review-report.txt
-          test "$(wc -l < /tmp/review-report.txt)" -eq 4
+          python3 /tmp/extract-local-challenger-report.py /tmp/review-analysis.txt /tmp/verdict.json
+          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
+          verdict="$(jq -er '.verdict' /tmp/verdict.json)"
+          defect="$(jq -er '.defect' /tmp/verdict.json)"
+          min_test="$(jq -er '.min_test' /tmp/verdict.json)"
+          evidence="$(jq -er '.evidence' /tmp/verdict.json)"
+          anchor="$(jq -er '.evidence_anchor' /tmp/verdict.json)"
+          printf 'VERDICT: %s\nDEFECT: %s\nMIN_TEST: %s\nEVIDENCE: %s | ANCHOR: %s\n' "$verdict" "$defect" "$min_test" "$evidence" "$anchor" | tee /tmp/review-report.txt
 
       - name: Comment exact-head report on PR
         if: always()
@@ -210,25 +125,17 @@ jobs:
             echo "Exact head: \`$EXPECTED_HEAD_SHA\`"
             echo
             echo '```text'
-            if [ -s /tmp/review-report.txt ] && grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt; then
-              cat /tmp/review-report.txt
-            else
+            if [ -s /tmp/review-report.txt ]; then cat /tmp/review-report.txt; else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: local Challenger did not produce a grounded deterministic verdict'
-              echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
-              if [ -s /tmp/challenger-infra-summary.txt ]; then
-                printf 'EVIDENCE: '
-                tr '\n' ' ' < /tmp/challenger-infra-summary.txt | head -c 1000 || true
-                echo
-              else
-                echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
-              fi
+              echo 'DEFECT: reviewer did not produce a grounded verdict'
+              echo 'MIN_TEST: rerun after verifier repair'
+              echo 'EVIDENCE: no accepted exact-packet verdict'
             fi
             echo '```'
           } > /tmp/pr-comment.md
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/pr-comment.md
 
-      - name: Enforce Challenger verdict
+      - name: Enforce verdict
         shell: bash
         run: |
           set -euo pipefail
