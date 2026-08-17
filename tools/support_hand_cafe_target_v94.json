@@ -1,0 +1,12 @@
+{
+  "measurement_run": 32020753168,
+  "measurement_head": "fcb8e173f2ca9208898fd3aa4f1358d54d6cf804",
+  "scene": "res://scenes/peel_lab/peel_lab.tscn",
+  "space": "LeftHand/AuthoredHand local",
+  "cup_center": [-0.0764425992965698, 0.00385926570743322, -0.0127513222396374],
+  "cup_axis": [0.686102747917175, 0.686102688312531, -0.241921961307526],
+  "cup_radial_from_wrist": [0.262141793966293, 0.0770449712872505, 0.961948931217194],
+  "measured_wrist": [0.588107347488403, 0.734007120132446, -0.620744287967682],
+  "measured_authored_root_scale": [4.15000009536743, 4.15000009536743, 4.15000009536743],
+  "note": "This is a runtime measurement used only for one algebraic source-frame alignment. It is not a pose-search parameter set."
+}
