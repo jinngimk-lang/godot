@@ -8,6 +8,7 @@ on:
       - tools/extract_local_challenger_json.py
       - tools/normalize_local_challenger_verdict.sh
       - tools/should_retry_local_challenger.sh
+      - tools/test_normalize_local_challenger_retry.sh
       - .github/workflows/agent-challenger-local.yml
       - .github/workflows/local-challenger-packet-selftest.yml
 
@@ -31,6 +32,7 @@ jobs:
           bash -n tools/validate_local_challenger_verdict.sh
           bash -n tools/normalize_local_challenger_verdict.sh
           bash -n tools/should_retry_local_challenger.sh
+          bash -n tools/test_normalize_local_challenger_retry.sh
           python3 -m py_compile tools/extract_local_challenger_json.py
 
       - name: Normalize one model JSON envelope
@@ -70,19 +72,25 @@ jobs:
           echo "multiple envelope extractor rc=$rc"
           test "$rc" -eq 4
 
-      - name: Retry only strict grounding failures
+      - name: Retry malformed normalization once
         shell: bash
         run: |
           set -euo pipefail
-          for code in 42 43 44 45 46; do
+          bash tools/test_normalize_local_challenger_retry.sh
+
+      - name: Retry only known format or grounding failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          for code in 4 42 43 44 45 46; do
             bash tools/should_retry_local_challenger.sh "$code"
           done
-          for code in 0 1 2 4 41 47 99; do
+          for code in 0 1 2 3 5 22 41 47 99; do
             set +e
             bash tools/should_retry_local_challenger.sh "$code"
             rc=$?
             set -e
-            echo "non-retryable validator code=$code classifier rc=$rc"
+            echo "non-retryable failure code=$code classifier rc=$rc"
             test "$rc" -eq 1
           done
 
