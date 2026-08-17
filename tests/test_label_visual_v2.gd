@@ -61,4 +61,39 @@ func run() -> Array[String]:
 	if retains_cup_anchor:
 		failures.append("held label geometry must not retain the cup-side endpoint")
 
+	var visual_path := "res://scripts/peel/label_visual.gd"
+	if not ResourceLoader.exists(visual_path):
+		failures.append("RED: missing LabelVisual paper presentation")
+		return failures
+	var visual = load(visual_path).new()
+	visual.segments = segments
+	visual.label_height = 0.36
+	var attached_edges: PackedVector2Array = visual.get_edge_offsets(0.0)
+	var peeled_edges: PackedVector2Array = visual.get_edge_offsets(progress)
+	var repeated_edges: PackedVector2Array = visual.get_edge_offsets(progress)
+	if attached_edges.size() != segments + 1 or peeled_edges.size() != segments + 1:
+		failures.append("RED: paper edge profile must cover every label segment")
+	elif peeled_edges != repeated_edges:
+		failures.append("RED: paper edge profile must be deterministic across identical frames")
+	else:
+		var attached_max := 0.0
+		var peeled_min := INF
+		var peeled_max := -INF
+		for i in range(attached_edges.size()):
+			attached_max = maxf(attached_max, maxf(absf(attached_edges[i].x), absf(attached_edges[i].y)))
+			peeled_min = minf(peeled_min, minf(peeled_edges[i].x, peeled_edges[i].y))
+			peeled_max = maxf(peeled_max, maxf(peeled_edges[i].x, peeled_edges[i].y))
+		if attached_max > 0.0030:
+			failures.append("attached label deckle must remain subtle; max=%.4f" % attached_max)
+		if peeled_max - peeled_min < 0.010:
+			failures.append("RED: partially peeled label needs visible deterministic edge irregularity")
+		var boundary_index := clampi(int(round(progress * float(segments))),0,segments)
+		var boundary := peeled_edges[boundary_index]
+		if boundary.x > -0.001 and boundary.y < 0.001:
+			failures.append("RED: peel front should narrow/notch the paper edge instead of staying rectangular")
+	var thickness := float(visual.get_paper_thickness())
+	if thickness < 0.003 or thickness > 0.007:
+		failures.append("RED: label needs a thin but visible paper sidewall; got %.4f" % thickness)
+	visual.free()
+
 	return failures
