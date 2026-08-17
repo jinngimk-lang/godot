@@ -31,7 +31,7 @@ const VARIANTS := [
 		},
 		"cup_color":Color(0.91,0.87,0.78),
 		"cup_shell":"paper",
-		"cup_dimensions":{"top_radius":0.52,"bottom_radius":0.43,"height":1.42},
+		"cup_dimensions":{"top_radius":0.49,"bottom_radius":0.38,"height":1.40},
 		"container_profile":{"kind":"paper_cup","body_color":Color(0.91,0.87,0.78),"lid_color":Color(0.025,0.024,0.022),"roughness":0.90},
 		"scene_profile":{"id":"cafe_window","table_color":Color(0.20,0.095,0.040),"table_roughness":0.48,"ambient_color":Color(0.20,0.15,0.11),"accent_color":Color(1.0,0.70,0.38),"light_energy":1.18},
 		"post_peel_action":"crumple",
