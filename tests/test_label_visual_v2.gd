@@ -25,9 +25,7 @@ func run() -> Array[String]:
 	if effective.distance_to(front) > available + 0.0001:
 		failures.append("effective grip exceeds physically peeled label length")
 
-	var peel_points: PackedVector3Array = geometry.peeling_points(
-		progress, far_grip, width, radius, label_y, offset, segments
-	)
+	var peel_points: PackedVector3Array = geometry.peeling_points(progress, far_grip, width, radius, label_y, offset, segments)
 	if peel_points.size() != segments + 1:
 		failures.append("peeling centerline should return segments + 1 points")
 	else:
@@ -117,6 +115,19 @@ func run() -> Array[String]:
 				failures.append("RED: torn-front fibers must protrude enough to break the rectangular silhouette")
 			if longest - shortest < 0.004:
 				failures.append("RED: torn-front fibers need varied lengths instead of a uniform comb")
+
+	visual._ready()
+	if visual.mesh == null or visual.mesh.get_surface_count() < 1:
+		failures.append("RED: label must generate a printable front surface")
+	else:
+		var print_material := visual.mesh.surface_get_material(0) as StandardMaterial3D
+		if print_material == null or print_material.cull_mode != BaseMaterial3D.CULL_BACK:
+			failures.append("RED: printed label face must be single-sided so the reverse cannot show front ink")
+	var attached_surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
+	visual.set_peel(progress,far_grip)
+	var peeled_surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
+	if peeled_surface_count < attached_surface_count + 2:
+		failures.append("RED: peeled label must add a distinct fibrous backing surface plus torn-front fibers")
 	visual.free()
 
 	return failures
