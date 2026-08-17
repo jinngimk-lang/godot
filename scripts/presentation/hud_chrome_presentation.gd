@@ -21,27 +21,27 @@ func _process(_delta: float) -> void:
 		return
 	var panel := Panel.new()
 	panel.name = "ReferenceHudPanel"
-	panel.position = Vector2(16,14)
-	panel.size = Vector2(540,64)
+	panel.position = Vector2(14,12)
+	panel.size = Vector2(430,50)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.018,0.017,0.016,0.30)
-	style.border_color = Color(1.0,1.0,1.0,0.045)
+	style.bg_color = Color(0.018,0.017,0.016,0.23)
+	style.border_color = Color(1.0,1.0,1.0,0.032)
 	style.set_border_width_all(1)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	style.shadow_color = Color(0,0,0,0.14)
-	style.shadow_size = 4
+	style.corner_radius_top_left = 7
+	style.corner_radius_top_right = 7
+	style.corner_radius_bottom_left = 7
+	style.corner_radius_bottom_right = 7
+	style.shadow_color = Color(0,0,0,0.10)
+	style.shadow_size = 3
 	panel.add_theme_stylebox_override("panel",style)
 	layer.add_child(panel)
 	layer.move_child(panel,0)
-	label.position = Vector2(28,20)
-	label.size = Vector2(520,58)
-	label.add_theme_font_size_override("font_size",12)
-	label.add_theme_color_override("font_color",Color(0.97,0.96,0.93,0.90))
-	label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.58))
+	label.position = Vector2(22,16)
+	label.size = Vector2(408,42)
+	label.add_theme_font_size_override("font_size",10)
+	label.add_theme_color_override("font_color",Color(0.97,0.96,0.93,0.88))
+	label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.52))
 	label.add_theme_constant_override("shadow_offset_x",1)
 	label.add_theme_constant_override("shadow_offset_y",1)
 	_applied = true

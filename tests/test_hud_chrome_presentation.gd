@@ -31,10 +31,10 @@ func run() -> Array[String]:
 	if panel == null:
 		failures.append("reference HUD panel was not created")
 	else:
-		if panel.size.y > 68.0:
-			failures.append("RED: reference HUD panel must stay <= 68 px tall, got %.1f" % panel.size.y)
-		if panel.size.x > 560.0:
-			failures.append("RED: reference HUD panel must stay <= 560 px wide, got %.1f" % panel.size.x)
+		if panel.size.y > 52.0:
+			failures.append("RED: reference HUD chrome must stay <= 52 px tall so photography remains primary, got %.1f" % panel.size.y)
+		if panel.size.x > 440.0:
+			failures.append("RED: reference HUD chrome must stay <= 440 px wide on the 1152 px capture, got %.1f" % panel.size.x)
 
 	var lines := label.text.split("\n", false)
 	if lines.size() > 2:
