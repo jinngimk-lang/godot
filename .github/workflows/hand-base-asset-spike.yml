@@ -35,55 +35,69 @@ jobs:
           sudo apt-get install -y blender >/dev/null
           blender --version | head -n 2 | tee blender-version.txt
 
-      - name: Inspect Realistic Hand asset topology and rig readiness
+      - name: Inspect Realistic Hand asset topology and multires detail
         shell: bash
         run: |
           set -euo pipefail
           cat > inspect_hand.py <<'PY'
           import bpy
 
-          def material_summary(mat):
-              if mat is None:
-                  return 'none'
-              return f'{mat.name}|nodes={bool(mat.use_nodes)}'
-
           lines = []
           lines.append(f'BLENDER_VERSION={bpy.app.version_string}')
-          lines.append(f'OBJECT_COUNT={len(bpy.data.objects)}')
-          lines.append(f'MESH_COUNT={len(bpy.data.meshes)}')
-
-          assets = []
-          for obj in bpy.data.objects:
-              if getattr(obj, 'asset_data', None) is not None:
-                  assets.append((obj.name, obj.type))
-          lines.append('OBJECT_ASSETS=' + repr(sorted(assets)))
-
           hand_candidates = [obj for obj in bpy.data.objects if 'hand' in obj.name.lower()]
           lines.append('HAND_OBJECT_NAMES=' + repr([(o.name, o.type) for o in hand_candidates]))
 
+          depsgraph = bpy.context.evaluated_depsgraph_get()
           for obj in hand_candidates:
               lines.append(f'OBJECT name={obj.name} type={obj.type} parent={obj.parent.name if obj.parent else "none"}')
-              lines.append('  modifiers=' + repr([(m.name, m.type, getattr(getattr(m, 'object', None), 'name', None)) for m in obj.modifiers]))
-              if obj.type == 'MESH':
-                  mesh = obj.data
-                  lines.append(f'  mesh={mesh.name} vertices={len(mesh.vertices)} edges={len(mesh.edges)} polygons={len(mesh.polygons)} loops={len(mesh.loops)}')
-                  lines.append(f'  uv_layers={len(mesh.uv_layers)} color_attrs={len(mesh.color_attributes)} materials={len(mesh.materials)}')
-                  lines.append('  material_names=' + repr([material_summary(m) for m in mesh.materials]))
-                  smooth = sum(1 for p in mesh.polygons if p.use_smooth)
-                  lines.append(f'  smooth_polygons={smooth}/{len(mesh.polygons)}')
-                  lines.append('  vertex_groups=' + repr([(g.name, len([v for v in mesh.vertices if any(gr.group == g.index for gr in v.groups)])) for g in obj.vertex_groups[:40]]))
+              modifier_rows = []
+              for modifier in obj.modifiers:
+                  row = [modifier.name, modifier.type]
+                  if modifier.type == 'MULTIRES':
+                      row.extend([
+                          f'levels={modifier.levels}',
+                          f'sculpt_levels={modifier.sculpt_levels}',
+                          f'render_levels={modifier.render_levels}',
+                          f'total_levels={modifier.total_levels}',
+                      ])
+                  modifier_rows.append(tuple(row))
+              lines.append('  modifiers=' + repr(modifier_rows))
+              if obj.type != 'MESH':
+                  continue
+              mesh = obj.data
+              lines.append(f'  BASE vertices={len(mesh.vertices)} edges={len(mesh.edges)} polygons={len(mesh.polygons)} loops={len(mesh.loops)}')
+              lines.append(f'  uv_layers={len(mesh.uv_layers)} materials={len(mesh.materials)} vertex_groups={len(obj.vertex_groups)}')
+              lines.append(f'  smooth_polygons={sum(1 for p in mesh.polygons if p.use_smooth)}/{len(mesh.polygons)}')
+
+              original_levels = {}
+              multires = [m for m in obj.modifiers if m.type == 'MULTIRES']
+              for m in multires:
+                  original_levels[m.name] = (m.levels, m.render_levels)
+
+              max_level = max([m.total_levels for m in multires] or [0])
+              sample_levels = sorted(set([0, min(1,max_level), min(2,max_level), max_level]))
+              for sample_level in sample_levels:
+                  for m in multires:
+                      m.levels = sample_level
+                      m.render_levels = sample_level
+                  bpy.context.view_layer.update()
+                  evaluated = obj.evaluated_get(depsgraph)
+                  evaluated_mesh = evaluated.to_mesh()
+                  try:
+                      lines.append(
+                          f'  EVAL level={sample_level} vertices={len(evaluated_mesh.vertices)} '
+                          f'polygons={len(evaluated_mesh.polygons)} loops={len(evaluated_mesh.loops)}'
+                      )
+                  finally:
+                      evaluated.to_mesh_clear()
+
+              for m in multires:
+                  levels, render_levels = original_levels[m.name]
+                  m.levels = levels
+                  m.render_levels = render_levels
 
           armatures = [o for o in bpy.data.objects if o.type == 'ARMATURE']
-          for arm in armatures:
-              lines.append(f'ARMATURE name={arm.name} bones={len(arm.data.bones)}')
-              lines.append('  bone_names=' + repr([b.name for b in arm.data.bones[:80]]))
-
-          # Also inspect mesh datablocks named as realistic hand even if the asset
-          # is not currently instantiated as an object in the saved scene.
-          for mesh in bpy.data.meshes:
-              if 'hand' not in mesh.name.lower():
-                  continue
-              lines.append(f'MESH_DATABLOCK name={mesh.name} vertices={len(mesh.vertices)} polygons={len(mesh.polygons)} uv_layers={len(mesh.uv_layers)} materials={len(mesh.materials)}')
+          lines.append('ARMATURES=' + repr([(o.name, len(o.data.bones)) for o in armatures]))
 
           with open('realistic-hand-inspection.txt', 'w', encoding='utf-8') as f:
               f.write('\n'.join(lines) + '\n')
@@ -91,7 +105,7 @@ jobs:
           PY
           blender -b human_base_meshes_bundle.blend --python inspect_hand.py 2>&1 | tee blender-inspect.log
           test -s realistic-hand-inspection.txt
-          grep -i 'hand' realistic-hand-inspection.txt
+          cat realistic-hand-inspection.txt
 
       - name: Upload inspected upstream bundle evidence
         uses: actions/upload-artifact@v4
