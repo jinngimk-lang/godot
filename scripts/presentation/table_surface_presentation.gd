@@ -7,6 +7,34 @@ var _shader: Shader
 func _ready() -> void:
 	_shader = load("res://art/shaders/reference_table.gdshader") as Shader
 
+func profile_parameters(profile_id: String) -> Dictionary:
+	if profile_id == "night_bar":
+		return {
+			"base_color": Vector3(0.105,0.045,0.018),
+			"roughness_value": 0.23,
+			"grain_strength": 0.16,
+			"grain_scale": 72.0,
+			"stone_mode": 0.0,
+			"grain_bump_strength": 0.034
+		}
+	if profile_id == "market_coldcase":
+		return {
+			"base_color": Vector3(0.72,0.71,0.67),
+			"roughness_value": 0.38,
+			"grain_strength": 0.018,
+			"grain_scale": 18.0,
+			"stone_mode": 1.0,
+			"grain_bump_strength": 0.024
+		}
+	return {
+		"base_color": Vector3(0.26,0.105,0.035),
+		"roughness_value": 0.40,
+		"grain_strength": 0.12,
+		"grain_scale": 58.0,
+		"stone_mode": 0.0,
+		"grain_bump_strength": 0.044
+	}
+
 func _process(_delta: float) -> void:
 	var root := get_parent()
 	if root == null:
@@ -21,22 +49,7 @@ func _process(_delta: float) -> void:
 	_active_id = next_id
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader
-	if next_id == "night_bar":
-		mat.set_shader_parameter("base_color",Vector3(0.105,0.045,0.018))
-		mat.set_shader_parameter("roughness_value",0.23)
-		mat.set_shader_parameter("grain_strength",0.16)
-		mat.set_shader_parameter("grain_scale",72.0)
-		mat.set_shader_parameter("stone_mode",0.0)
-	elif next_id == "market_coldcase":
-		mat.set_shader_parameter("base_color",Vector3(0.72,0.71,0.67))
-		mat.set_shader_parameter("roughness_value",0.38)
-		mat.set_shader_parameter("grain_strength",0.018)
-		mat.set_shader_parameter("grain_scale",18.0)
-		mat.set_shader_parameter("stone_mode",0.0)
-	else:
-		mat.set_shader_parameter("base_color",Vector3(0.26,0.105,0.035))
-		mat.set_shader_parameter("roughness_value",0.40)
-		mat.set_shader_parameter("grain_strength",0.12)
-		mat.set_shader_parameter("grain_scale",58.0)
-		mat.set_shader_parameter("stone_mode",0.0)
+	var parameters := profile_parameters(next_id)
+	for parameter_name in parameters:
+		mat.set_shader_parameter(StringName(parameter_name),parameters[parameter_name])
 	table.material_override = mat
