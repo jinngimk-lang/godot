@@ -119,9 +119,9 @@ func run() -> Array[String]:
 				failures.append("RED: torn-front fibers need varied lengths instead of a uniform comb")
 
 	visual._ready()
-	var attached_surface_count := visual.mesh.get_surface_count() if visual.mesh != null else 0
+	var attached_surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
 	visual.set_peel(progress,far_grip)
-	var peeled_surface_count := visual.mesh.get_surface_count() if visual.mesh != null else 0
+	var peeled_surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
 	if attached_surface_count > 3:
 		failures.append("RED: fully attached label should not generate a separate exposed backing surface")
 	if peeled_surface_count < attached_surface_count + 2:
