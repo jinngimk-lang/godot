@@ -115,6 +115,28 @@ func has_adhesive_trace() -> bool:
 func has_layered_residue() -> bool:
 	return _residue_amount > 0.002 and _fiber_strength > 0.02 and _progress > 0.002 and _immediate.get_surface_count() >= 2
 
+func get_fiber_island_spans(progress: float) -> PackedVector2Array:
+	var spans := PackedVector2Array()
+	var peeled_u := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	if peeled_u <= 0.08 or _fiber_strength <= 0.02:
+		return spans
+	var island_count := clampi(3+int(floor(_fiber_strength*2.2)),3,5)
+	for i in range(island_count):
+		var center := peeled_u*(float(i)+0.5)/float(island_count)
+		var width_signal := _signal(i,127)
+		var width := maxf(0.09,peeled_u*(0.15+0.035*width_signal))
+		width = minf(width,peeled_u*0.30)
+		var u0 := maxf(0.0,center-width*0.5)
+		var u1 := minf(peeled_u,center+width*0.5)
+		# Edge clipping should not collapse a broad island into a tiny square.
+		if u1-u0 < 0.085:
+			if u0 <= 0.0001:
+				u1 = minf(peeled_u,u0+0.085)
+			else:
+				u0 = maxf(0.0,u1-0.085)
+		spans.append(Vector2(u0,u1))
+	return spans
+
 func set_inspection_yaw(yaw: float) -> void:
 	rotation.y = yaw if is_finite(yaw) else 0.0
 
@@ -198,33 +220,37 @@ func _draw_tack_streaks(peeled_u: float) -> void:
 			_emit_patch(u0,u1,row_center+wobble0+half0,row_center+wobble0-half0,row_center+wobble1+half1,row_center+wobble1-half1,0.0162)
 
 func _draw_fiber_layer() -> void:
-	var segments := 14
-	var peeled_u := clampf(_progress,0.0,1.0)
-	var density := clampf(0.18+_fiber_strength*0.68,0.18,0.86)
-	var started := false
-	for i in range(segments):
-		var u0 := float(i)/float(segments)
-		if u0 >= peeled_u:
-			break
-		var u1 := minf(float(i+1)/float(segments),peeled_u)
-		var signal_value := _signal(i,17)
-		if signal_value > density:
-			continue
-		if not started:
-			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_fiber_material)
-			started = true
-		var center_offset := (0.5-_signal(i,31))*_label_height*0.34
-		var next_offset := center_offset+(0.5-_signal(i+1,37))*_label_height*0.08
-		var half_height := _label_height*(0.035+0.075*_fiber_strength+0.020*(1.0-signal_value))
-		var rag0 := (0.5-_signal(i,23))*_label_height*0.025
-		var rag1 := (0.5-_signal(i+1,29))*_label_height*0.025
-		var y0_top := _label_y+center_offset+half_height+rag0
-		var y0_bottom := _label_y+center_offset-half_height-rag0*0.35
-		var y1_top := _label_y+next_offset+half_height*0.90+rag1
-		var y1_bottom := _label_y+next_offset-half_height*0.88-rag1*0.35
-		_emit_patch(u0,u1,y0_top,y0_bottom,y1_top,y1_bottom,0.0172)
-	if started:
-		_immediate.surface_end()
+	var islands := get_fiber_island_spans(_progress)
+	if islands.is_empty():
+		return
+	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_fiber_material)
+	for island_index in range(islands.size()):
+		var island := islands[island_index]
+		var subdivisions := 4
+		for j in range(subdivisions):
+			var t0 := float(j)/float(subdivisions)
+			var t1 := float(j+1)/float(subdivisions)
+			var u0 := lerpf(island.x,island.y,t0)
+			var u1 := lerpf(island.x,island.y,t1)
+			var seed0 := island_index*13+j
+			var seed1 := island_index*13+j+1
+			var center0 := _label_y+(0.5-_signal(seed0,31))*_label_height*0.28
+			var center1 := _label_y+(0.5-_signal(seed1,37))*_label_height*0.28
+			var half0 := _label_height*(0.075+0.085*_fiber_strength+0.022*_signal(seed0,23))
+			var half1 := _label_height*(0.075+0.085*_fiber_strength+0.022*_signal(seed1,29))
+			var rag_top0 := (0.5-_signal(seed0,41))*_label_height*0.035
+			var rag_top1 := (0.5-_signal(seed1,43))*_label_height*0.035
+			var rag_bottom0 := (0.5-_signal(seed0,47))*_label_height*0.030
+			var rag_bottom1 := (0.5-_signal(seed1,53))*_label_height*0.030
+			_emit_patch(
+				u0,u1,
+				center0+half0+rag_top0,
+				center0-half0-rag_bottom0,
+				center1+half1+rag_top1,
+				center1-half1-rag_bottom1,
+				0.0172
+			)
+	_immediate.surface_end()
 
 func _emit_patch(u0: float, u1: float, y0_top: float, y0_bottom: float, y1_top: float, y1_bottom: float, offset: float) -> void:
 	var a := _point(u0,y0_top,offset)
