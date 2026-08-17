@@ -118,6 +118,16 @@ func run() -> Array[String]:
 			if longest - shortest < 0.004:
 				failures.append("RED: torn-front fibers need varied lengths instead of a uniform comb")
 
+	if not visual.has_method("get_peel_front_fold_depth"):
+		failures.append("RED: partially peeled label needs a visible folded backing lip at the release front")
+	else:
+		var attached_fold := float(visual.get_peel_front_fold_depth(0.0))
+		var partial_fold := float(visual.get_peel_front_fold_depth(progress))
+		if attached_fold > 0.0001:
+			failures.append("RED: fully attached label must not show a backing fold")
+		if partial_fold < 0.014 or partial_fold > 0.035:
+			failures.append("RED: peel-front backing fold must be camera-readable but restrained; got %.4f" % partial_fold)
+
 	visual._ready()
 	var attached_surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
 	visual.set_peel(progress,far_grip)
