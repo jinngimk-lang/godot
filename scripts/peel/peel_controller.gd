@@ -12,8 +12,11 @@ var _edge_position := Vector2.ZERO
 var _grab_region := Rect2()
 var _grab_origin := Vector2.ZERO
 var _hand_position := Vector2.ZERO
-var _edge_radius := 34.0
-var _lift_distance := 4.0
+var _edge_radius := 30.0
+var _regrab_edge_radius := 34.0
+var _lift_distance := 10.0
+var _minimum_lift_hold := 0.08
+var _lift_elapsed := 0.0
 var _tension_per_pixel := 0.65
 var _hand_follow_rate := 14.0
 
@@ -25,6 +28,7 @@ func reset() -> void:
 	_state = State.IDLE
 	_grab_origin = Vector2.ZERO
 	_hand_position = _edge_position
+	_lift_elapsed = 0.0
 
 func set_edge_position(screen_position: Vector2) -> void:
 	_edge_position = screen_position
@@ -49,9 +53,10 @@ func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
 				_set_state(State.IDLE)
 		State.EDGE_LIFT:
 			_update_hand(pointer.position, delta)
+			_lift_elapsed += clampf(delta if is_finite(delta) else 0.0, 0.0, 0.1)
 			if not pointer.pressed:
 				_set_state(State.RELEASED)
-			elif pointer.position.distance_to(_grab_origin) >= _lift_distance:
+			elif pointer.position.distance_to(_grab_origin) >= _lift_distance and _lift_elapsed >= _minimum_lift_hold:
 				_set_state(State.PINCHED)
 		State.PINCHED:
 			_update_hand(pointer.position, delta)
@@ -109,13 +114,18 @@ func get_model_config() -> Dictionary:
 	return _model.get_config()
 
 func _can_grab(position: Vector2) -> bool:
-	if _grab_region.size.x > 0.0 and _grab_region.size.y > 0.0 and _grab_region.grow(7.0).has_point(position):
-		return true
+	# The first peel has to begin at the actual lifted edge. Once some paper is
+	# already free, let the whole visible label remain forgiving to re-grab.
+	if _model.get_progress() > 0.001:
+		if _grab_region.size.x > 0.0 and _grab_region.size.y > 0.0 and _grab_region.grow(7.0).has_point(position):
+			return true
+		return position.distance_to(_edge_position) <= _regrab_edge_radius
 	return position.distance_to(_edge_position) <= _edge_radius
 
 func _begin_lift(position: Vector2) -> void:
 	_grab_origin = position
 	_hand_position = position
+	_lift_elapsed = 0.0
 	_set_state(State.EDGE_LIFT)
 
 func _advance_peel(pointer: PointerState, delta: float) -> void:
