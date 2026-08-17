@@ -68,7 +68,14 @@ jobs:
               scene.frame_set(frame); bpy.context.view_layer.update()
               snapshots[action_name]={pb.name:pb.matrix.copy() for pb in arm.pose.bones}
 
-          bpy.ops.object.select_all(action='DESELECT')
+          # The source .blend is saved in Pose Mode. Normalize the active object
+          # before any edit operators and use direct selection flags rather than
+          # UI-context-sensitive object.select_all calls.
+          bpy.context.view_layer.objects.active=arm
+          if arm.mode!='OBJECT':
+              bpy.ops.object.mode_set(mode='OBJECT')
+          for obj in scene.objects:
+              obj.select_set(False)
           source_mesh.select_set(True); bpy.context.view_layer.objects.active=source_mesh
           bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.separate(type='LOOSE'); bpy.ops.object.mode_set(mode='OBJECT')
           parts=[o for o in scene.objects if o.type=='MESH']
@@ -93,7 +100,11 @@ jobs:
           palm_width=((arm.matrix_world @ arm.data.bones['f_index.01.L'].head_local)-(arm.matrix_world @ arm.data.bones['f_pinky.01.L'].head_local)).length
 
           cutoff=palm_width*0.10
-          bpy.ops.object.select_all(action='DESELECT'); keep.select_set(True); bpy.context.view_layer.objects.active=keep
+          for obj in scene.objects:
+              obj.select_set(False)
+          keep.select_set(True); bpy.context.view_layer.objects.active=keep
+          if keep.mode!='OBJECT':
+              bpy.ops.object.mode_set(mode='OBJECT')
           bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='DESELECT'); bpy.ops.object.mode_set(mode='OBJECT')
           for vertex in keep.data.vertices:
               vertex.select=(keep.matrix_world @ vertex.co).z>cutoff
@@ -161,7 +172,11 @@ jobs:
 
           scale_m=Matrix.Scale(PRE_SCALE,4)
           arm.matrix_world=scale_m @ arm.matrix_world; keep.matrix_world=scale_m @ keep.matrix_world; bpy.context.view_layer.update()
-          bpy.ops.object.select_all(action='DESELECT'); keep.select_set(True); arm.select_set(True); bpy.context.view_layer.objects.active=arm
+          for obj in scene.objects:
+              obj.select_set(False)
+          keep.select_set(True); arm.select_set(True); bpy.context.view_layer.objects.active=arm
+          if arm.mode!='OBJECT':
+              bpy.ops.object.mode_set(mode='OBJECT')
           arm.animation_data.action=bpy.data.actions.get('Cup'); scene.frame_set(0)
           kwargs=dict(filepath=OUT,export_format='GLB',use_selection=True,export_animations=True,export_force_sampling=True)
           prop_names=set(bpy.ops.export_scene.gltf.get_rna_type().properties.keys())
