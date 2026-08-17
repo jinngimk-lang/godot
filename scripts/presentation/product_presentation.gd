@@ -15,7 +15,7 @@ void fragment() {
 	ROUGHNESS = mix(0.075, 0.022, fresnel);
 	SPECULAR = 0.92;
 	CLEARCOAT = 0.94;
-	CLEARCOAT_GLOSS = 0.95;
+	CLEARCOAT_ROUGHNESS = 0.05;
 }
 """
 
