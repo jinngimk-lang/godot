@@ -151,6 +151,16 @@ func get_backing_signature() -> String:
 func has_distinct_peeled_backing() -> bool:
 	return _has_backing_surface
 
+func get_peel_roll_angle(u: float, progress: float) -> float:
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	var x := clampf(u if is_finite(u) else 0.0,0.0,1.0)
+	if p <= 0.025 or x >= p:
+		return 0.0
+	var free_weight := 1.0-x/maxf(p,0.0001)
+	var smooth_weight := free_weight*free_weight*(3.0-2.0*free_weight)
+	var progress_weight := clampf(p/0.18,0.0,1.0)
+	return deg_to_rad(150.0)*smooth_weight*progress_weight
+
 func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
 	_cup_bottom_radius = maxf(bottom_radius,0.001)
 	_cup_top_radius = maxf(top_radius,0.001)
@@ -274,15 +284,27 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_material)
 	for i in range(points.size()):
 		var center := points[i]
-		var curve_normal := _normal_from_points(points,i)
+		var tangent := _tangent_from_points(points,i)
+		var curve_normal := tangent.cross(Vector3.UP).normalized()
+		if curve_normal.length_squared()<=0.000001:
+			curve_normal = Vector3.FORWARD
 		var u := float(i)/float(points.size()-1)
 		var offsets := edge_offsets[mini(i,edge_offsets.size()-1)]
 		var top_y_offset := label_height*0.5+offsets.x
 		var bottom_y_offset := -label_height*0.5+offsets.y
-		var top_vertex := center+Vector3.UP*top_y_offset
-		var bottom_vertex := center+Vector3.UP*bottom_y_offset
+		var height_axis := Vector3.UP
 		var top_normal := curve_normal
 		var bottom_normal := curve_normal
+		if not _is_attached_u(u):
+			var roll_angle := get_peel_roll_angle(u,_last_progress)
+			if absf(roll_angle)>0.000001 and tangent.length_squared()>0.000001:
+				height_axis = Vector3.UP.rotated(tangent,roll_angle).normalized()
+				var rolled_normal := tangent.cross(height_axis).normalized()
+				if rolled_normal.length_squared()>0.000001:
+					top_normal = rolled_normal
+					bottom_normal = rolled_normal
+		var top_vertex := center+height_axis*top_y_offset
+		var bottom_vertex := center+height_axis*bottom_y_offset
 		if _is_attached_u(u):
 			top_vertex = _frustum_edge_point(u,label_y+top_y_offset)
 			bottom_vertex = _frustum_edge_point(u,label_y+bottom_y_offset)
@@ -440,13 +462,17 @@ func _frustum_edge_point(u: float, y: float) -> Vector3:
 func _frustum_edge_normal(point: Vector3) -> Vector3:
 	return CupSurface.frustum_surface_normal(point,_cup_bottom_radius,_cup_top_radius,_cup_height)
 
-func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
+func _tangent_from_points(points: PackedVector3Array, index: int) -> Vector3:
 	var left_index := maxi(index-1,0)
 	var right_index := mini(index+1,points.size()-1)
 	var tangent := points[right_index]-points[left_index]
 	if tangent.length_squared()<=0.000001:
-		return Vector3.FORWARD
-	var normal := tangent.normalized().cross(Vector3.UP).normalized()
+		return Vector3.RIGHT
+	return tangent.normalized()
+
+func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
+	var tangent := _tangent_from_points(points,index)
+	var normal := tangent.cross(Vector3.UP).normalized()
 	if normal.length_squared()<=0.000001:
 		return Vector3.FORWARD
 	return normal
