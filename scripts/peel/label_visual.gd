@@ -109,6 +109,12 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 func get_paper_thickness() -> float:
 	return clampf(label_height * 0.014, 0.0032, 0.0060)
 
+func get_peel_front_fold_depth(progress: float) -> float:
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	if p <= 0.025 or p >= 0.985:
+		return 0.0
+	return 0.018 + 0.006 * sin(p * PI)
+
 func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var fringe := PackedVector2Array()
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
@@ -186,6 +192,7 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 	_mesh.surface_end()
 
 	_draw_paper_backing(points,top_vertices,bottom_vertices,top_normals,bottom_normals,_last_progress)
+	_draw_peel_front_fold(points,top_vertices,bottom_vertices,_last_progress)
 	_draw_paper_edge(top_vertices,top_normals,true)
 	_draw_paper_edge(bottom_vertices,bottom_normals,false)
 	_draw_torn_front_fringe(points,_last_progress)
@@ -212,6 +219,38 @@ func _draw_paper_backing(points: PackedVector3Array, top_vertices: PackedVector3
 		_mesh.surface_set_normal(-normal)
 		_mesh.surface_set_uv(Vector2(u,0.0))
 		_mesh.surface_add_vertex(back_top)
+	_mesh.surface_end()
+
+func _draw_peel_front_fold(points: PackedVector3Array, top_vertices: PackedVector3Array, bottom_vertices: PackedVector3Array, progress: float) -> void:
+	var depth := get_peel_front_fold_depth(progress)
+	if depth <= 0.0 or points.size()<3 or top_vertices.size()!=points.size() or bottom_vertices.size()!=points.size():
+		return
+	var boundary_index := clampi(int(round(progress*float(points.size()-1))),1,points.size()-1)
+	var normal := _normal_from_points(points,boundary_index)
+	var peel_direction := points[boundary_index-1]-points[boundary_index]
+	if peel_direction.length_squared()<=0.000001:
+		return
+	peel_direction = peel_direction.normalized()
+	var fold_vector := peel_direction*(depth*0.55)-normal*(depth*0.75)
+	var thickness := get_paper_thickness()
+	var base_top := top_vertices[boundary_index]-normal*thickness
+	var base_bottom := bottom_vertices[boundary_index]-normal*thickness
+	var tip_top := base_top+fold_vector+Vector3.UP*0.0020
+	var tip_bottom := base_bottom+fold_vector-Vector3.UP*0.0020
+	var fold_normal := (-normal+peel_direction*0.35).normalized()
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_backing_material)
+	_mesh.surface_set_normal(fold_normal)
+	_mesh.surface_set_uv(Vector2(0.0,0.0))
+	_mesh.surface_add_vertex(base_top)
+	_mesh.surface_set_normal(fold_normal)
+	_mesh.surface_set_uv(Vector2(0.0,1.0))
+	_mesh.surface_add_vertex(base_bottom)
+	_mesh.surface_set_normal(fold_normal)
+	_mesh.surface_set_uv(Vector2(1.0,0.0))
+	_mesh.surface_add_vertex(tip_top)
+	_mesh.surface_set_normal(fold_normal)
+	_mesh.surface_set_uv(Vector2(1.0,1.0))
+	_mesh.surface_add_vertex(tip_bottom)
 	_mesh.surface_end()
 
 func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array, top_edge: bool) -> void:
