@@ -1,0 +1,120 @@
+name: Preview CC0 MakeHuman cup grip
+
+on:
+  push:
+    branches:
+      - spike/oga-makehuman-arms-v93
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender virtual display
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full blender python3-numpy xvfb libegl1 libgl1
+      - name: Download CC0 native source
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --retry-delay 2 -o /tmp/oga-arms.7z 'https://opengameart.org/sites/default/files/fps%20arms.7z'
+          mkdir -p /tmp/oga-arms /tmp/cup-grip
+          7z x -y -o/tmp/oga-arms /tmp/oga-arms.7z >/tmp/cup-grip/extract.log
+      - name: Render one authored mid-curl around a semantic cup proxy
+        run: |
+          set -euo pipefail
+          cat > /tmp/cup_grip.py <<'PY'
+          import bpy, json
+          from mathutils import Vector
+
+          src='/tmp/oga-arms/FPS ARMS RIG 1 test anim.blend'
+          out='/tmp/cup-grip'
+          bpy.ops.wm.open_mainfile(filepath=src)
+          scene=bpy.context.scene
+          arm=next(o for o in scene.objects if o.type=='ARMATURE')
+          mesh=next(o for o in scene.objects if o.type=='MESH')
+          scene.frame_set(20)
+
+          # Split the disconnected arm islands and keep the component closest to
+          # the authored left hand. This changes no pose; it only removes the
+          # opposite arm from the capability preview.
+          bpy.context.view_layer.objects.active=mesh
+          mesh.select_set(True)
+          bpy.ops.object.mode_set(mode='EDIT')
+          bpy.ops.mesh.separate(type='LOOSE')
+          bpy.ops.object.mode_set(mode='OBJECT')
+          parts=[o for o in scene.objects if o.type=='MESH']
+          hand_head=arm.matrix_world @ arm.pose.bones['hand.L'].head
+          def center(o):
+              pts=[o.matrix_world @ Vector(c) for c in o.bound_box]
+              return sum(pts,Vector())/len(pts)
+          keep=min(parts,key=lambda o:(center(o)-hand_head).length)
+          for o in parts:
+              o.hide_render=(o!=keep)
+
+          def head(name): return arm.matrix_world @ arm.pose.bones[name].head
+          def tail(name): return arm.matrix_world @ arm.pose.bones[name].tail
+          roots=[head(n) for n in ['f_index.01.L','f_middle.01.L','f_ring.01.L','f_pinky.01.L']]
+          tips=[tail(n) for n in ['f_index.03.L','f_middle.03.L','f_ring.03.L','f_pinky.03.L']]
+          palm=(hand_head+sum(roots,Vector()))/5.0
+          fingers=sum(tips,Vector())/4.0
+          grip=fingers-palm
+          if grip.length<1e-5: raise RuntimeError('degenerate grip direction')
+          grip.normalize()
+          width_vec=roots[0]-roots[-1]
+          palm_width=width_vec.length
+          axis=width_vec.cross(grip)
+          if axis.length<1e-5: axis=Vector((0,0,1))
+          axis.normalize()
+
+          # Proxy size derives only from palm width. Place it between palm and
+          # curled fingertips so overlap/enclosure is directly readable.
+          radius=palm_width*0.62
+          height=palm_width*2.75
+          cup_center=palm+grip*(radius*0.80)
+          bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=radius, depth=height, location=cup_center)
+          cup=bpy.context.object; cup.name='SemanticCupProxy'
+          cup.rotation_euler=axis.to_track_quat('Z','Y').to_euler()
+          mat=bpy.data.materials.new('CupProxy'); mat.diffuse_color=(0.78,0.68,0.52,1); mat.roughness=0.85
+          cup.data.materials.append(mat)
+
+          report={
+              'source_frame':20,
+              'palm_width':palm_width,
+              'proxy_radius':radius,
+              'proxy_height':height,
+              'palm_center':list(palm),
+              'finger_center':list(fingers),
+              'proxy_center':list(cup_center),
+              'axis':list(axis),
+          }
+          with open(out+'/cup-grip-report.json','w') as f: json.dump(report,f,indent=2)
+
+          scene.render.engine='BLENDER_WORKBENCH'
+          scene.render.resolution_x=900; scene.render.resolution_y=700; scene.render.resolution_percentage=100
+          scene.render.image_settings.file_format='PNG'
+          scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'; scene.display.shading.show_shadows=True; scene.display.shading.show_cavity=True
+
+          focus=(palm+cup_center)*0.5
+          # View along palm-to-finger depth plus a slight axial offset so thumb,
+          # fingers and cup overlap are visible in one frame.
+          view=(-grip + axis*0.22).normalized()
+          camd=bpy.data.cameras.new('Camera'); cam=bpy.data.objects.new('Camera',camd); bpy.context.collection.objects.link(cam); scene.camera=cam; camd.lens=62
+          cam.location=focus+view*(palm_width*6.2)
+          cam.rotation_euler=(focus-cam.location).to_track_quat('-Z','Y').to_euler()
+          scene.render.filepath=out+'/cup_grip_frame20.png'
+          bpy.ops.render.render(write_still=True)
+          PY
+          xvfb-run -a blender -b --python-exit-code 1 --python /tmp/cup_grip.py 2>&1 | tee /tmp/cup-grip/blender.log
+          test -s /tmp/cup-grip/cup-grip-report.json
+          test -s /tmp/cup-grip/cup_grip_frame20.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oga-cc0-cup-grip-preview
+          path: /tmp/cup-grip
+          if-no-files-found: error
