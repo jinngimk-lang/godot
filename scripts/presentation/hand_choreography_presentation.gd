@@ -67,12 +67,6 @@ func _stage_support_hand(venue_id: String, delta: float) -> void:
 func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
 	if _right_hand == null or _controller == null:
 		return
-	# During the Café post-peel crumple ritual, CrumpleHandStaging is the sole
-	# presentation owner of both hand roots. Resolve the live sibling each frame
-	# instead of caching it during deferred bind: scene/variant setup can replace
-	# presentation state after the choreography node first binds.
-	if _cafe_crumple_owns_peel_hand(venue_id):
-		return
 	var state := _controller.get_state_name()
 	var progress := _controller.get_progress()
 	# Once the player has lifted any paper, the gameplay hand target owns the
@@ -89,12 +83,6 @@ func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
 	_right_hand.rotation.x = lerp_angle(_right_hand.rotation.x,desired.x,rotation_weight)
 	_right_hand.rotation.y = lerp_angle(_right_hand.rotation.y,desired.y,rotation_weight)
 	_right_hand.rotation.z = lerp_angle(_right_hand.rotation.z,desired.z,rotation_weight)
-
-func _cafe_crumple_owns_peel_hand(venue_id: String) -> bool:
-	if venue_id != "cafe_window" or _parent == null:
-		return false
-	var crumple := _parent.get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
-	return crumple != null and crumple.get_progress() > 0.001
 
 func _support_profile(venue_id: String) -> Dictionary:
 	match venue_id:
