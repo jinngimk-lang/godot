@@ -46,7 +46,10 @@ func _init() -> void:
 	]:
 		if ResourceLoader.exists(suite_path):
 			var suite = load(suite_path).new()
-			failures.append_array(suite.run())
+			if suite_path == "res://tests/test_crumple_shell_contact.gd":
+				failures.append_array(suite.run(self))
+			else:
+				failures.append_array(suite.run())
 
 	if failures.is_empty():
 		print("PASS: all deterministic tests")
