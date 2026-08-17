@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - tools/build_local_challenger_packet.sh
+      - tools/test_build_local_challenger_packet.sh
       - tools/validate_local_challenger_verdict.sh
       - tools/extract_local_challenger_json.py
       - tools/normalize_local_challenger_verdict.sh
@@ -29,11 +30,18 @@ jobs:
         shell: bash
         run: |
           bash -n tools/build_local_challenger_packet.sh
+          bash -n tools/test_build_local_challenger_packet.sh
           bash -n tools/validate_local_challenger_verdict.sh
           bash -n tools/normalize_local_challenger_verdict.sh
           bash -n tools/should_retry_local_challenger.sh
           bash -n tools/test_normalize_local_challenger_retry.sh
           python3 -m py_compile tools/extract_local_challenger_json.py
+
+      - name: Bound a genuinely large multi-file product batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/test_build_local_challenger_packet.sh
 
       - name: Normalize one model JSON envelope
         shell: bash
@@ -43,7 +51,7 @@ jobs:
           {"verdict":"VERIFIED","defect":"none","min_test":"none","evidence":"ok","evidence_anchor":"NO_CONCRETE_DEFECT"}
           JSON
           python3 tools/extract_local_challenger_json.py /tmp/raw-model.json /tmp/raw-normalized.json
-          jq -e '.verdict == "VERIFIED"' /tmp/raw-normalized.json
+          jq -e '.verdict == "VERIFIED"' /tmp/raw-normalized.json >/dev/null
 
           cat > /tmp/fenced-model.txt <<'MODEL'
           ```json
@@ -51,7 +59,7 @@ jobs:
           ```
           MODEL
           python3 tools/extract_local_challenger_json.py /tmp/fenced-model.txt /tmp/fenced-normalized.json
-          jq -e '.evidence_anchor == "NO_CONCRETE_DEFECT"' /tmp/fenced-normalized.json
+          jq -e '.evidence_anchor == "NO_CONCRETE_DEFECT"' /tmp/fenced-normalized.json >/dev/null
 
           cat > /tmp/prose-wrapped-model.txt <<'MODEL'
           Here is the grounded result after re-evaluation:
@@ -59,7 +67,7 @@ jobs:
           This is the only structured verdict object.
           MODEL
           python3 tools/extract_local_challenger_json.py /tmp/prose-wrapped-model.txt /tmp/prose-normalized.json
-          jq -e '.verdict == "VERIFIED"' /tmp/prose-normalized.json
+          jq -e '.verdict == "VERIFIED"' /tmp/prose-normalized.json >/dev/null
 
           cat > /tmp/multiple-model.txt <<'MODEL'
           {"verdict":"VERIFIED"}
