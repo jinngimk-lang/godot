@@ -35,6 +35,16 @@ func run() -> Array[String]:
 		if aspect > 1.35:
 			failures.append("RED: café receipt should read near-square rather than landscape, aspect %.2f" % aspect)
 
+	var cafe_label_profile: Dictionary = cafe.get("label_profile",{}) as Dictionary
+	var cafe_fill := float(cafe_label_profile.get("front_fill",0.0))
+	if cafe_fill < 0.20 or cafe_fill > 0.65:
+		failures.append("RED: café thermal-paper receipt needs bounded front_fill 0.20..0.65 after measured dark-face mismatch, got %.3f" % cafe_fill)
+	for i in [1,2]:
+		var other_profile: Dictionary = (model.VARIANTS[i] as Dictionary).get("label_profile",{}) as Dictionary
+		var other_fill := float(other_profile.get("front_fill",0.0))
+		if absf(other_fill) > 0.001:
+			failures.append("RED: front paper bounce is Café-only; variant %d front_fill must stay 0, got %.3f" % [i,other_fill])
+
 	model.select_variant(2)
 	if String(model.current_variant().container_profile.get("kind","")) != "clear_bottle":
 		failures.append("direct navigation should select market bottle even before progression unlock")
