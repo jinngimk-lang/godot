@@ -26,6 +26,7 @@ var _surface_roughness := 0.90
 var _thickness_scale := 1.0
 var _fiber_scale := 1.0
 var _edge_tint := Color(0.76,0.72,0.63,1.0)
+var _profile_signature := ""
 
 func _ready() -> void:
 	mesh = _mesh
@@ -40,10 +41,19 @@ func _ready() -> void:
 	_edge_material.metallic = 0.0
 	_edge_material.metallic_specular = 0.08
 	_edge_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_sync_profile_from_parent()
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
 
 func apply_profile(profile: Dictionary) -> void:
+	_set_profile_fields(profile)
+	var grip := _last_grip
+	if grip.length_squared() <= 0.000001:
+		grip = get_front_position(_last_progress)
+	if mesh != null:
+		set_peel(_last_progress,grip)
+
+func _set_profile_fields(profile: Dictionary) -> void:
 	_substrate = String(profile.get("substrate",_substrate))
 	_surface_roughness = clampf(float(profile.get("roughness",_surface_roughness)),0.35,1.0)
 	_thickness_scale = clampf(float(profile.get("thickness_scale",_thickness_scale)),0.55,1.55)
@@ -51,18 +61,37 @@ func apply_profile(profile: Dictionary) -> void:
 	var tint_value = profile.get("edge_tint",_edge_tint)
 	if tint_value is Color:
 		_edge_tint = tint_value
+	_profile_signature = _profile_key(profile)
 	_material.roughness = _surface_roughness
-	# Coated market stock gets a tighter, slightly brighter specular lobe while
-	# the uncoated bar paper stays diffuse. This changes material identity without
-	# replacing the print texture or adding decorative geometry.
 	_material.metallic_specular = lerpf(0.10,0.28,clampf((0.96-_surface_roughness)/0.36,0.0,1.0))
 	_edge_material.albedo_color = _edge_tint
 	_edge_material.roughness = clampf(_surface_roughness+0.08,0.0,1.0)
-	if mesh != null:
-		var grip := _last_grip
-		if grip.length_squared() <= 0.000001:
-			grip = get_front_position(_last_progress)
-		set_peel(_last_progress,grip)
+
+func _sync_profile_from_parent() -> void:
+	if not is_inside_tree():
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var session = parent.get("_session")
+	if session == null or not session.has_method("current_variant"):
+		return
+	var variant: Dictionary = session.current_variant()
+	var profile: Dictionary = variant.get("label_profile",{})
+	if profile.is_empty():
+		return
+	var key := _profile_key(profile)
+	if key == _profile_signature:
+		return
+	_set_profile_fields(profile)
+
+func _profile_key(profile: Dictionary) -> String:
+	return "%s/%.4f/%.4f/%.4f" % [
+		String(profile.get("substrate","")),
+		float(profile.get("roughness",0.0)),
+		float(profile.get("thickness_scale",0.0)),
+		float(profile.get("fiber_scale",0.0))
+	]
 
 func get_substrate_signature() -> String:
 	return "%s/%.3f/%.3f/%.3f" % [_substrate,_surface_roughness,_thickness_scale,_fiber_scale]
@@ -145,9 +174,6 @@ func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
 	if p <= 0.025:
 		return fringe
-	# Keep count stable for silhouette readability; substrate identity changes the
-	# individual protrusion length/jitter instead of turning coated stock into a
-	# noisy comb or making fibrous bar stock disappear at small scale.
 	var fiber_count := 7
 	for i in range(fiber_count):
 		var t := float(i+1)/float(fiber_count+1)
@@ -179,6 +205,7 @@ func get_edge_offsets(progress: float) -> PackedVector2Array:
 	return result
 
 func set_peel(progress: float, grip_local: Vector3) -> void:
+	_sync_profile_from_parent()
 	_last_progress = clampf(progress,0.0,1.0)
 	_last_grip = grip_local
 	var points := get_sample_points(_last_progress,grip_local)
