@@ -1,6 +1,7 @@
 extends SceneTree
 
 const TEST_CUBE_SIZE := 0.145
+const GLASS_ICE_MAX_CENTER_Y := 0.34
 
 func _init() -> void:
 	call_deferred("_run")
@@ -89,11 +90,41 @@ func _run() -> void:
 			if child is MeshInstance3D and not (child as MeshInstance3D).transform.is_equal_approx(base_transforms[i]):
 				failures.append("reset_visual should restore deterministic base ice transform for cube %d" % i)
 
+	# Glass bottles use the same deterministic ice presenter, but their visible
+	# shoulder/neck extends far above the cylindrical interaction proxy. Ice must
+	# remain in the liquid/body region instead of floating into the shoulder and
+	# reading as a bright plastic bottle cap in the product camera.
+	var glass_ice_profile := {
+		"cup_shell": "clear_glass",
+		"cup_dimensions": {"top_radius": 0.335, "bottom_radius": 0.315, "height": 1.52},
+		"contents_profile": {
+			"type": "ice",
+			"count": 3,
+			"cube_size": TEST_CUBE_SIZE,
+			"motion_gain": 0.55,
+			"max_center_y": GLASS_ICE_MAX_CENTER_Y
+		}
+	}
+	presentation.set_profile(glass_ice_profile)
+	var glass_container: Node = presentation.get_node_or_null("IceContents")
+	if glass_container == null or glass_container.get_child_count() != 3:
+		failures.append("glass ice profile should preserve all three deterministic cubes")
+	else:
+		for child in glass_container.get_children():
+			if child is MeshInstance3D:
+				var cube := child as MeshInstance3D
+				if cube.position.y > GLASS_ICE_MAX_CENTER_Y + 0.0001:
+					failures.append("RED: glass ice must stay below the bottle shoulder; y=%.3f max=%.3f" % [cube.position.y, GLASS_ICE_MAX_CENTER_Y])
+		presentation.set_crumple(1.0, 1, 1.0)
+		for child in glass_container.get_children():
+			if child is MeshInstance3D and (child as MeshInstance3D).position.y > GLASS_ICE_MAX_CENTER_Y + 0.0001:
+				failures.append("RED: glass ice motion must remain below the bottle shoulder")
+
 	root.queue_free()
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: contained ice is deterministic, rim-readable, bounded, finite and physics-free")
+		print("PASS: contained ice is deterministic, shell-aware, bounded, finite and physics-free")
 		quit(0)
 		return
 	for failure in failures:
