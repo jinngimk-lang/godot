@@ -24,9 +24,10 @@ FIELDS = (
 )
 
 # Accept the common harmless formats a 3B model emits despite a plain-text
-# protocol request: `FIELD: value`, `- FIELD: value`, or `**FIELD:** value`.
+# protocol request: `FIELD: value`, `- FIELD: value`, `**FIELD:** value`, or
+# `- **FIELD:** value`. Markdown commonly closes the bold span after the colon.
 FIELD_RE = re.compile(
-    r"^\s*(?:[-*+]\s+)?(?:\*\*)?(PROVISIONAL_VERDICT|DEFECT|MIN_TEST|EVIDENCE|EVIDENCE_ANCHOR)(?:\*\*)?\s*:\s*(.*)\s*$"
+    r"^\s*(?:[-*+]\s+)?(?:\*\*)?(PROVISIONAL_VERDICT|DEFECT|MIN_TEST|EVIDENCE|EVIDENCE_ANCHOR)\s*:(?:\*\*)?\s*(.*)\s*$"
 )
 
 
