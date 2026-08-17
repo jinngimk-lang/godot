@@ -58,8 +58,8 @@ func _run() -> void:
 				var deformed_mid_span := _mid_ring_x_span(shell.mesh as ArrayMesh)
 				if not shell.visible or (cup != null and cup.visible):
 					failures.append("CRUMPLE_PRESENTATION_RED: positive crumple should swap visible shell without changing peel authority node")
-				if baseline_mid_span <= 0.0 or deformed_mid_span >= baseline_mid_span * 0.97:
-					failures.append("CRUMPLE_PRESENTATION_RED: mid crumple must visibly compress the cup waist")
+				if baseline_mid_span <= 0.0 or deformed_mid_span >= baseline_mid_span * 0.82:
+					failures.append("CRUMPLE_PRESENTATION_RED: 60% ritual frame must show at least 18% waist compression so the squeeze reads at thumbnail scale")
 				if deformed.size.x <= baseline.size.x * 0.55 or deformed.size.y <= baseline.size.y * 0.70:
 					failures.append("CRUMPLE_PRESENTATION_RED: bounded crumple must not numerically collapse/invert cup shell")
 				if not is_finite(deformed.size.x) or not is_finite(deformed.size.y) or not is_finite(deformed.size.z):
