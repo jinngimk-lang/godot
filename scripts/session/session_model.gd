@@ -15,8 +15,8 @@ const VARIANTS := [
 		"safe_pull_speed":5.0,
 		"tear_pull_speed":12.0,
 		"residue_gain":0.16,
-		"label_width":1.08,
-		"label_height":0.34,
+		"label_width":0.68,
+		"label_height":0.58,
 		"label_y":0.18,
 		"label_profile":{
 			"substrate":"thermal_paper",

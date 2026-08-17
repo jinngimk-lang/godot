@@ -20,6 +20,21 @@ func run() -> Array[String]:
 		if String(variant.scene_profile.get("id","")) != expected_scenes[i]: failures.append("variant %d wrong scene" % i)
 		if String(variant.container_profile.get("kind","")) != expected_kinds[i]: failures.append("variant %d wrong container kind" % i)
 		if String(variant.post_peel_action) != expected_post[i]: failures.append("variant %d wrong post-peel action" % i)
+
+	var cafe: Dictionary = model.VARIANTS[0]
+	var cafe_width := float(cafe.get("label_width",0.0))
+	var cafe_height := float(cafe.get("label_height",0.0))
+	if cafe_width <= 0.0 or cafe_height <= 0.0:
+		failures.append("RED: café label dimensions must be positive")
+	else:
+		var aspect := cafe_width/cafe_height
+		if cafe_width > 0.72:
+			failures.append("RED: approved café receipt needs a narrower silhouette, got %.3f m" % cafe_width)
+		if cafe_height < 0.54:
+			failures.append("RED: approved café receipt needs stronger vertical presence, got %.3f m" % cafe_height)
+		if aspect > 1.35:
+			failures.append("RED: café receipt should read near-square rather than landscape, aspect %.2f" % aspect)
+
 	model.select_variant(2)
 	if String(model.current_variant().container_profile.get("kind","")) != "clear_bottle":
 		failures.append("direct navigation should select market bottle even before progression unlock")
