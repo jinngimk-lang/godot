@@ -37,12 +37,12 @@ func run() -> Array[String]:
 	guide._process(0.0)
 
 	var rail := layer.get_node_or_null("JourneyRail") as Control
-	var action := layer.get_node_or_null("JourneyGuide/Action") as Label
-	var scene_status := layer.get_node_or_null("JourneyGuide/SceneStatus") as Label
-	if rail == null or action == null or scene_status == null:
-		failures.append("GUIDE_RED: HUD must expose JourneyRail plus scene/action guide")
+	if rail == null:
+		failures.append("GUIDE_RED: HUD must expose the pointer/touch JourneyRail")
 		root.free()
 		return failures
+	if layer.get_node_or_null("JourneyGuide") != null:
+		failures.append("GUIDE_RED: guided journey must not render a second persistent top-left scene/action panel beside the compact reference HUD")
 
 	var expected_names: Array[String] = ["WINDOW CAFÉ", "AMBER BAR", "MARKET COOLER"]
 	for i in range(3):
@@ -53,7 +53,7 @@ func run() -> Array[String]:
 			failures.append("GUIDE_RED: scene button %d must identify %s" % [i+1, expected_names[i]])
 
 	if reward.visible:
-		failures.append("GUIDE_RED: legacy Reward chrome must be hidden when JourneyGuide owns completion status")
+		failures.append("GUIDE_RED: legacy Reward chrome must be hidden when journey presentation owns completion status")
 	if continue_button.anchor_left != 0.5 or continue_button.anchor_top != 1.0:
 		failures.append("GUIDE_RED: Continue should be anchored beside the bottom JourneyRail instead of floating at a fixed screen corner")
 	if continue_button.offset_left < 294.0 or continue_button.offset_top > -50.0:
@@ -62,17 +62,15 @@ func run() -> Array[String]:
 	guide.set_state(0, "PEEL", "crumple", 0.18, false)
 	if guide.get_active_scene_index() != 0:
 		failures.append("GUIDE_RED: café must report active journey scene index 0")
-	if not scene_status.text.contains("1 / 3") or not scene_status.text.contains("WINDOW CAFÉ"):
-		failures.append("GUIDE_RED: café guide must show scene 1 / 3 and venue name")
 	if not String(guide.get_action_text()).to_lower().contains("peel"):
-		failures.append("GUIDE_RED: attached café guide must instruct peeling")
+		failures.append("GUIDE_RED: attached café journey state must retain peeling guidance even when it is not rendered as duplicate chrome")
 	if rail.visible:
 		failures.append("GUIDE_RED: bottom journey rail must hide during active peel so the reference interaction frame stays visually quiet")
 
 	guide.set_state(0, "HELD", "crumple", 1.0, true)
 	var cafe_post: String = String(guide.get_action_text()).to_lower()
 	if not cafe_post.contains("squeeze") or not cafe_post.contains("continue"):
-		failures.append("GUIDE_RED: completed café must explain optional squeeze and Continue")
+		failures.append("GUIDE_RED: completed café must retain optional squeeze and Continue state guidance")
 	if not rail.visible:
 		failures.append("GUIDE_RED: journey rail must return after detach so touch users can navigate scenes")
 
@@ -85,14 +83,14 @@ func run() -> Array[String]:
 
 	guide.set_state(1, "HELD", "inspect", 1.0, true)
 	var bar_post: String = String(guide.get_action_text()).to_lower()
-	if guide.get_active_scene_index() != 1 or not scene_status.text.contains("2 / 3"):
-		failures.append("GUIDE_RED: bar must report scene 2 / 3")
+	if guide.get_active_scene_index() != 1:
+		failures.append("GUIDE_RED: bar must report scene index 1")
 	if not bar_post.contains("inspect") or not bar_post.contains("continue"):
-		failures.append("GUIDE_RED: completed bar must explain inspect and Continue")
+		failures.append("GUIDE_RED: completed bar must retain inspect and Continue state guidance")
 
 	guide.set_state(2, "PEEL", "inspect", 0.0, false)
-	if guide.get_active_scene_index() != 2 or not scene_status.text.contains("3 / 3"):
-		failures.append("GUIDE_RED: market must report scene 3 / 3")
+	if guide.get_active_scene_index() != 2:
+		failures.append("GUIDE_RED: market must report scene index 2")
 	if not rail.visible:
 		failures.append("GUIDE_RED: journey rail must remain available before peeling starts")
 
