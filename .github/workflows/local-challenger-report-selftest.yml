@@ -1,0 +1,28 @@
+name: Local Challenger Report Self-Test
+
+on:
+  push:
+    paths:
+      - tools/extract_local_challenger_report.py
+      - tools/test_extract_local_challenger_report.sh
+      - .github/workflows/agent-challenger-local.yml
+      - .github/workflows/local-challenger-report-selftest.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-report-protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Parse strict Challenger final report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/extract_local_challenger_report.py
+          bash tools/test_extract_local_challenger_report.sh
