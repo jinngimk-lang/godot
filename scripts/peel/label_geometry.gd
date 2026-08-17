@@ -41,7 +41,10 @@ static func peeling_points(
 	var grip := resolve_grip(p, desired_grip, width, cup_radius, label_y, surface_offset)
 	var front_normal := CupSurface.attached_normal(p, width, cup_radius, surface_offset)
 	var free_length := width * p
-	var curve_amp := minf(0.07, free_length * 0.08)
+	# Keep the free flap visibly curved at the product's 38-48% evidence range.
+	# The previous 0.08/0.07 profile produced a nearly straight chord that read
+	# like a rigid triangular card once the peeled backing became visible.
+	var curve_amp := minf(0.09, free_length * 0.11)
 
 	for i in range(safe_segments + 1):
 		var u := float(i) / float(safe_segments)
