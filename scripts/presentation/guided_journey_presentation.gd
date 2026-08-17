@@ -49,6 +49,13 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	# Keep the target-like peel moment visually quiet while preserving scene
 	# navigation before engagement and after detach for pointer/touch users.
 	_rail_visible = not (progress > 0.001 and not post_interaction)
+	# Fixed reference-frame inspection is staged by directly applying product yaw
+	# while the guide process is frozen. Treat that visible yaw as inspection
+	# evidence so capture and live RMB inspection share the same quiet UI contract.
+	var lab := get_parent()
+	var cup := lab.get_node_or_null("Cup") as Node3D if lab != null else null
+	if cup != null and absf(cup.rotation.y) > 0.001:
+		_inspection_active = true
 	_apply_state_to_ui()
 
 func set_inspection_active(active: bool) -> void:
