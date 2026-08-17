@@ -2,50 +2,42 @@ extends RefCounted
 
 func run() -> Array[String]:
 	var failures: Array[String] = []
-	var visual_path := "res://scripts/peel/label_visual.gd"
-	if not ResourceLoader.exists(visual_path):
-		failures.append("CAFE_RECEIPT_READABILITY_RED: missing LabelVisual")
+	var presentation_path := "res://scripts/presentation/cafe_receipt_readability_presentation.gd"
+	if not ResourceLoader.exists(presentation_path):
+		failures.append("CAFE_RECEIPT_READABILITY_RED: missing Café receipt readability presentation")
 		return failures
 
-	var visual = load(visual_path).new()
-	if not visual.has_method("get_front_paper_bounce") or not visual.has_method("is_front_paper_bounce_texture_linked"):
+	var presentation = load(presentation_path).new()
+	if not presentation.has_method("configure_front_material") or not presentation.has_method("get_front_paper_bounce") or not presentation.has_method("is_front_paper_bounce_texture_linked"):
 		failures.append("CAFE_RECEIPT_READABILITY_RED: thermal receipt needs bounded texture-linked paper bounce")
-		visual.free()
+		presentation.free()
 		return failures
 
-	var thermal := {
-		"substrate":"thermal_paper",
-		"roughness":0.94,
-		"thickness_scale":0.92,
-		"fiber_scale":0.82,
-		"paper_bounce":0.18
-	}
-	visual.apply_profile(thermal)
-	var cafe_bounce := float(visual.get_front_paper_bounce())
+	var image := Image.create(2,2,false,Image.FORMAT_RGBA8)
+	image.fill(Color(0.97,0.96,0.90,1.0))
+	var print_texture := ImageTexture.create_from_image(image)
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = print_texture
+
+	var cafe_signature := "thermal_paper/0.940/0.920/0.820"
+	presentation.configure_front_material(material,cafe_signature)
+	var cafe_bounce := float(presentation.get_front_paper_bounce(cafe_signature))
 	if cafe_bounce < 0.10 or cafe_bounce > 0.28:
 		failures.append("CAFE_RECEIPT_READABILITY_RED: thermal receipt paper bounce must stay subtle and bounded; got %.3f" % cafe_bounce)
-	if not bool(visual.is_front_paper_bounce_texture_linked()):
+	if not bool(presentation.is_front_paper_bounce_texture_linked(material)):
 		failures.append("CAFE_RECEIPT_READABILITY_RED: paper bounce must follow the print texture so dark receipt text stays dark")
+	if not material.emission_enabled:
+		failures.append("CAFE_RECEIPT_READABILITY_RED: thermal receipt front must enable bounded paper bounce")
 
-	var fibrous := {
-		"substrate":"uncoated_fiber",
-		"roughness":0.88,
-		"thickness_scale":1.22,
-		"fiber_scale":1.35
-	}
-	visual.apply_profile(fibrous)
-	if float(visual.get_front_paper_bounce()) > 0.001:
+	var bar_signature := "uncoated_fiber/0.880/1.220/1.350"
+	presentation.configure_front_material(material,bar_signature)
+	if float(presentation.get_front_paper_bounce(bar_signature)) > 0.001 or material.emission_enabled:
 		failures.append("CAFE_RECEIPT_READABILITY_RED: bar fibrous label must not inherit Café paper bounce")
 
-	var coated := {
-		"substrate":"coated_citrus",
-		"roughness":0.66,
-		"thickness_scale":0.72,
-		"fiber_scale":0.58
-	}
-	visual.apply_profile(coated)
-	if float(visual.get_front_paper_bounce()) > 0.001:
+	var market_signature := "coated_citrus/0.660/0.720/0.580"
+	presentation.configure_front_material(material,market_signature)
+	if float(presentation.get_front_paper_bounce(market_signature)) > 0.001 or material.emission_enabled:
 		failures.append("CAFE_RECEIPT_READABILITY_RED: market coated label must not inherit Café paper bounce")
 
-	visual.free()
+	presentation.free()
 	return failures
