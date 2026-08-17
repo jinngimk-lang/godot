@@ -12,6 +12,10 @@ func run() -> Array[String]:
 	var expected_scenes := ["cafe_window","night_bar","market_coldcase"]
 	var expected_kinds := ["paper_cup","amber_bottle","clear_bottle"]
 	var expected_post := ["crumple","inspect","inspect"]
+	var composition_path := "res://scripts/presentation/reference_composition.gd"
+	var composition = load(composition_path) if ResourceLoader.exists(composition_path) else null
+	if composition == null:
+		failures.append("BOTTLE_FRAMING_RED: live ReferenceComposition is required")
 	for i in range(3):
 		var variant: Dictionary = model.VARIANTS[i]
 		for key in ["scene_profile","container_profile","post_peel_action"]:
@@ -22,19 +26,19 @@ func run() -> Array[String]:
 		if String(variant.post_peel_action) != expected_post[i]: failures.append("variant %d wrong post-peel action" % i)
 
 		# ReferenceComposition promises a hand-and-object closeup where the hero
-		# vessel occupies roughly one-half to two-thirds of frame height. The
-		# taller bottle meshes need a slightly wider vertical lens than the café
-		# cup so their mouth remains inside the 720p acceptance capture instead
-		# of being cropped by the top edge.
-		var camera_fov := float((variant.scene_profile as Dictionary).get("camera_fov",39.0))
-		if expected_kinds[i] == "paper_cup":
-			if absf(camera_fov-39.0) > 0.1:
-				failures.append("BOTTLE_FRAMING_RED: café closeup lens must remain 39 degrees, got %.2f" % camera_fov)
-		else:
-			if camera_fov < 47.0:
-				failures.append("BOTTLE_FRAMING_RED: %s needs a wider bottle lens so the full slender vessel stays in frame, got %.2f" % [expected_scenes[i],camera_fov])
-			if camera_fov > 50.0:
-				failures.append("BOTTLE_FRAMING_RED: %s lens became too wide for the reference closeup, got %.2f" % [expected_scenes[i],camera_fov])
+		# vessel occupies roughly one-half to two-thirds of frame height. Test the
+		# live composition owner directly so a dead profile value cannot make CI
+		# green while captured product pixels remain unchanged.
+		if composition != null:
+			var camera_fov := float(composition.target_fov_for_kind(expected_kinds[i]))
+			if expected_kinds[i] == "paper_cup":
+				if absf(camera_fov-39.0) > 0.1:
+					failures.append("BOTTLE_FRAMING_RED: café closeup lens must remain 39 degrees, got %.2f" % camera_fov)
+			else:
+				if camera_fov < 47.0:
+					failures.append("BOTTLE_FRAMING_RED: %s needs a wider bottle lens so the full slender vessel stays in frame, got %.2f" % [expected_scenes[i],camera_fov])
+				if camera_fov > 50.0:
+					failures.append("BOTTLE_FRAMING_RED: %s lens became too wide for the reference closeup, got %.2f" % [expected_scenes[i],camera_fov])
 
 	var cafe: Dictionary = model.VARIANTS[0]
 	var cafe_width := float(cafe.get("label_width",0.0))
