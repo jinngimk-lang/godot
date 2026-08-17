@@ -78,19 +78,19 @@ jobs:
           set -euo pipefail
           bash tools/test_normalize_local_challenger_retry.sh
 
-      - name: Retry only strict grounding failures
+      - name: Retry only known format or grounding failures
         shell: bash
         run: |
           set -euo pipefail
-          for code in 42 43 44 45 46; do
+          for code in 4 42 43 44 45 46; do
             bash tools/should_retry_local_challenger.sh "$code"
           done
-          for code in 0 1 2 4 41 47 99; do
+          for code in 0 1 2 3 5 22 41 47 99; do
             set +e
             bash tools/should_retry_local_challenger.sh "$code"
             rc=$?
             set -e
-            echo "non-retryable validator code=$code classifier rc=$rc"
+            echo "non-retryable failure code=$code classifier rc=$rc"
             test "$rc" -eq 1
           done
 
