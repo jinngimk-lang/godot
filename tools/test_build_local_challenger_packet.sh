@@ -11,7 +11,7 @@ cd "$tmp"
 git init -q
 git config user.email challenger-test@example.invalid
 git config user.name ChallengerPacketTest
-mkdir -p scripts/presentation scripts/peel scripts/session tests
+mkdir -p scripts/presentation scripts/peel scripts/session scripts/hands tests
 
 # Model a real fast visual batch: several production/test files all carry
 # meaningful edits, so the exact patch itself is much larger than the model's
@@ -100,8 +100,60 @@ TASK_ID_VALUE=2 PR_NUMBER_VALUE=2 EXPECTED_HEAD_VALUE="$capture_head" ROUND_VALU
 
 grep -Fq -- '--- EXACT DIFF: tests/capture_reference_frames.gd ---' "$tmp/capture-packet.txt"
 grep -Fq -- '--- HEAD EXCERPT: tests/capture_reference_frames.gd ---' "$tmp/capture-packet.txt"
-if grep -Fq '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ===' "$tmp/capture-packet.txt"; then
+if grep -Fq '=== DIRECT PRESENTATION/INTERACTION CONTRACTS' "$tmp/capture-packet.txt"; then
   echo 'capture-only packet incorrectly routed into hand-contract bundle' >&2
   exit 1
 fi
 echo "Local Challenger capture-only routing self-test PASS ($(wc -c < "$tmp/capture-packet.txt") bytes)"
+
+# Hand ownership batches legitimately need broader context, but that context
+# must also remain bounded. Before this regression test, changing
+# hand_choreography pulled whole capture/hand contract files and could exceed
+# the packet ceiling before Ollama ever ran.
+hand_base="$capture_head"
+hand_contract_paths=(
+  scripts/presentation/hand_choreography_presentation.gd
+  scripts/hands/hand_visual.gd
+  scripts/peel_lab.gd
+  tests/capture_reference_frames.gd
+  tests/test_hand_visual.gd
+  tests/test_authored_hand_asset.gd
+)
+for path in "${hand_contract_paths[@]}"; do
+  mkdir -p "$(dirname "$path")"
+  {
+    echo 'extends RefCounted'
+    echo 'const HAND_REVISION := "base"'
+    for i in $(seq 1 220); do
+      printf 'var hand_line_%03d := "bounded hand contract context %03d for independent exact-head review"\n' "$i" "$i"
+    done
+  } > "$path"
+done
+git add .
+git commit -qm hand-contract-base
+hand_base="$(git rev-parse HEAD)"
+sed -i 's/const HAND_REVISION := "base"/const HAND_REVISION := "candidate"/' scripts/presentation/hand_choreography_presentation.gd
+cat >> scripts/presentation/hand_choreography_presentation.gd <<'HANDCHANGE'
+func _cafe_crumple_owns_peel_hand() -> bool:
+    return true
+HANDCHANGE
+git add scripts/presentation/hand_choreography_presentation.gd
+git commit -qm hand-contract-candidate
+hand_head="$(git rev-parse HEAD)"
+TASK_ID_VALUE=3 PR_NUMBER_VALUE=3 EXPECTED_HEAD_VALUE="$hand_head" ROUND_VALUE=1 \
+  bash "$tmp/build_local_challenger_packet.sh" "$hand_base" "$hand_head" "$tmp/hand-packet.txt"
+
+grep -Fq -- '--- EXACT DIFF: scripts/presentation/hand_choreography_presentation.gd ---' "$tmp/hand-packet.txt"
+grep -Fq -- '=== DIRECT PRESENTATION/INTERACTION CONTRACTS (BOUNDED) ===' "$tmp/hand-packet.txt"
+for path in "${hand_contract_paths[@]}"; do
+  grep -Fq -- "--- HAND CONTRACT: $path ---" "$tmp/hand-packet.txt" || {
+    echo "hand packet lost bounded context for $path" >&2
+    exit 1
+  }
+done
+hand_bytes="$(wc -c < "$tmp/hand-packet.txt")"
+if [ "$hand_bytes" -ge 42000 ]; then
+  echo "hand packet self-test exceeded budget: $hand_bytes" >&2
+  exit 1
+fi
+echo "Local Challenger hand-route packet self-test PASS ($hand_bytes bytes)"
