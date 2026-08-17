@@ -17,6 +17,18 @@ EOF
 python3 "$parser" "$tmp/verified.txt" "$tmp/verified.json"
 jq -e '.verdict == "VERIFIED" and .evidence_anchor == "NO_CONCRETE_DEFECT"' "$tmp/verified.json" >/dev/null
 
+cat > "$tmp/markdown-trailing.txt" <<'EOF'
+I tried a boundary case and found no packet-grounded defect.
+- **PROVISIONAL_VERDICT:** VERIFIED
+- **DEFECT:** NONE
+- **MIN_TEST:** NONE
+- **EVIDENCE:** The exact candidate already bounds and resets every changed ice state.
+- **EVIDENCE_ANCHOR:** NO_CONCRETE_DEFECT
+That is my final answer.
+EOF
+python3 "$parser" "$tmp/markdown-trailing.txt" "$tmp/markdown-trailing.json"
+jq -e '.verdict == "VERIFIED" and .evidence_anchor == "NO_CONCRETE_DEFECT"' "$tmp/markdown-trailing.json" >/dev/null
+
 cat > "$tmp/needs-fix.txt" <<'EOF'
 A boundary case is not covered when the glass cluster is selected.
 PROVISIONAL_VERDICT: NEEDS_FIX
@@ -44,16 +56,30 @@ cat > "$tmp/conflicting.txt" <<'EOF'
 PROVISIONAL_VERDICT: VERIFIED
 DEFECT: NONE
 MIN_TEST: NONE
-EVIDENCE: first
+EVIDENCE: first complete result
 EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT
 PROVISIONAL_VERDICT: NEEDS_FIX
 DEFECT: conflicting second answer
 MIN_TEST: add a regression test for the conflicting answer
-EVIDENCE: second
+EVIDENCE: second complete result
 EVIDENCE_ANCHOR: return _glass_cluster_transform(index, count, dims)
 EOF
 set +e
 python3 "$parser" "$tmp/conflicting.txt" "$tmp/should-not-exist-2.json"
+rc=$?
+set -e
+test "$rc" -eq 4
+
+cat > "$tmp/duplicate-field.txt" <<'EOF'
+PROVISIONAL_VERDICT: VERIFIED
+DEFECT: NONE
+DEFECT: actually something else
+MIN_TEST: NONE
+EVIDENCE: conflicting duplicate field must fail closed
+EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT
+EOF
+set +e
+python3 "$parser" "$tmp/duplicate-field.txt" "$tmp/should-not-exist-3.json"
 rc=$?
 set -e
 test "$rc" -eq 4
