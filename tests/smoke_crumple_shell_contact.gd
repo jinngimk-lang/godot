@@ -18,21 +18,19 @@ func _run() -> void:
 
 	var source := scene.get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
 	var staging := scene.get_node_or_null("CrumpleHandStaging") as CrumpleHandStaging
-	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
-	var venue := scene.get_node_or_null("VenuePresentation") as VenuePresentation
 	var support := scene.get_node_or_null("LeftHand") as HandVisual
 	var peel := scene.get_node_or_null("RightHand") as HandVisual
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var lifecycle = scene.get("_lifecycle")
 	var ritual = scene.get("_ritual")
-	if source == null or staging == null or choreography == null or venue == null or support == null or peel == null or label == null or lifecycle == null or ritual == null:
+	if source == null or staging == null or support == null or peel == null or label == null or lifecycle == null or ritual == null:
 		push_error("CRUMPLE_CONTACT_RED: live Café scene is missing crumple presentation, lifecycle, ritual, or hand nodes")
 		quit(1)
 		return
 
-	# Reproduce the capture/runtime post-detach ritual state rather than driving
-	# CrumpleHandStaging in isolation. This keeps the contract bound to the real
-	# scene tree, authored HandVisual anchors, and rendered CrumpledCup mesh.
+	# Reproduce the capture/runtime post-detach state. Explicit squeeze intent is
+	# allowed during the calm PEEL_SETTLE beat, so begin_crumple() must actually
+	# establish CRUMPLING ownership before any crumpled-shell evidence is judged.
 	lifecycle.update(1.0,true,0.0)
 	lifecycle.update(1.0,false,0.22)
 	label.set_phase(String(lifecycle.get_phase_name()))
@@ -40,28 +38,22 @@ func _run() -> void:
 	label.visible = false
 	scene.call("_handle_detached_label")
 	ritual.update(0.22)
-	ritual.begin_crumple()
+	if not ritual.begin_crumple() or String(ritual.get_phase_name()) != "CRUMPLING":
+		push_error("CRUMPLE_CONTACT_RED: explicit post-detach squeeze must enter CRUMPLING before shell-contact evidence")
+		quit(1)
+		return
+
 	staging._bind()
 	var support_home := support.position
 	var peel_home := peel.position
 	source.set_crumple(0.55,-1,0.72)
+	await _settle_frames(4)
+
 	var shell := source.get_node_or_null("CrumpledCup") as MeshInstance3D
 	if shell == null or not shell.visible or not (shell.mesh is ArrayMesh):
 		push_error("CRUMPLE_CONTACT_RED: 55% Café crumple must expose the rendered CrumpledCup shell")
 		quit(1)
 		return
-	print("CRUMPLE_OWNER_TRACE venue=%s source=%.3f yields=%s choreo_processing=%s ritual=%s target=%s" % [
-		venue.get_active_profile_id(),
-		source.get_progress(),
-		str(choreography.call("_cafe_crumple_owns_peel_hand",venue.get_active_profile_id())),
-		str(choreography.is_processing()),
-		String(ritual.get_phase_name()),
-		str(peel.get("_target"))
-	])
-	_trace_gaps("signal",shell,support,peel,ritual)
-	for frame_index in range(4):
-		await process_frame
-		_trace_gaps("frame%d" % (frame_index+1),shell,support,peel,ritual)
 
 	var support_gap := _nearest_shell_vertex_gap(shell,support.get_pinch_world_position())
 	var peel_gap := _nearest_shell_vertex_gap(shell,peel.get_pinch_world_position())
@@ -89,17 +81,6 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 	quit(1)
-
-func _trace_gaps(label: String,shell: MeshInstance3D,support: HandVisual,peel: HandVisual,ritual) -> void:
-	print("CRUMPLE_CONTACT_TRACE %s support=%.4f peel=%.4f support_root=%s peel_root=%s target=%s ritual=%s" % [
-		label,
-		_nearest_shell_vertex_gap(shell,support.get_pinch_world_position()),
-		_nearest_shell_vertex_gap(shell,peel.get_pinch_world_position()),
-		str(support.position),
-		str(peel.position),
-		str(peel.get("_target")),
-		String(ritual.get_phase_name())
-	])
 
 func _nearest_shell_vertex_gap(shell: MeshInstance3D,world_point: Vector3) -> float:
 	var mesh := shell.mesh as ArrayMesh
