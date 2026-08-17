@@ -33,6 +33,29 @@ func run() -> Array[String]:
 		if (cloth as ShaderMaterial).resource_name != "SleeveFabric":
 			failures.append("cafe cloth shader must preserve SleeveFabric semantic identity")
 
+	if not methods.has("_build_cuff_mesh") or not methods.has("_make_cafe_cuff"):
+		failures.append("RED: cafe_v1 needs a short semantic ribbed cuff to break the smooth tube at the wrist")
+	else:
+		var cuff_mat = presentation.call("_make_cafe_cuff")
+		if not (cuff_mat is ShaderMaterial):
+			failures.append("RED: cafe cuff needs a dedicated ribbed ShaderMaterial")
+		else:
+			var cuff_shader := (cuff_mat as ShaderMaterial).shader
+			var cuff_code := cuff_shader.code.to_lower() if cuff_shader != null else ""
+			if "rib" not in cuff_code or "roughness" not in cuff_code:
+				failures.append("RED: cafe cuff shader must encode subtle ribbing in its material response")
+			if (cuff_mat as ShaderMaterial).resource_name != "SleeveCuffFabric":
+				failures.append("cafe cuff must preserve SleeveCuffFabric semantic identity")
+		var cuff_mesh: ArrayMesh = presentation.call("_build_cuff_mesh",Vector3.ZERO,Vector3(1.0,-0.35,0.18).normalized())
+		if cuff_mesh == null or cuff_mesh.get_surface_count() != 1:
+			failures.append("RED: cafe cuff mesh must build one bounded surface")
+		else:
+			var cuff_aabb := cuff_mesh.get_aabb()
+			if cuff_aabb.size.length() > 0.62:
+				failures.append("RED: cafe cuff must remain short and wrist-local, aabb=%.3f" % cuff_aabb.size.length())
+			if minf(cuff_aabb.size.x,cuff_aabb.size.z) <= 0.12:
+				failures.append("RED: cafe cuff must have enough cloth volume to visibly cover the hand/sleeve seam")
+
 	var mesh: ArrayMesh = presentation.call("_build_curve_mesh",Vector3.ZERO,Vector3(-0.5,-0.4,0.2),Vector3(-2.0,-1.0,0.4),Vector3(-4.5,-1.2,0.6))
 	if mesh == null or mesh.get_surface_count() != 1:
 		failures.append("cafe sleeve curve mesh did not build one surface")
