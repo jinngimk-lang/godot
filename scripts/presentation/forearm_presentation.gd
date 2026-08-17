@@ -4,6 +4,8 @@ class_name ForearmPresentation
 const CURVE_RINGS := 36
 const RING_SIDES := 32
 const AUTHORED_HAND_SCALE := 4.15
+const AUTHORED_WRIST_END_Z := 0.026
+const WRIST_OVERLAP_AUTHORED := 0.012
 
 var _applied := false
 var _forearms: Dictionary = {}
@@ -85,7 +87,11 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 		skin_mat.metallic = 0.0
 		skin_mat.metallic_specular = 0.46
 
-	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,0.023))
+	# The imported XR hand ends around authored local +Z=0.026. Start the bridge
+	# deliberately inside that surface rather than butt-joining at the boundary;
+	# the overlap plus an open wrist end prevents a visible circular cap/seam.
+	var wrist_start_z := AUTHORED_WRIST_END_Z-WRIST_OVERLAP_AUTHORED
+	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,wrist_start_z))
 	if not _finite_vector(start):
 		return
 	var start_world := hand.to_global(start)
@@ -115,6 +121,9 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	_forearms[hand_name] = forearm
 	_cloth_materials[hand_name] = cloth
 	_skin_materials[hand_name] = skin
+
+func _wrist_overlap_authored() -> float:
+	return WRIST_OVERLAP_AUTHORED
 
 func _path_offsets(outward_sign: float) -> Array[Vector3]:
 	var sign_value := -1.0 if outward_sign < 0.0 else 1.0
@@ -175,16 +184,14 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
-	var start_center := vertices.size()
-	vertices.append(start)
-	normals.append(-_cubic_tangent(start,control_a,control_b,end,0.0).normalized())
+	# Leave the wrist end open because it is embedded under the authored hand.
+	# Only the far/off-frame end is capped, avoiding a dark butt-cap at the seam.
 	var end_center := vertices.size()
 	vertices.append(end)
 	normals.append(_cubic_tangent(start,control_a,control_b,end,1.0).normalized())
+	var end_ring := (CURVE_RINGS-1)*RING_SIDES
 	for side_index in range(RING_SIDES):
 		var side_next := (side_index+1)%RING_SIDES
-		indices.append(start_center); indices.append(side_next); indices.append(side_index)
-		var end_ring := (CURVE_RINGS-1)*RING_SIDES
 		indices.append(end_center); indices.append(end_ring+side_index); indices.append(end_ring+side_next)
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
