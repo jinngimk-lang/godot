@@ -11,8 +11,10 @@ ROUND_VALUE="${ROUND_VALUE:-unknown}"
 MAX_PACKET_BYTES=42000
 EXACT_DIFF_TOTAL_BYTES=12000
 GENERIC_EXCERPT_TOTAL_BYTES=18000
+HAND_CONTRACT_TOTAL_BYTES=18000
 MAX_DIFF_PER_FILE_BYTES=3600
 MAX_EXCERPT_PER_FILE_BYTES=3200
+MAX_HAND_CONTRACT_FILE_BYTES=3200
 
 changed_paths="$(git diff --name-only "$BASE_REF...$HEAD_REF")"
 
@@ -103,18 +105,52 @@ append_hud_contracts() {
 }
 
 append_hand_contracts() {
-  {
-    echo '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ==='
-    show_file scripts/presentation/hand_choreography_presentation.gd
-    show_file scripts/hands/hand_visual.gd | sed -n '1,230p'
-    echo '=== GAMEPLAY HAND OWNERSHIP CONTRACT ==='
-    show_file scripts/peel_lab.gd | sed -n '1,145p'
-    echo '=== REFERENCE CAPTURE CONTRACT ==='
-    show_file tests/capture_reference_frames.gd
-    echo '=== HAND REGRESSION CONTRACTS ==='
-    show_file tests/test_hand_visual.gd
-    show_file tests/test_authored_hand_asset.gd
-  } >> "$OUT"
+  local -a contract_paths=(
+    scripts/presentation/hand_choreography_presentation.gd
+    scripts/hands/hand_visual.gd
+    scripts/peel_lab.gd
+    tests/capture_reference_frames.gd
+    tests/test_hand_visual.gd
+    tests/test_authored_hand_asset.gd
+  )
+  local existing_count=0 per_file path tmp
+  for path in "${contract_paths[@]}"; do
+    if git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
+      existing_count=$((existing_count + 1))
+    fi
+  done
+  [ "$existing_count" -gt 0 ] || return 0
+
+  per_file=$((HAND_CONTRACT_TOTAL_BYTES / existing_count))
+  if [ "$per_file" -gt "$MAX_HAND_CONTRACT_FILE_BYTES" ]; then
+    per_file="$MAX_HAND_CONTRACT_FILE_BYTES"
+  fi
+  if [ "$per_file" -lt 500 ]; then
+    per_file=500
+  fi
+
+  echo '=== DIRECT PRESENTATION/INTERACTION CONTRACTS (BOUNDED) ===' >> "$OUT"
+  for path in "${contract_paths[@]}"; do
+    if ! git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
+      continue
+    fi
+    echo "--- HAND CONTRACT: $path ---" >> "$OUT"
+    tmp="$(mktemp)"
+    case "$path" in
+      scripts/hands/hand_visual.gd)
+        show_file "$path" | sed -n '1,230p' > "$tmp"
+        ;;
+      scripts/peel_lab.gd)
+        show_file "$path" | sed -n '1,145p' > "$tmp"
+        ;;
+      *)
+        show_file "$path" > "$tmp"
+        ;;
+    esac
+    bounded_bytes "$tmp" "$per_file" >> "$OUT"
+    rm -f "$tmp"
+    echo >> "$OUT"
+  done
 }
 
 append_generic_contracts() {
@@ -150,9 +186,10 @@ if printf '%s\n' "$changed_paths" | grep -Eq '(^|/)(hud_chrome_presentation\.gd|
   append_hud_contracts
 # A capture fixture may be edited for residue, table, glass, HUD, or other
 # presentation evidence. That file alone must not route the packet into the
-# much larger hand-contract bundle. Exact diff + HEAD excerpt already preserve
-# the capture change in the generic packet. Only actual hand/pose/grip paths
-# opt into the broader hand ownership context.
+# broader hand-contract bundle. Exact diff + HEAD excerpt already preserve the
+# capture change in the generic packet. Only actual hand/pose/grip paths opt
+# into hand ownership context, and that context is itself byte-bounded so a
+# legitimate multi-file hand batch cannot fail before the reviewer runs.
 elif printf '%s\n' "$changed_paths" | grep -Eq '(hand_visual|hand_choreography|authored_hand|reference.*hand|peel.*grip|partial.*peel)'; then
   append_hand_contracts
 else
