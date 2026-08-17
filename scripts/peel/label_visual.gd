@@ -11,6 +11,7 @@ class_name LabelVisual
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
 var _edge_material := StandardMaterial3D.new()
+var _backing_material := StandardMaterial3D.new()
 var _phase_name := "ATTACHED"
 var _detach_alpha := 0.0
 var _held_direction := Vector3.LEFT
@@ -31,6 +32,11 @@ func _ready() -> void:
 	_edge_material.albedo_color = Color(0.76,0.72,0.63,1.0)
 	_edge_material.roughness = 0.98
 	_edge_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_backing_material.albedo_color = Color(0.82,0.78,0.68,1.0)
+	_backing_material.roughness = 0.98
+	_backing_material.metallic = 0.0
+	_backing_material.metallic_specular = 0.12
+	_backing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
 
@@ -179,9 +185,34 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
 
+	_draw_paper_backing(points,top_vertices,bottom_vertices,top_normals,bottom_normals,_last_progress)
 	_draw_paper_edge(top_vertices,top_normals,true)
 	_draw_paper_edge(bottom_vertices,bottom_normals,false)
 	_draw_torn_front_fringe(points,_last_progress)
+
+func _draw_paper_backing(points: PackedVector3Array, top_vertices: PackedVector3Array, bottom_vertices: PackedVector3Array, top_normals: PackedVector3Array, bottom_normals: PackedVector3Array, progress: float) -> void:
+	if points.size()<2 or top_vertices.size()!=points.size() or bottom_vertices.size()!=points.size():
+		return
+	var reveal := 1.0 if _phase_name in ["DETACHING","HELD"] else clampf(progress,0.0,1.0)
+	if reveal<=0.025:
+		return
+	var last_index := clampi(int(ceil(reveal*float(points.size()-1))),1,points.size()-1)
+	var thickness := get_paper_thickness()
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_backing_material)
+	for i in range(last_index+1):
+		var u := float(i)/float(points.size()-1)
+		var normal := (top_normals[i]+bottom_normals[i]).normalized()
+		if normal.length_squared()<=0.000001:
+			normal = _normal_from_points(points,i)
+		var back_top := top_vertices[i]-normal*thickness
+		var back_bottom := bottom_vertices[i]-normal*thickness
+		_mesh.surface_set_normal(-normal)
+		_mesh.surface_set_uv(Vector2(u,1.0))
+		_mesh.surface_add_vertex(back_bottom)
+		_mesh.surface_set_normal(-normal)
+		_mesh.surface_set_uv(Vector2(u,0.0))
+		_mesh.surface_add_vertex(back_top)
+	_mesh.surface_end()
 
 func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array, top_edge: bool) -> void:
 	if vertices.size()<2 or normals.size()!=vertices.size():
