@@ -39,30 +39,27 @@ func run() -> Array[String]:
 		failures.append("one completed ritual should advance progression exactly once")
 	if model.get_total_score() != 0:
 		failures.append("ritual progression must not require public score accumulation")
-	if bool(first_result.get("unlocked_new", true)):
-		failures.append("second tactile profile should not unlock after only one ritual")
-
-	var unlock_two: Dictionary = model.record_ritual_complete()
-	if model.get_unlocked_count() != 2 or not bool(unlock_two.get("unlocked_new", false)):
-		failures.append("second tactile profile should unlock on second completed ritual")
+	if model.get_unlocked_count() != 2 or not bool(first_result.get("unlocked_new", false)):
+		failures.append("POST_PEEL_RED: first completed café ritual should unlock amber bar immediately")
 	model.advance_item()
 	var second: Dictionary = model.current_variant()
-	if String(second.get("id", "")) == String(first.get("id", "")):
-		failures.append("advance_item should rotate to a meaningfully different unlocked tactile profile")
+	if String(second.get("id", "")) != "silky_long":
+		failures.append("POST_PEEL_RED: first Continue must rotate café to amber bar")
 	if float(second.get("base_adhesion", 0.0)) == float(first.get("base_adhesion", 0.0)):
 		failures.append("variant rotation must change actual peel feel, not only text")
 	var second_crumple: Dictionary = second.get("crumple_profile", {})
 	if is_equal_approx(float(second_crumple.get("rigidity", 0.0)), float(first_crumple.get("rigidity", 0.0))) and is_equal_approx(float(second_crumple.get("max_compression", 0.0)), float(first_crumple.get("max_compression", 0.0))):
 		failures.append("unlocked cup variants should change crumple feel, not only label feel")
 
-	model.record_ritual_complete()
-	model.record_ritual_complete()
-	var unlock_three: Dictionary = model.record_ritual_complete()
-	if model.get_unlocked_count() != 3 or not bool(unlock_three.get("unlocked_new", false)):
-		failures.append("third tactile profile should unlock on fifth completed ritual")
+	var second_result: Dictionary = model.record_ritual_complete()
+	if model.get_unlocked_count() != 3 or not bool(second_result.get("unlocked_new", false)):
+		failures.append("POST_PEEL_RED: completed bar ritual should unlock market immediately")
+	model.advance_item()
+	if String(model.current_variant().get("id", "")) != "crisp_seal":
+		failures.append("POST_PEEL_RED: second Continue must rotate amber bar to market")
 
 	# V6 sensory profile contract: each tactile cup must read as a distinct silhouette,
-	# and only the final unlocked profile may introduce a small contained ice layer.
+	# and only the final profile may introduce a small contained ice layer.
 	var silhouette_signatures: Array[String] = []
 	for i in range(model.VARIANTS.size()):
 		var variant: Dictionary = model.VARIANTS[i]
@@ -79,7 +76,7 @@ func run() -> Array[String]:
 		var contents: Dictionary = variant.get("contents_profile", {})
 		if i < model.VARIANTS.size() - 1:
 			if String(contents.get("type", "")) != "none":
-				failures.append("only the final unlocked tactile cup should introduce contents")
+				failures.append("only the final tactile cup should introduce contents")
 		else:
 			if String(contents.get("type", "")) != "ice":
 				failures.append("RED: final tactile cup should introduce bounded contained ice")
@@ -114,8 +111,8 @@ func run() -> Array[String]:
 	var legacy_result: Dictionary = model.record_clean_peel(75)
 	if model.get_clean_peels() != 1 or model.get_total_score() != 75:
 		failures.append("legacy clean-peel API should remain compatible while delegating ritual progression")
-	if bool(legacy_result.get("unlocked_new", true)):
-		failures.append("legacy compatibility wrapper must keep the same unlock cadence")
+	if model.get_unlocked_count() != 2 or not bool(legacy_result.get("unlocked_new", false)):
+		failures.append("legacy compatibility wrapper must keep the same immediate next-scene unlock cadence")
 
 	model.restart_run()
 	if model.get_clean_peels() != 0 or model.get_total_score() != 0 or model.get_unlocked_count() != 1:

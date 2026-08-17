@@ -133,6 +133,9 @@ func restart_run() -> void:
 	_unlocked_count = 1
 
 func _unlock_count_for(clean_peels: int) -> int:
-	if clean_peels >= 5: return 3
-	if clean_peels >= 2: return 2
+	# The showcase is a short three-scene tactile sequence, not a grind gate.
+	# One clean completion unlocks the next scene so Continue always moves the
+	# player forward: Café -> Bar -> Market -> Café.
+	if clean_peels >= 2: return 3
+	if clean_peels >= 1: return 2
 	return 1
