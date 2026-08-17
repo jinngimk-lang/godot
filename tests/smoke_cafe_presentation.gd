@@ -62,6 +62,16 @@ func _run() -> void:
 				var expected_y := lid.position.y + lid_mesh.height * 0.5
 				if absf(outer_ridge.position.y - expected_y) > 0.045:
 					failures.append("CAFE_RED: molded lid ridge must sit on the actual production lid, not float above it")
+				var product := scene.get_node_or_null("ProductPresentation") as Node3D
+				var paper_lip := product.get_node_or_null("CupPaperDetails/PaperLip") as MeshInstance3D if product != null else null
+				if paper_lip == null or not (paper_lip.mesh is CylinderMesh):
+					failures.append("CAFE_RED: missing product PaperLip structural cue")
+				else:
+					var paper_lip_mesh := paper_lip.mesh as CylinderMesh
+					if paper_lip_mesh.top_radius > (cup.mesh as CylinderMesh).top_radius + 0.020:
+						failures.append("CAFE_RED: paper lip overhang is too wide and masks the black molded lid")
+					if ridge_mesh.top_radius < paper_lip_mesh.top_radius + 0.020:
+						failures.append("CAFE_RED: black lid outer ridge must remain visibly outside the paper lip silhouette")
 
 		var seam := presentation.get_node_or_null("CupPaperSeam") as MeshInstance3D
 		if seam == null or not (seam.mesh is ArrayMesh) or seam.material_override == null:
