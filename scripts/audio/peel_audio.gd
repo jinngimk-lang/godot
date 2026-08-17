@@ -37,11 +37,14 @@ func set_feedback(
 	var safe_speed := clampf(speed if is_finite(speed) else 0.0, 0.0, 30.0)
 	var safe_tension := clampf(tension if is_finite(tension) else 0.0, 0.0, 80.0)
 	var speed_mix := clampf(safe_speed / 9.0, 0.0, 1.0)
-	var tension_lift := clampf(safe_tension / 80.0, 0.0, 1.0) * 5.0
+	# Continuous adhesive friction is environmental texture, not foreground music.
+	# Keep tension modulation subtle so the loop never outruns the paper/micro/final
+	# release transients that carry the tactile interaction hierarchy.
+	var tension_lift := clampf(safe_tension / 80.0, 0.0, 1.0) * 2.0
 
 	if active:
-		_slow_target_db = lerpf(-13.0 + tension_lift, -35.0, speed_mix)
-		_fast_target_db = lerpf(-38.0, -14.0 + tension_lift, speed_mix)
+		_slow_target_db = lerpf(-24.0 + tension_lift, -39.0, speed_mix)
+		_fast_target_db = lerpf(-39.0, -23.0 + tension_lift, speed_mix)
 	else:
 		_slow_target_db = -80.0
 		_fast_target_db = -80.0
