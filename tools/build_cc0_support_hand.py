@@ -6,7 +6,8 @@ from mathutils import Matrix, Vector
 SRC = "/tmp/oga-arms/FPS ARMS RIG 1 test anim.blend"
 OUT = "assets/models/hands/hand_left.glb"
 REPORT = "/tmp/support-hand-build/build-report.json"
-PRE_SCALE = 1.0 / 2.25
+RUNTIME_AUTHORED_SCALE = 2.25
+TARGET_RUNTIME_EXTENT = 1.20
 POSE_FRAMES = {
     "Default pose": 1,
     "Pinch Up": 14,
@@ -52,6 +53,28 @@ def pose_depth(pose_bone):
         depth += 1
         parent = parent.parent
     return depth
+
+
+def world_mesh_extent(obj):
+    points = [obj.matrix_world @ vertex.co for vertex in obj.data.vertices]
+    if not points:
+        raise RuntimeError("cannot measure empty support-hand mesh")
+    minimum = Vector(
+        (
+            min(point.x for point in points),
+            min(point.y for point in points),
+            min(point.z for point in points),
+        )
+    )
+    maximum = Vector(
+        (
+            max(point.x for point in points),
+            max(point.y for point in points),
+            max(point.z for point in points),
+        )
+    )
+    size = maximum - minimum
+    return max(size.x, size.y, size.z), size
 
 
 bpy.ops.wm.open_mainfile(filepath=SRC)
@@ -101,7 +124,10 @@ substantial = [obj for obj in parts if len(obj.data.polygons) >= 500]
 if not substantial:
     raise RuntimeError("source separation produced no substantial arm component")
 keep = min(substantial, key=lambda obj: (bounds_center(obj) - left_wrist_world).length)
-if len(keep.data.polygons) < 1000:
+selected_component_name = keep.name
+selected_component_vertices = len(keep.data.vertices)
+selected_component_polygons = len(keep.data.polygons)
+if selected_component_polygons < 1000:
     raise RuntimeError("selected left arm component is structurally too small")
 for obj in list(parts):
     if obj != keep:
@@ -162,6 +188,18 @@ if len(keep.data.polygons) < 800:
         "forearm crop removed implausibly much hand geometry: %d polygons"
         % len(keep.data.polygons)
     )
+
+# Scale is derived once from the actual cropped asset. The previous candidate
+# imported at runtime extent 1.719 and violated the <=1.40 smoke bound. The
+# locked Café composition has a 1.40-high cup and a visible hand shorter than
+# the cup, so target the support-hand mesh at 1.20 after HandVisual's fixed
+# 2.25 authored-root multiplier. No pose/position/rotation is changed here.
+source_extent_before_scale, source_extent_size = world_mesh_extent(keep)
+pre_scale = TARGET_RUNTIME_EXTENT / (
+    source_extent_before_scale * RUNTIME_AUTHORED_SCALE
+)
+if not (0.15 <= pre_scale <= 0.50):
+    raise RuntimeError("derived support-hand pre-scale is implausible: %.6f" % pre_scale)
 
 # Preserve the original textured material as HandSkin.
 if len(keep.data.materials) == 0 or keep.data.materials[0] is None:
@@ -270,8 +308,8 @@ for action in actions:
     strip = track.strips.new(action.name, 0, action)
     strip.name = action.name
 
-# Cancel HandVisual's legacy 2.25 authored-root multiplier structurally.
-scale_matrix = Matrix.Scale(PRE_SCALE, 4)
+# Apply the one evidence-derived structural scale correction.
+scale_matrix = Matrix.Scale(pre_scale, 4)
 arm.matrix_world = scale_matrix @ arm.matrix_world
 keep.matrix_world = scale_matrix @ keep.matrix_world
 bpy.context.view_layer.update()
@@ -299,11 +337,18 @@ report = {
     "source": SRC,
     "source_archive_sha256": "31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562",
     "source_pose_frames": POSE_FRAMES,
-    "pre_scale": PRE_SCALE,
+    "runtime_authored_scale": RUNTIME_AUTHORED_SCALE,
+    "target_runtime_extent": TARGET_RUNTIME_EXTENT,
+    "source_extent_before_scale": source_extent_before_scale,
+    "source_extent_size_before_scale": list(source_extent_size),
+    "derived_pre_scale": pre_scale,
+    "predicted_runtime_extent": source_extent_before_scale
+    * pre_scale
+    * RUNTIME_AUTHORED_SCALE,
     "component_candidates": component_report,
-    "selected_component_vertices_before_crop": next(
-        item["vertices"] for item in component_report if item["name"] == keep.name
-    ) if any(item["name"] == keep.name for item in component_report) else None,
+    "selected_component_name": selected_component_name,
+    "selected_component_vertices_before_crop": selected_component_vertices,
+    "selected_component_polygons_before_crop": selected_component_polygons,
     "palm_width_before_prescale": palm_width,
     "forearm_cutoff_before_prescale": cutoff,
     "mesh_vertices_after_crop": len(keep.data.vertices),
