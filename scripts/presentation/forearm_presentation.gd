@@ -3,6 +3,8 @@ class_name ForearmPresentation
 
 const CURVE_RINGS := 36
 const RING_SIDES := 32
+const CUFF_RINGS := 7
+const CUFF_LENGTH := 0.15
 const AUTHORED_HAND_SCALE := 4.15
 const AUTHORED_WRIST_END_Z := 0.026
 const WRIST_OVERLAP_AUTHORED := 0.012
@@ -21,9 +23,22 @@ void fragment() {
 	SPECULAR = 0.09;
 }
 """
+const SLEEVE_CUFF_SHADER := """shader_type spatial;
+render_mode cull_back;
+uniform vec4 cuff_color : source_color = vec4(0.137, 0.134, 0.130, 1.0);
+uniform float rib_strength = 0.010;
+
+void fragment() {
+	float rib = 0.5 + 0.5 * sin(UV.x * 10.0 * 6.2831853);
+	ALBEDO = cuff_color.rgb * (0.997 + rib * 0.004);
+	ROUGHNESS = clamp(0.958 + rib * rib_strength, 0.95, 0.985);
+	SPECULAR = 0.075;
+}
+"""
 
 var _applied := false
 var _forearms: Dictionary = {}
+var _cuffs: Dictionary = {}
 var _cloth_materials: Dictionary = {}
 var _skin_materials: Dictionary = {}
 var _last_venue := ""
@@ -94,17 +109,12 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 		fallback_skin.roughness = 0.80
 		skin = fallback_skin
 	elif skin is StandardMaterial3D:
-		# Re-use the actual imported hand material so the forearm/hand join stays
-		# continuous, but calibrate the XR asset away from the prototype pink read.
 		var skin_mat := skin as StandardMaterial3D
 		skin_mat.albedo_color = Color(0.66,0.43,0.31,1.0)
 		skin_mat.roughness = 0.78
 		skin_mat.metallic = 0.0
 		skin_mat.metallic_specular = 0.46
 
-	# The imported XR hand ends around authored local +Z=0.026. Start the bridge
-	# deliberately inside that surface rather than butt-joining at the boundary;
-	# the overlap plus an open wrist end prevents a visible circular cap/seam.
 	var wrist_start_z := AUTHORED_WRIST_END_Z-WRIST_OVERLAP_AUTHORED
 	var start: Vector3 = _descendant_point_to_ancestor(authored,hand,Vector3(0.0,0.0,wrist_start_z))
 	if not _finite_vector(start):
@@ -115,10 +125,6 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	if absf(start_world.x-cup_world.x)<0.05:
 		outward_sign = -1.0 if dynamic_hand else 1.0
 
-	# Use a cubic path with two deliberate anatomical phases: a short wrist-to-
-	# forearm tangent that drops toward the table, then a broader elbow/exit arc.
-	# The old single-control quadratic only changed tangent by ~12 degrees and
-	# still read as a straight beam after the radius was fixed.
 	var offsets := _path_offsets(outward_sign)
 	var control_a_world := start_world+(offsets[0] as Vector3)
 	var control_b_world := start_world+(offsets[1] as Vector3)
@@ -136,6 +142,14 @@ func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	_forearms[hand_name] = forearm
 	_cloth_materials[hand_name] = cloth
 	_skin_materials[hand_name] = skin
+
+	var cuff := MeshInstance3D.new()
+	cuff.name = "SleeveCuffNatural"
+	cuff.mesh = _build_cuff_mesh(start,(control_a-start).normalized())
+	cuff.material_override = _make_cafe_cuff()
+	cuff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	hand.add_child(cuff)
+	_cuffs[hand_name] = cuff
 
 func _wrist_overlap_authored() -> float:
 	return WRIST_OVERLAP_AUTHORED
@@ -166,6 +180,64 @@ func _make_cafe_cloth() -> ShaderMaterial:
 	material.set_shader_parameter("cloth_color",Color(0.145,0.142,0.138,1.0))
 	material.set_shader_parameter("weave_strength",0.014)
 	return material
+
+func _make_cafe_cuff() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = SLEEVE_CUFF_SHADER
+	var material := ShaderMaterial.new()
+	material.resource_name = "SleeveCuffFabric"
+	material.shader = shader
+	material.set_shader_parameter("cuff_color",Color(0.137,0.134,0.130,1.0))
+	material.set_shader_parameter("rib_strength",0.010)
+	return material
+
+func _build_cuff_mesh(start: Vector3, tangent: Vector3) -> ArrayMesh:
+	var direction := tangent.normalized()
+	if direction.length_squared()<=0.000001:
+		direction = Vector3.FORWARD
+	var helper := Vector3.UP
+	if absf(direction.dot(helper))>0.94:
+		helper = Vector3.RIGHT
+	var ring_x := helper.cross(direction).normalized()
+	var ring_y := direction.cross(ring_x).normalized()
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for ring_index in range(CUFF_RINGS):
+		var t := float(ring_index)/float(CUFF_RINGS-1)
+		var point := start+direction*(CUFF_LENGTH*(t-0.14))
+		var half_x := lerpf(0.124,0.118,t)
+		var half_y := lerpf(0.073,0.070,t)
+		for side_index in range(RING_SIDES):
+			var u := float(side_index)/float(RING_SIDES)
+			var angle := TAU*u
+			var rib_shape := 1.0+0.008*cos(angle*10.0)
+			var local_cross := Vector2(cos(angle)*half_x*rib_shape,sin(angle)*half_y)
+			var radial := ring_x*local_cross.x+ring_y*local_cross.y
+			vertices.append(point+radial)
+			normals.append(radial.normalized())
+			uvs.append(Vector2(u,t))
+	for ring_index in range(CUFF_RINGS-1):
+		var current := ring_index*RING_SIDES
+		var next := (ring_index+1)*RING_SIDES
+		for side_index in range(RING_SIDES):
+			var side_next := (side_index+1)%RING_SIDES
+			var a := current+side_index
+			var b := next+side_index
+			var c := next+side_next
+			var d := current+side_next
+			indices.append(a); indices.append(b); indices.append(c)
+			indices.append(a); indices.append(c); indices.append(d)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	return mesh
 
 func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, end: Vector3) -> ArrayMesh:
 	var vertices := PackedVector3Array()
@@ -208,8 +280,6 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 			var d := current+side_next
 			indices.append(a); indices.append(b); indices.append(c)
 			indices.append(a); indices.append(c); indices.append(d)
-	# Leave the wrist end open because it is embedded under the authored hand.
-	# Only the far/off-frame end is capped, avoiding a dark butt-cap at the seam.
 	var end_center := vertices.size()
 	vertices.append(end)
 	normals.append(_cubic_tangent(start,control_a,control_b,end,1.0).normalized())
@@ -232,15 +302,11 @@ func _sleeve_cross_section(t: float, angle: float) -> Vector2:
 	var p := clampf(t,0.0,1.0)
 	var radius := _radius_profile(p)
 	var vertical_ratio := lerpf(0.58,0.66,p)
-	# A restrained deterministic multi-lobe modulation breaks the hose-like
-	# extrusion without making a visible star edge at the 720p acceptance scale.
 	var fold := 1.0+0.030*sin(angle*3.0+p*1.7)+0.018*cos(angle*5.0-p*1.15)
 	var vertical_fold := 1.0+0.015*sin(angle*2.0-p*2.2)
 	return Vector2(cos(angle)*radius*fold,sin(angle)*radius*vertical_ratio*fold*vertical_fold)
 
 func _radius_profile(t: float) -> float:
-	# The reference sleeve stays subordinate to hand/paper contact. Broaden only
-	# toward the crop edge; a slimmer 0.112→0.168 bridge reduces the old tube band.
 	var p := clampf(t,0.0,1.0)
 	var base := lerpf(0.112,0.168,smoothstep(0.0,1.0,p))
 	return base*(1.0+0.025*sin(p*PI))
@@ -261,6 +327,10 @@ func _apply_venue_materials(venue_id: String) -> void:
 		if forearm == null:
 			continue
 		forearm.material_override = (_cloth_materials.get(hand_name) as Material) if use_cloth else (_skin_materials.get(hand_name) as Material)
+	for hand_name in _cuffs.keys():
+		var cuff := _cuffs[hand_name] as MeshInstance3D
+		if cuff != null:
+			cuff.visible = use_cloth
 
 func _find_material(node: Node, wanted_name: String):
 	if node is MeshInstance3D:
