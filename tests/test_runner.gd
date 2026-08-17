@@ -14,6 +14,7 @@ func _init() -> void:
 		"res://tests/test_pointer_adapter.gd",
 		"res://tests/test_score_model.gd",
 		"res://tests/test_peel_controller.gd",
+		"res://tests/test_peel_entry_guidance.gd",
 		"res://tests/test_label_visual_geometry.gd",
 		"res://tests/test_label_lifecycle.gd",
 		"res://tests/test_label_visual_v2.gd",
