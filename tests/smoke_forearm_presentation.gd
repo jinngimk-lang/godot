@@ -7,6 +7,7 @@ const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 const MIN_WRIST_OVERLAP_AUTHORED := 0.009
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
+const CAP_EXIT_MARGIN_PX := 8.0
 
 func _init() -> void:
 	call_deferred("_run")
@@ -93,6 +94,9 @@ func _run() -> void:
 		if forearm.material_override == null or forearm.material_override.resource_name != "HandSkin":
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
+		if not _forearm_cap_is_offscreen(scene,forearm):
+			_fail("bar %s bare forearm must continue past the viewport instead of ending in a visible amputated cap" % hand_name,scene)
+			return
 
 	# Support-root choreography has one owner. ForearmPresentation owns geometry
 	# and venue material only; HandChoreographyPresentation owns glass grip root
@@ -121,11 +125,32 @@ func _run() -> void:
 		if forearm.material_override == null or forearm.material_override.resource_name != "HandSkin":
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
+		if not _forearm_cap_is_offscreen(scene,forearm):
+			_fail("market %s bare forearm must continue past the viewport instead of ending in a visible amputated cap" % hand_name,scene)
+			return
 
 	print("PASS: reference-scale hands, seamless curved forearms and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
+
+func _forearm_cap_is_offscreen(scene: Node,forearm: MeshInstance3D) -> bool:
+	var camera := scene.get_node_or_null("Camera") as Camera3D
+	if camera == null or forearm == null or not (forearm.mesh is ArrayMesh):
+		return false
+	var arrays := (forearm.mesh as ArrayMesh).surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	if vertices.is_empty():
+		return false
+	# ForearmPresentation appends the far cap center as the final vertex. A bare
+	# arm should enter from beyond the frame, never terminate as a pointed stump
+	# inside the reference composition.
+	var cap_world := forearm.to_global(vertices[vertices.size()-1])
+	if camera.is_position_behind(cap_world):
+		return true
+	var screen := camera.unproject_position(cap_world)
+	var viewport_size := camera.get_viewport().get_visible_rect().size
+	return screen.x <= -CAP_EXIT_MARGIN_PX or screen.x >= viewport_size.x+CAP_EXIT_MARGIN_PX or screen.y <= -CAP_EXIT_MARGIN_PX or screen.y >= viewport_size.y+CAP_EXIT_MARGIN_PX
 
 func _fail(message: String, scene: Node = null) -> void:
 	push_error("FOREARM_RED: %s" % message)
