@@ -105,7 +105,7 @@ jobs:
           F. Check that tests actually exercise the claimed path and do not only assert internal implementation state.
           G. Do not treat CI green as proof of subjective hand naturalness or reference-image similarity; those remain visual/experiential gates.
 
-          You may reason concisely in prose first. Then your LAST FIVE NON-EMPTY LINES MUST be exactly this protocol, with no prose after it and no other PROVISIONAL_VERDICT line earlier:
+          You may reason concisely in prose first. Then emit these five labelled fields exactly once. Common Markdown decoration is acceptable, but do not emit a second verdict or conflicting duplicate fields:
           PROVISIONAL_VERDICT: VERIFIED
           DEFECT: NONE
           MIN_TEST: NONE
@@ -141,12 +141,45 @@ jobs:
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
           chmod +x /tmp/validate-local-challenger-verdict.sh
 
+          set +e
           python3 /tmp/extract-local-challenger-report.py \
             /tmp/review-analysis.txt \
-            /tmp/verdict.json
+            /tmp/verdict.json 2> /tmp/challenger-parser.err
+          parser_rc=$?
+          set -e
+          if [ "$parser_rc" -ne 0 ]; then
+            echo "::error title=Local Challenger parser failure::parser exit=$parser_rc; see analysis tail below"
+            echo '=== Challenger parser stderr ==='
+            cat /tmp/challenger-parser.err || true
+            echo '=== Challenger analysis tail (last 120 lines) ==='
+            tail -n 120 /tmp/review-analysis.txt || true
+            {
+              echo "parser exit=$parser_rc"
+              tr '\n' ' ' < /tmp/challenger-parser.err | head -c 700 || true
+            } > /tmp/challenger-infra-summary.txt
+            exit "$parser_rc"
+          fi
+
+          set +e
           bash /tmp/validate-local-challenger-verdict.sh \
             /tmp/verdict.json \
-            /tmp/review-packet.txt
+            /tmp/review-packet.txt 2> /tmp/challenger-validator.err
+          validator_rc=$?
+          set -e
+          if [ "$validator_rc" -ne 0 ]; then
+            echo "::error title=Local Challenger grounding failure::validator exit=$validator_rc"
+            echo '=== Parsed verdict ==='
+            cat /tmp/verdict.json || true
+            echo '=== Grounding validator stderr ==='
+            cat /tmp/challenger-validator.err || true
+            echo '=== Challenger analysis tail (last 80 lines) ==='
+            tail -n 80 /tmp/review-analysis.txt || true
+            {
+              echo "validator exit=$validator_rc"
+              tr '\n' ' ' < /tmp/challenger-validator.err | head -c 700 || true
+            } > /tmp/challenger-infra-summary.txt
+            exit "$validator_rc"
+          fi
 
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
           defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
@@ -183,7 +216,13 @@ jobs:
               echo 'VERDICT: INFRA_FAILURE'
               echo 'DEFECT: local Challenger did not produce a grounded deterministic verdict'
               echo 'MIN_TEST: rerun the local Challenger after fixing verifier infrastructure'
-              echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
+              if [ -s /tmp/challenger-infra-summary.txt ]; then
+                printf 'EVIDENCE: '
+                tr '\n' ' ' < /tmp/challenger-infra-summary.txt | head -c 1000 || true
+                echo
+              else
+                echo 'EVIDENCE: no grounded VERIFIED or NEEDS_FIX verdict was accepted'
+              fi
             fi
             echo '```'
           } > /tmp/pr-comment.md
