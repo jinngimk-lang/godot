@@ -1,4 +1,4 @@
-# Reference Convergence Checkpoint 84 — Quiet Café crumple journey UI candidate
+# Reference Convergence Checkpoint 84 — Quiet Café crumple journey UI
 
 Date: 2026-08-18
 
@@ -17,7 +17,7 @@ No installable Blender / 3D rigging / model-editing plugin was available in the 
 ## Ranked reds at recovery
 
 1. **R1 Macro — hero support-hand anatomy / true vessel enclosure.** Still dominant and still blocked from further numeric pose searching.
-2. **Café crumple Macro/UI — bottom JourneyRail remains visible during the active 55% squeeze ritual.** This visibly occupies the lower negative space while both hands and the compressed cup should own the frame.
+2. **Café crumple Macro/UI — bottom JourneyRail remains visible during the active 55% squeeze ritual.** This visibly occupied lower negative space while both hands and the compressed cup should own the frame.
 3. **R2/Meso — whole-hand peel pinch quality / full-hand flap following.**
 4. **Micro — skin/paper/glass/residue/condensation detail.** Frozen.
 
@@ -42,7 +42,7 @@ The deterministic journey-presentation contract was extended to require:
 - active `CRUMPLING` => `JourneyRail.visible == false`;
 - idle `CRUMPLE_READY` => rail visible again for pointer/touch scene navigation.
 
-The implementation commit changed only the journey presentation owner:
+The implementation exact head was:
 
 `e498eac9b0c05d68ff6c751d7af59f23479ff3e8`
 
@@ -54,7 +54,7 @@ Implementation rule:
 
 ## Exact-head verification
 
-PR #143 exact head:
+PR #143 exact product head:
 
 `e498eac9b0c05d68ff6c751d7af59f23479ff3e8`
 
@@ -70,44 +70,52 @@ Godot Check:
 
 Before: checkpoint-83 artifact `9302410623`.
 
-After: candidate artifact `9303571967`.
+After: exact candidate artifact `9303571967`.
 
 Inspected the full nine-frame set and direct `cafe_crumple55` A/B.
 
 Scoped result: **Macro/UI PASS**.
 
-- before, the 588 px-wide three-scene rail occupied the lower center of `cafe_crumple55` while both hands squeezed the cup;
+- before, the ~588 px-wide three-scene rail occupied the lower center of `cafe_crumple55` while both hands squeezed the cup;
 - after, the rail is absent during active crumple, restoring table/negative space and making the hand-and-cup ritual the dominant lower-frame read;
 - the Continue button remains available at lower right;
-- cup, hands, crumple deformation, camera and top-left guidance are pixel-stable apart from the intended rail removal;
+- cup, hands, crumple deformation, camera and top-left guidance remain stable apart from the intended rail removal;
 - other café/bar/market base, inspect and partial-peel frames show no obvious scoped regression.
 
 This does **not** close R1 hand anatomy/enclosure.
 
-## Challenger gate status
+## Independent Challenger
 
-The product candidate has **not been merged** because the independent Challenger gate is not closed.
+The first two round-1 Local Challenger comments returned `INFRA_FAILURE` with no accepted exact-packet verdict. They were duplicate dispatches from overlapping AUTO / explicit round-1 commands and were treated as verifier/invocation noise, not product findings.
 
-Two round-1 Local Challenger reports on the unchanged exact head returned:
+A clean explicit round-2 run then reviewed the unchanged exact product head:
 
-`VERDICT: INFRA_FAILURE`
+`e498eac9b0c05d68ff6c751d7af59f23479ff3e8`
 
-with no accepted exact-packet verdict. Those duplicate round-1 attempts were triggered by overlapping AUTO / explicit dispatches and therefore are not product findings.
+Grounded result:
 
-An explicit round-2 dispatch was then sent for the same exact head. At checkpoint time no grounded round-2 verdict had yet been posted.
+- `VERDICT: VERIFIED`
+- `DEFECT: NONE`
+- `MIN_TEST: NONE`
+- `EVIDENCE: NO_CONCRETE_DEFECT`
 
-Therefore:
+No product changes were made between the visual PASS and this VERIFIED result.
 
-- do not merge PR #143 yet;
-- do not interpret Challenger infrastructure failure as a product defect;
-- do not alter the already visual-PASS product candidate merely to appease an ungrounded failure.
+## Merge
 
-## Closed / improved red
+PR #143 was merged with expected-head protection and squash semantics only after the exact head remained unchanged and the round-2 Challenger returned VERIFIED.
 
-Evidence-backed candidate improvement, pending Challenger merge gate:
+Merged product commit:
 
-- active Café crumple no longer needs to carry persistent three-scene navigation chrome in the exact runtime capture;
-- touch navigation remains available before/after the active squeeze through `CRUMPLE_READY` and other non-active states.
+`75f10b39df9d0d78cd93b590dbb63642212db231`
+
+## Closed red
+
+Closed in this checkpoint:
+
+- active Café crumple no longer carries the persistent three-scene JourneyRail in the exact runtime ritual frame;
+- touch navigation still returns in `CRUMPLE_READY` and other non-active states;
+- active peel and inspection quiet-UI behavior remain intact.
 
 ## Remaining reds
 
@@ -119,15 +127,15 @@ Evidence-backed candidate improvement, pending Challenger merge gate:
 ## Failed / rejected / prohibited repetition
 
 - Do not resume support-hand CCD, endpoint chasing, grip-number, wrist/orbit/yaw/translation grids, per-finger numeric grids, subdivision-density sweeps, or the rejected fixed-Cup CC0 source.
-- Do not start a JourneyRail size/opacity/position sweep; this candidate changes only active-crumple ownership.
+- Do not start a JourneyRail size/opacity/position sweep; this change is only active-crumple ownership.
 - Do not remove the Continue button as part of this scoped change without new evidence.
 - Do not descend into decorative Micro polish while R1 remains dominant.
-- Do not merge PR #143 without an independent grounded Challenger verdict on its unchanged exact head.
+- Do not interpret the duplicate round-1 Challenger `INFRA_FAILURE` reports as product defects; round 2 on the unchanged exact head is the accepted grounded result.
 
 ## Next exact action
 
-1. Read PR #143 current head and Challenger comments first.
-2. If a grounded exact-head `VERIFIED` result exists and the head remains `e498eac9b0c05d68ff6c751d7af59f23479ff3e8`, expected-head squash merge PR #143.
-3. Immediately run fresh merged-main Godot 4.7.1 and inspect all nine runtime frames; confirm `cafe_crumple55` keeps the quiet rail state in the actual merge tree.
-4. If Challenger returns a real grounded `NEEDS_FIX`, fix only the proven contradiction and rerun exact-head evidence.
-5. Re-check live Blender/native-rig visual-authoring capability; if it becomes available, return immediately to R1 whole-hand support-grasp authoring. Otherwise choose the next independent objective Macro/Meso red from fresh merged-main interaction frames.
+1. Start from `main` and confirm the merged product commit / newest checkpoint head.
+2. Inspect the freshest merged-main nine-frame artifact, especially `cafe_crumple55`, to confirm the rail remains absent in the true integration tree.
+3. Re-check live Blender/native-rig visual-authoring capability. If available, return immediately to R1 whole-hand support-grasp authoring against the locked references.
+4. If unavailable, choose the next independent objective Macro/Meso red from the freshest interaction-step frames; preserve base / partial-peel / inspect / crumple evidence.
+5. Keep Micro polish frozen while R1 remains dominant.
