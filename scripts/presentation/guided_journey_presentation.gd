@@ -163,14 +163,11 @@ func _ensure_ui() -> void:
 	_refresh_existing_hud()
 
 func _style_existing_hud() -> void:
+	# JourneyGuide owns completion state and next-action copy. Keep the legacy
+	# Reward node alive for compatibility, but remove its duplicate visual chrome
+	# so it cannot compete with the guide or overlap the scene rail.
 	if _reward != null:
-		_reward.position = Vector2(18, 126)
-		_reward.size = Vector2(310, 24)
-		_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_reward.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_reward.autowrap_mode = TextServer.AUTOWRAP_OFF
-		_reward.add_theme_font_size_override("font_size", 10)
-		_reward.add_theme_color_override("font_color", Color(0.98, 0.91, 0.76, 0.78))
+		_reward.visible = false
 	if _continue_button != null:
 		_continue_button.anchor_left = 0.5
 		_continue_button.anchor_top = 1.0
@@ -193,23 +190,8 @@ func _refresh_existing_hud() -> void:
 			_reward = layer.get_node_or_null("Reward") as Label
 			_continue_button = layer.get_node_or_null("Continue") as Button
 			_style_existing_hud()
-	if _reward != null and not _reward.text.is_empty():
-		_reward.text = _compact_reward(_reward.text)
-		# A multi-line message can expand Label's minimum height before this
-		# presentation frame gets to compact it. Reclaim the visual footprint after
-		# compaction so the stale three-line size cannot overlap JourneyRail.
-		_reward.position = Vector2(18, 126)
-		_reward.size = Vector2(310, 24)
-
-func _compact_reward(source: String) -> String:
-	var upper := source.to_upper()
-	if upper.contains("CLEAN RELEASE"):
-		return "CLEAN RELEASE  •  NEXT SCENE READY"
-	if upper.contains("TEXTURED RELEASE"):
-		return "TEXTURED RELEASE  •  NEXT SCENE READY"
-	if upper.contains("GENTLE CRUMPLE"):
-		return "GENTLE CRUMPLE  •  CONTINUE WHEN READY"
-	return source.get_slice("\n", 0).strip_edges()
+	if _reward != null:
+		_reward.visible = false
 
 func _request_scene(index: int) -> void:
 	scene_requested.emit(clampi(index, 0, SCENE_NAMES.size() - 1))
