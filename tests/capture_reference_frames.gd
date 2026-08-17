@@ -33,6 +33,7 @@ func _run() -> void:
 	await _settle_frames(4)
 	_stage_crumple(scene,0.55)
 	await _settle_frames(8)
+	if not _assert_staged_crumple_survived_settle(scene,"cafe_crumple55"): return
 	if not await _capture("cafe_crumple55"): return
 
 	scene.call("debug_select_variant",1)
@@ -198,6 +199,23 @@ func _assert_staged_peel_survived_settle(scene: Node, capture_name: String, evid
 		return false
 	return true
 
+func _assert_staged_crumple_survived_settle(scene: Node, capture_name: String) -> bool:
+	var label := scene.get_node("PeelLabel") as LabelVisual
+	var lifecycle = scene.get("_lifecycle")
+	if label == null or lifecycle == null:
+		push_error("CAPTURE_RED: %s missing label/lifecycle evidence contract" % capture_name)
+		quit(1)
+		return false
+	if label.visible:
+		push_error("CAPTURE_RED: %s regrew the detached receipt during crumple settle" % capture_name)
+		quit(1)
+		return false
+	if String(lifecycle.get_phase_name()) != "HELD":
+		push_error("CAPTURE_RED: %s must stage the post-detach lifecycle as HELD before crumpling" % capture_name)
+		quit(1)
+		return false
+	return true
+
 func _assert_staged_inspect_survived_settle(scene: Node, capture_name: String) -> bool:
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var residue := scene.get_node("ResidueVisual") as ResidueVisual
@@ -248,8 +266,17 @@ func _stage_inspect(scene: Node, yaw: float, residue_amount: float, integrity: f
 
 func _stage_crumple(scene: Node, amount: float) -> void:
 	var label := scene.get_node("PeelLabel") as LabelVisual
+	var lifecycle = scene.get("_lifecycle")
 	var ritual = scene.get("_ritual")
 	var crumple_visual := scene.get_node_or_null("CupCrumplePresentation")
+	# Reproduce the real post-detach state before staging the optional ritual.
+	# A bare visible=false is not stable because PeelLab._process() will apply
+	# ATTACHED again on the next settle frame and regrow the receipt on the cup.
+	if lifecycle != null:
+		lifecycle.update(1.0,true,0.0)
+		lifecycle.update(1.0,false,0.22)
+		label.set_phase(String(lifecycle.get_phase_name()))
+		label.set_detach_alpha(float(lifecycle.get_detach_alpha()))
 	label.visible = false
 	scene.call("_handle_detached_label")
 	ritual.update(0.22)
