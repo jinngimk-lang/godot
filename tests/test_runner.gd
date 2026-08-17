@@ -17,6 +17,7 @@ func _init() -> void:
 		"res://tests/test_label_visual_geometry.gd",
 		"res://tests/test_label_lifecycle.gd",
 		"res://tests/test_label_visual_v2.gd",
+		"res://tests/test_cafe_receipt_readability.gd",
 		"res://tests/test_peel_flap_arc.gd",
 		"res://tests/test_label_backing_material.gd",
 		"res://tests/test_label_print_contract.gd",
