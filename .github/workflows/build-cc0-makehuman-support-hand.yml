@@ -68,9 +68,6 @@ jobs:
               scene.frame_set(frame); bpy.context.view_layer.update()
               snapshots[action_name]={pb.name:pb.matrix.copy() for pb in arm.pose.bones}
 
-          # The source .blend is saved in Pose Mode. Normalize the active object
-          # before any edit operators and use direct selection flags rather than
-          # UI-context-sensitive object.select_all calls.
           bpy.context.view_layer.objects.active=arm
           if arm.mode!='OBJECT':
               bpy.ops.object.mode_set(mode='OBJECT')
@@ -121,9 +118,14 @@ jobs:
               principled=next((n for n in nail.node_tree.nodes if n.type=='BSDF_PRINCIPLED'),None)
               if principled and 'Roughness' in principled.inputs: principled.inputs['Roughness'].default_value=0.44
           keep.data.materials.append(nail)
+
+          # Use only existing distal-phalanx skin. Select the strongest tail of
+          # real distal weights rather than fabricating a hidden marker surface.
           distal_groups=['thumb.03.L','f_index.03.L','f_middle.03.L','f_ring.03.L','f_pinky.03.L']
           group_indices={g:keep.vertex_groups[g].index for g in distal_groups if keep.vertex_groups.get(g)}
-          nail_faces=0
+          if len(group_indices)<5:
+              raise RuntimeError('distal finger deform groups were not preserved')
+          scored=[]
           for poly in keep.data.polygons:
               best=0.0
               for group_index in group_indices.values():
@@ -135,9 +137,19 @@ jobs:
                               value=membership.weight; break
                       weights.append(value)
                   if weights: best=max(best,sum(weights)/len(weights))
-              if best>=0.82:
+              if best>0.0:
+                  scored.append((best,poly))
+          if len(scored)<10:
+              raise RuntimeError('too little real distal finger surface to derive nails')
+          score_values=sorted(score for score,_poly in scored)
+          percentile_index=max(0,min(len(score_values)-1,int(round((len(score_values)-1)*0.86))))
+          nail_threshold=max(0.10,score_values[percentile_index])
+          nail_faces=0
+          for score,poly in scored:
+              if score>=nail_threshold:
                   poly.material_index=1; nail_faces+=1
-          if nail_faces<=0: raise RuntimeError('could not identify any real distal nail-region surface')
+          if nail_faces<5:
+              raise RuntimeError('real distal nail-region selection remained too small')
 
           for old,new in RENAME.items():
               if arm.data.bones.get(old): arm.data.bones[old].name=new
@@ -185,7 +197,7 @@ jobs:
           bpy.ops.export_scene.gltf(**kwargs)
           if not os.path.exists(OUT) or os.path.getsize(OUT)<50000: raise RuntimeError('GLB export missing or implausibly small')
 
-          report={'source':SRC,'source_archive_sha256':'31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562','source_pose_frames':POSE_FRAMES,'pre_scale':PRE_SCALE,'canonical_axes':{'x':list(x_axis),'y':list(y_axis),'z':list(z_axis)},'palm_width_before_prescale':palm_width,'forearm_cutoff_before_prescale':cutoff,'mesh_vertices':len(keep.data.vertices),'mesh_polygons':len(keep.data.polygons),'nail_region_faces':nail_faces,'bones':len(arm.data.bones),'actions':action_names,'output_bytes':os.path.getsize(OUT)}
+          report={'source':SRC,'source_archive_sha256':'31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562','source_pose_frames':POSE_FRAMES,'pre_scale':PRE_SCALE,'canonical_axes':{'x':list(x_axis),'y':list(y_axis),'z':list(z_axis)},'palm_width_before_prescale':palm_width,'forearm_cutoff_before_prescale':cutoff,'mesh_vertices':len(keep.data.vertices),'mesh_polygons':len(keep.data.polygons),'nail_region_faces':nail_faces,'nail_weight_threshold':nail_threshold,'bones':len(arm.data.bones),'actions':action_names,'output_bytes':os.path.getsize(OUT)}
           with open(REPORT,'w') as f: json.dump(report,f,indent=2)
           print(json.dumps(report,indent=2))
           PY
