@@ -12,10 +12,10 @@ func _process(_delta: float) -> void:
 		if _label == null:
 			return
 	var signature := _label.get_substrate_signature()
-	var material = _label.get("_material") as StandardMaterial3D
+	var material: StandardMaterial3D = _label.get("_material") as StandardMaterial3D
 	if material == null:
 		return
-	var texture_changed := material.emission_texture != material.albedo_texture
+	var texture_changed: bool = material.emission_texture != material.albedo_texture
 	if signature == _last_signature and not texture_changed:
 		return
 	_last_signature = signature
