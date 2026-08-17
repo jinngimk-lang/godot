@@ -1,0 +1,103 @@
+name: Evaluate CC0 MakeHuman authoring rig
+
+on:
+  push:
+    branches:
+      - spike/oga-makehuman-arms-v93
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-native-rig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender virtual display
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full blender python3-numpy xvfb libegl1 libgl1
+      - name: Download CC0 native authoring source
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --retry-delay 2 -o /tmp/oga-arms.7z 'https://opengameart.org/sites/default/files/fps%20arms.7z'
+          mkdir -p /tmp/oga-arms /tmp/oga-rig-eval
+          7z x -y -o/tmp/oga-arms /tmp/oga-arms.7z >/tmp/oga-rig-eval/extract.log
+          test -s '/tmp/oga-arms/FPS ARMS RIG 1 test anim.blend'
+      - name: Inspect native controls constraints and authored motion
+        run: |
+          set -euo pipefail
+          cat > /tmp/eval_native_rig.py <<'PY'
+          import bpy, json, os
+          from mathutils import Vector
+
+          src='/tmp/oga-arms/FPS ARMS RIG 1 test anim.blend'
+          out='/tmp/oga-rig-eval'
+          bpy.ops.wm.open_mainfile(filepath=src)
+          meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
+          arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']
+          if not meshes or not arms:
+              raise RuntimeError('native blend must contain mesh + armature')
+          constraints={}
+          custom_props={}
+          for arm in arms:
+              for pb in arm.pose.bones:
+                  if pb.constraints:
+                      constraints[pb.name]=[c.type for c in pb.constraints]
+                  props=[k for k in pb.keys() if k != '_RNA_UI']
+                  if props:
+                      custom_props[pb.name]={k:pb[k] for k in props}
+          actions=[]
+          for a in bpy.data.actions:
+              actions.append({'name':a.name,'frame_range':[float(a.frame_range[0]),float(a.frame_range[1])], 'fcurves':len(a.fcurves)})
+          report={
+              'source':src,
+              'scene_frame_start':bpy.context.scene.frame_start,
+              'scene_frame_end':bpy.context.scene.frame_end,
+              'armatures':[a.name for a in arms],
+              'bones':sum(len(a.data.bones) for a in arms),
+              'pose_constraints':constraints,
+              'custom_properties':custom_props,
+              'actions':actions,
+              'mesh_objects':[o.name for o in meshes],
+              'vertices':sum(len(o.data.vertices) for o in meshes),
+              'polygons':sum(len(o.data.polygons) for o in meshes),
+              'images':[{'name':i.name,'filepath':i.filepath} for i in bpy.data.images if i.name!='Render Result'],
+          }
+          with open(out+'/native-rig-report.json','w') as f: json.dump(report,f,indent=2,default=str)
+          with open(out+'/native-rig-report.txt','w') as f:
+              f.write(json.dumps(report,indent=2,default=str))
+
+          scene=bpy.context.scene
+          scene.render.engine='BLENDER_WORKBENCH'
+          scene.render.resolution_x=900; scene.render.resolution_y=600; scene.render.resolution_percentage=100
+          scene.render.image_settings.file_format='PNG'
+          scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'; scene.display.shading.show_shadows=True; scene.display.shading.show_cavity=True
+
+          corners=[o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
+          mins=Vector((min(c.x for c in corners),min(c.y for c in corners),min(c.z for c in corners)))
+          maxs=Vector((max(c.x for c in corners),max(c.y for c in corners),max(c.z for c in corners)))
+          center=(mins+maxs)*0.5; radius=max((maxs-mins).length*0.52,0.5)
+          camd=bpy.data.cameras.new('EvalCamera'); cam=bpy.data.objects.new('EvalCamera',camd); bpy.context.collection.objects.link(cam); scene.camera=cam; camd.lens=58
+          direction=Vector((0.55,-1.0,0.25)); direction.normalize(); cam.location=center+direction*(radius*2.2)
+          cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
+
+          start=int(scene.frame_start); end=int(scene.frame_end)
+          frames=sorted(set([start, start+(end-start)//4, start+(end-start)//2, start+3*(end-start)//4, end]))
+          for frame in frames:
+              scene.frame_set(frame)
+              scene.render.filepath=f'{out}/anim_{frame:04d}.png'
+              bpy.ops.render.render(write_still=True)
+          bpy.ops.export_scene.gltf(filepath=out+'/native-authoring-source.glb', export_format='GLB', export_animations=True)
+          PY
+          xvfb-run -a blender -b --python-exit-code 1 --python /tmp/eval_native_rig.py 2>&1 | tee /tmp/oga-rig-eval/blender.log
+          test -s /tmp/oga-rig-eval/native-rig-report.json
+          test -s /tmp/oga-rig-eval/native-authoring-source.glb
+          test "$(find /tmp/oga-rig-eval -name 'anim_*.png' -size +0c | wc -l)" -ge 5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oga-cc0-native-rig-eval
+          path: /tmp/oga-rig-eval
+          if-no-files-found: error
