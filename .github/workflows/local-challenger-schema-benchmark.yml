@@ -1,0 +1,74 @@
+name: Local Challenger Schema Benchmark
+
+on:
+  push:
+    branches:
+      - fix/challenger-schema-fast-v74
+    paths:
+      - .github/workflows/local-challenger-schema-benchmark.yml
+      - tools/build_local_challenger_packet.sh
+      - tools/extract_local_challenger_json.py
+      - tools/validate_local_challenger_verdict.sh
+
+permissions:
+  contents: read
+
+jobs:
+  qwen3b-schema-real-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build the real fast-batch packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          git fetch origin feat/reference-convergence-fast-batch-v71:refs/remotes/origin/fast-batch-v71
+          TASK_ID_VALUE=88 PR_NUMBER_VALUE=88 EXPECTED_HEAD_VALUE=d12c77780ae7f74d98e8526e65efc3928e79b380 ROUND_VALUE=benchmark \
+            bash tools/build_local_challenger_packet.sh origin/main refs/remotes/origin/fast-batch-v71 /tmp/review-packet.txt
+          test "$(wc -c < /tmp/review-packet.txt)" -lt 42000
+          # The builder puts bounded exact diffs for every changed file before
+          # HEAD excerpts, so this compact model window still sees every file's
+          # exact changed evidence instead of a prefix of one giant raw diff.
+          head -c 18000 /tmp/review-packet.txt > /tmp/model-packet.txt
+          grep -Fq -- '--- EXACT DIFF: scripts/peel/label_visual.gd ---' /tmp/model-packet.txt
+          grep -Fq -- '--- EXACT DIFF: scripts/presentation/product_presentation.gd ---' /tmp/model-packet.txt
+          grep -Fq -- '--- EXACT DIFF: tests/test_product_presentation.gd ---' /tmp/model-packet.txt
+
+      - name: Install Ollama and pull compact reviewer
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for _ in {1..50}; do ollama list >/dev/null 2>&1 && break; sleep 1; done
+          ollama pull qwen2.5-coder:3b
+
+      - name: Review real batch with schema-constrained JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          packet="$(cat /tmp/model-packet.txt)"
+          prompt="$(cat <<'PROMPT'
+          You are an independent code-review Challenger. The exact packet below is the ONLY source of truth. Try to falsify the candidate. Check changed-path boundaries, reset/scene-switch cleanup, presentation-vs-gameplay authority, coordinate-space errors, capture/test false positives, and whether tests actually exercise claims. Never invent code or symbols. Do not output replacement code.
+
+          Return one JSON object matching the supplied schema. Use verdict NEEDS_FIX only when one concrete reproducible defect is proven by a contiguous 16-240 character verbatim quote from the packet. Otherwise use VERIFIED with defect/min_test NONE and evidence_anchor NO_CONCRETE_DEFECT.
+          PROMPT
+          )"
+          schema='{"type":"object","properties":{"verdict":{"type":"string","enum":["VERIFIED","NEEDS_FIX"]},"defect":{"type":"string"},"min_test":{"type":"string"},"evidence":{"type":"string"},"evidence_anchor":{"type":"string"}},"required":["verdict","defect","min_test","evidence","evidence_anchor"],"additionalProperties":false}'
+          jq -n --arg prompt "$prompt\n\nEXACT PACKET:\n$packet" --argjson schema "$schema" \
+            '{model:"qwen2.5-coder:3b",stream:false,prompt:$prompt,format:$schema,options:{temperature:0,num_predict:260,num_ctx:8192}}' > /tmp/request.json
+          start="$(date +%s)"
+          curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/request.json > /tmp/response.json
+          end="$(date +%s)"
+          echo "SCHEMA_REVIEW_SECONDS=$((end-start))"
+          jq -er '.response' /tmp/response.json | tee /tmp/analysis.json
+          python3 tools/extract_local_challenger_json.py /tmp/analysis.json /tmp/verdict.json
+          bash tools/validate_local_challenger_verdict.sh /tmp/verdict.json /tmp/review-packet.txt
+          jq -e '.verdict == "VERIFIED" or .verdict == "NEEDS_FIX"' /tmp/verdict.json >/dev/null
+          cat /tmp/verdict.json
