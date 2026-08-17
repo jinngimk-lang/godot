@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Parse the local Challenger's strict five-line final report into JSON.
+"""Parse the local Challenger's small labelled final report into JSON.
 
-The small local model may reason in prose, but the acceptance boundary is
-fully deterministic: exactly one final protocol block, then the existing
-packet-grounding validator decides whether a NEEDS_FIX claim is supported.
+The model may reason in prose and may add harmless Markdown decoration or one
+trailing sentence. Acceptance remains deterministic: each protocol field must
+appear exactly once, then the existing exact-packet validator decides whether a
+NEEDS_FIX claim is grounded. Duplicate/conflicting fields still fail closed.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 import pathlib
 import re
 import sys
+from typing import NoReturn
 
 FIELDS = (
     "PROVISIONAL_VERDICT",
@@ -21,8 +23,14 @@ FIELDS = (
     "EVIDENCE_ANCHOR",
 )
 
+# Accept the common harmless formats a 3B model emits despite a plain-text
+# protocol request: `FIELD: value`, `- FIELD: value`, or `**FIELD:** value`.
+FIELD_RE = re.compile(
+    r"^\s*(?:[-*+]\s+)?(?:\*\*)?(PROVISIONAL_VERDICT|DEFECT|MIN_TEST|EVIDENCE|EVIDENCE_ANCHOR)(?:\*\*)?\s*:\s*(.*)\s*$"
+)
 
-def fail(message: str, code: int = 4) -> "NoReturn":
+
+def fail(message: str, code: int = 4) -> NoReturn:
     print(f"challenger report parse failed: {message}", file=sys.stderr)
     raise SystemExit(code)
 
@@ -45,37 +53,25 @@ def main() -> None:
     source = pathlib.Path(sys.argv[1])
     output = pathlib.Path(sys.argv[2])
     text = source.read_text(encoding="utf-8", errors="replace")
-    lines = [line.rstrip("\r\n") for line in text.splitlines()]
-    nonempty = [i for i, line in enumerate(lines) if line.strip()]
-    if not nonempty:
+    if not text.strip():
         fail("empty model response")
 
-    verdict_indices = [
-        i for i, line in enumerate(lines)
-        if line.startswith("PROVISIONAL_VERDICT:")
-    ]
-    if len(verdict_indices) != 1:
-        fail(f"expected exactly one PROVISIONAL_VERDICT line, got {len(verdict_indices)}")
-
-    start = verdict_indices[0]
-    # The protocol is explicitly a final block. Reject a verdict embedded in
-    # middle-of-analysis prose because that makes later contradictory prose
-    # impossible to reason about deterministically.
-    trailing_nonempty = [i for i in nonempty if i >= start]
-    if len(trailing_nonempty) != len(FIELDS):
-        fail("final protocol must contain exactly five non-empty lines and nothing after it")
-
-    values: dict[str, str] = {}
-    for expected, line_index in zip(FIELDS, trailing_nonempty):
-        line = lines[line_index]
-        prefix = expected + ":"
-        if not line.startswith(prefix):
-            fail(f"expected final field {expected}, got: {line[:120]}")
-        value = line[len(prefix):].strip()
+    found: dict[str, list[str]] = {field: [] for field in FIELDS}
+    for raw_line in text.splitlines():
+        match = FIELD_RE.match(raw_line)
+        if not match:
+            continue
+        field, value = match.group(1), match.group(2).strip()
         if not value:
-            fail(f"empty final field {expected}")
-        values[expected] = value
+            fail(f"empty final field {field}")
+        found[field].append(value)
 
+    for field in FIELDS:
+        count = len(found[field])
+        if count != 1:
+            fail(f"expected exactly one {field} line, got {count}")
+
+    values = {field: found[field][0] for field in FIELDS}
     verdict = values["PROVISIONAL_VERDICT"]
     if verdict not in {"VERIFIED", "NEEDS_FIX"}:
         fail(f"unsupported verdict {verdict!r}")
@@ -113,7 +109,10 @@ def main() -> None:
         "evidence": evidence,
         "evidence_anchor": anchor,
     }
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":
