@@ -15,10 +15,29 @@ var _residue_amount: float = 0.0
 var _integrity: float = 1.0
 var _progress: float = 0.0
 var _fiber_strength: float = 0.0
+var _adhesive_trace_profile: float = 0.14
+var _adhesive_trace_amount: float = 0.0
+var _adhesive_tint: Color = Color(0.80,0.75,0.60)
+var _fiber_tint: Color = Color(0.92,0.87,0.78)
+var _fiber_gain: float = 1.0
+var _substrate := "thermal_paper"
 
 func _ready() -> void:
 	mesh = _immediate
 	_ensure_materials()
+
+func apply_profile(profile: Dictionary) -> void:
+	_substrate = String(profile.get("substrate",_substrate))
+	_adhesive_trace_profile = clampf(float(profile.get("adhesive_trace",_adhesive_trace_profile)),0.0,0.40)
+	_fiber_gain = clampf(float(profile.get("fiber_gain",_fiber_gain)),0.45,1.60)
+	var adhesive_value = profile.get("adhesive_tint",_adhesive_tint)
+	if adhesive_value is Color:
+		_adhesive_tint = adhesive_value
+	var fiber_value = profile.get("fiber_tint",_fiber_tint)
+	if fiber_value is Color:
+		_fiber_tint = fiber_value
+	_recompute_semantics()
+	_rebuild()
 
 func configure(bottom_radius: float, top_radius: float, body_height: float, body_center_y: float, label_width: float, label_height: float, label_y: float = 0.68) -> void:
 	_bottom_radius = maxf(bottom_radius,0.02)
@@ -34,17 +53,39 @@ func set_residue(progress: float, residue: float, integrity: float) -> void:
 	_progress = clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
 	_residue_amount = clampf(residue if is_finite(residue) else 0.0,0.0,1.0)
 	_integrity = clampf(integrity if is_finite(integrity) else 1.0,0.0,1.0)
-	_fiber_strength = clampf(_residue_amount*0.45+(1.0-_integrity)*0.75,0.0,1.0)
+	_recompute_semantics()
 	_rebuild()
+
+func _recompute_semantics() -> void:
+	if _progress <= 0.002:
+		_adhesive_trace_amount = 0.0
+		_fiber_strength = 0.0
+		return
+	# Even a careful peel separates a pressure-sensitive glue contact layer from
+	# the vessel. Damage residue is an additional failure mode, not the only way
+	# glue becomes visible. Ramp the clean trace with exposed area so a tiny lift
+	# stays subtle and mid-peel inspection reads as tack rather than paint.
+	var reveal := 0.35 + 0.65 * sqrt(_progress)
+	_adhesive_trace_amount = clampf(_adhesive_trace_profile*reveal + _residue_amount*0.30,0.0,0.68)
+	if _residue_amount <= 0.002 and _integrity >= 0.998:
+		_fiber_strength = 0.0
+	else:
+		_fiber_strength = clampf((_residue_amount*0.45+(1.0-_integrity)*0.75)*_fiber_gain,0.0,1.0)
 
 func get_residue_amount() -> float:
 	return _residue_amount
 
+func get_adhesive_trace_amount() -> float:
+	return _adhesive_trace_amount
+
 func get_fiber_strength() -> float:
 	return _fiber_strength
 
+func has_adhesive_trace() -> bool:
+	return _adhesive_trace_amount > 0.02 and _progress > 0.002 and _immediate.get_surface_count() >= 1
+
 func has_layered_residue() -> bool:
-	return _residue_amount > 0.002 and _progress > 0.002 and _immediate.get_surface_count() >= 2
+	return _residue_amount > 0.002 and _fiber_strength > 0.02 and _progress > 0.002 and _immediate.get_surface_count() >= 2
 
 func set_inspection_yaw(yaw: float) -> void:
 	rotation.y = yaw if is_finite(yaw) else 0.0
@@ -52,9 +93,9 @@ func set_inspection_yaw(yaw: float) -> void:
 func _ensure_materials() -> void:
 	_adhesive_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_adhesive_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_adhesive_material.roughness = 0.36
+	_adhesive_material.roughness = 0.30
 	_adhesive_material.metallic = 0.0
-	_adhesive_material.metallic_specular = 0.46
+	_adhesive_material.metallic_specular = 0.58
 	_adhesive_material.render_priority = 2
 
 	_fiber_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -68,22 +109,23 @@ func _rebuild() -> void:
 	if mesh != _immediate:
 		mesh = _immediate
 	_immediate.clear_surfaces()
-	if _residue_amount <= 0.002 or _progress <= 0.002:
+	if _adhesive_trace_amount <= 0.02 or _progress <= 0.002:
 		return
 	_ensure_materials()
 
-	var adhesive_alpha := clampf(0.14+_residue_amount*0.42,0.14,0.50)
-	_adhesive_material.albedo_color = Color(0.76,0.70,0.56,adhesive_alpha)
-	var fiber_alpha := clampf(0.64+_fiber_strength*0.28,0.64,0.90)
-	_fiber_material.albedo_color = Color(0.92,0.87,0.78,fiber_alpha)
+	var adhesive_alpha := clampf(0.10+_adhesive_trace_amount*0.72+_residue_amount*0.16,0.10,0.56)
+	_adhesive_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,adhesive_alpha)
+	var fiber_alpha := clampf(0.64+_fiber_strength*0.28,0.64,0.92)
+	_fiber_material.albedo_color = Color(_fiber_tint.r,_fiber_tint.g,_fiber_tint.b,fiber_alpha)
 
 	_draw_adhesive_layer()
-	_draw_fiber_layer()
+	if _fiber_strength > 0.02:
+		_draw_fiber_layer()
 
 func _draw_adhesive_layer() -> void:
 	var segments := 40
 	var peeled_u := clampf(_progress,0.0,1.0)
-	var density := clampf(0.32+_residue_amount*1.15,0.32,0.96)
+	var density := clampf(0.44+_adhesive_trace_amount*0.78+_residue_amount*0.36,0.44,0.98)
 	var started := false
 	for i in range(segments):
 		var u0 := float(i)/float(segments)
@@ -96,11 +138,13 @@ func _draw_adhesive_layer() -> void:
 		if not started:
 			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
 			started = true
-		var center_offset := sin(float(i)*1.43+0.25)*_label_height*0.16
-		var half_height := _label_height*(0.08+0.09*(1.0-signal_value)+0.04*_residue_amount)
+		# Glue print should read as broad irregular contact islands, with a few
+		# thicker tack streaks where damage residue accumulates.
+		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.10+0.08*_residue_amount)
+		var half_height := _label_height*(0.055+0.085*(1.0-signal_value)+0.055*_adhesive_trace_amount+0.035*_residue_amount)
 		var y0_top := _label_y+center_offset+half_height
 		var y0_bottom := _label_y+center_offset-half_height
-		var next_offset := sin(float(i+1)*1.43+0.25)*_label_height*0.16
+		var next_offset := sin(float(i+1)*1.43+0.25)*_label_height*(0.10+0.08*_residue_amount)
 		var next_half := half_height*(0.82+0.22*_signal(i+1,9))
 		var y1_top := _label_y+next_offset+next_half
 		var y1_bottom := _label_y+next_offset-next_half
@@ -109,12 +153,10 @@ func _draw_adhesive_layer() -> void:
 		_immediate.surface_end()
 
 func _draw_fiber_layer() -> void:
-	# Torn backing should read as a handful of broad paper islands, not a picket
-	# fence of narrow vertical shards. Fourteen broad cells preserve deterministic
-	# variation while keeping each surviving fragment wider than it is tall.
+	# Torn backing reads as a handful of broad paper islands, not a picket fence.
 	var segments := 14
 	var peeled_u := clampf(_progress,0.0,1.0)
-	var density := clampf(0.22+_fiber_strength*0.62,0.22,0.82)
+	var density := clampf(0.18+_fiber_strength*0.68,0.18,0.86)
 	var started := false
 	for i in range(segments):
 		var u0 := float(i)/float(segments)
