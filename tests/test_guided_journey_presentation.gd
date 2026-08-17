@@ -24,6 +24,14 @@ func run() -> Array[String]:
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
 	root.add_child(layer)
+	var reward := Label.new()
+	reward.name = "Reward"
+	reward.text = "CLEAN RELEASE\nnext scene unlocked\noptional squeeze • continue when ready"
+	layer.add_child(reward)
+	var continue_button := Button.new()
+	continue_button.name = "Continue"
+	continue_button.text = "Continue to Bar"
+	layer.add_child(continue_button)
 	var guide = script.new()
 	root.add_child(guide)
 	guide._process(0.0)
@@ -43,6 +51,17 @@ func run() -> Array[String]:
 			failures.append("GUIDE_RED: journey rail missing scene button %d" % (i+1))
 		elif not button.text.contains(expected_names[i]):
 			failures.append("GUIDE_RED: scene button %d must identify %s" % [i+1, expected_names[i]])
+
+	if reward.get_theme_font_size("font_size") > 12:
+		failures.append("GUIDE_RED: completion feedback must stay visually quiet instead of large center-screen reward copy")
+	if reward.position.y >= 200.0 or reward.size.y > 30.0:
+		failures.append("GUIDE_RED: completion feedback must stay compact near the guide and clear of the bottom journey rail")
+	if reward.text.contains("\n"):
+		failures.append("GUIDE_RED: completion feedback must collapse to one line when JourneyGuide owns the next action")
+	if continue_button.anchor_left != 0.5 or continue_button.anchor_top != 1.0:
+		failures.append("GUIDE_RED: Continue should be anchored beside the bottom JourneyRail instead of floating at a fixed screen corner")
+	if continue_button.offset_left < 294.0 or continue_button.offset_top > -50.0:
+		failures.append("GUIDE_RED: Continue must sit directly beside the rail without overlapping its three scene controls")
 
 	guide.set_state(0, "PEEL", "crumple", 0.18, false)
 	if guide.get_active_scene_index() != 0:
