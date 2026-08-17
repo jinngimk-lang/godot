@@ -21,6 +21,7 @@ const VARIANTS := [
 		"label_profile":{
 			"substrate":"thermal_paper",
 			"roughness":0.94,
+			"front_fill":0.42,
 			"thickness_scale":0.92,
 			"fiber_scale":0.82,
 			"edge_tint":Color(0.78,0.74,0.64),
@@ -59,6 +60,7 @@ const VARIANTS := [
 		"label_profile":{
 			"substrate":"uncoated_fiber",
 			"roughness":0.88,
+			"front_fill":0.0,
 			"thickness_scale":1.22,
 			"fiber_scale":1.35,
 			"edge_tint":Color(0.62,0.48,0.32),
@@ -97,6 +99,7 @@ const VARIANTS := [
 		"label_profile":{
 			"substrate":"coated_citrus",
 			"roughness":0.66,
+			"front_fill":0.0,
 			"thickness_scale":0.72,
 			"fiber_scale":0.58,
 			"edge_tint":Color(0.82,0.86,0.72),
