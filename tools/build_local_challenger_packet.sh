@@ -9,12 +9,60 @@ PR_NUMBER_VALUE="${PR_NUMBER_VALUE:-unknown}"
 EXPECTED_HEAD_VALUE="${EXPECTED_HEAD_VALUE:-$HEAD_REF}"
 ROUND_VALUE="${ROUND_VALUE:-unknown}"
 MAX_PACKET_BYTES=42000
-GENERIC_EXCERPT_BYTES=3200
+EXACT_DIFF_TOTAL_BYTES=12000
+GENERIC_EXCERPT_TOTAL_BYTES=18000
+MAX_DIFF_PER_FILE_BYTES=3600
+MAX_EXCERPT_PER_FILE_BYTES=3200
 
 changed_paths="$(git diff --name-only "$BASE_REF...$HEAD_REF")"
 
 show_file() {
   git show "$HEAD_REF:$1"
+}
+
+nonempty_line_count() {
+  local text="$1"
+  local count
+  count="$(printf '%s\n' "$text" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
+  printf '%s\n' "${count:-0}"
+}
+
+bounded_bytes() {
+  local path="$1"
+  local limit="$2"
+  if [ "$limit" -le 0 ]; then
+    return 0
+  fi
+  if [ "$(wc -c < "$path")" -le "$limit" ]; then
+    cat "$path"
+  else
+    head -c "$limit" "$path"
+    printf '\n[bounded evidence excerpt truncated at %s bytes]\n' "$limit"
+  fi
+}
+
+append_bounded_exact_diffs() {
+  local changed_count per_file path tmp
+  changed_count="$(nonempty_line_count "$changed_paths")"
+  [ "$changed_count" -gt 0 ] || return 0
+  per_file=$((EXACT_DIFF_TOTAL_BYTES / changed_count))
+  if [ "$per_file" -gt "$MAX_DIFF_PER_FILE_BYTES" ]; then
+    per_file="$MAX_DIFF_PER_FILE_BYTES"
+  fi
+  if [ "$per_file" -lt 500 ]; then
+    per_file=500
+  fi
+
+  echo '=== EXACT PR DIFF (BOUNDED PER CHANGED FILE) ===' >> "$OUT"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    echo "--- EXACT DIFF: $path ---" >> "$OUT"
+    tmp="$(mktemp)"
+    git diff --unified=8 "$BASE_REF...$HEAD_REF" -- "$path" > "$tmp"
+    bounded_bytes "$tmp" "$per_file" >> "$OUT"
+    rm -f "$tmp"
+    echo >> "$OUT"
+  done <<< "$changed_paths"
 }
 
 append_header() {
@@ -25,11 +73,10 @@ append_header() {
     echo "ROUND=$ROUND_VALUE"
     echo '=== CHANGE STAT ==='
     git diff --stat "$BASE_REF...$HEAD_REF"
-    echo '=== EXACT PR DIFF (FOCUSED CONTEXT) ==='
-    git diff --unified=24 "$BASE_REF...$HEAD_REF"
     echo '=== CHANGED PATHS ==='
     printf '%s\n' "$changed_paths"
   } > "$OUT"
+  append_bounded_exact_diffs
 }
 
 append_hud_contracts() {
@@ -71,25 +118,30 @@ append_hand_contracts() {
 }
 
 append_generic_contracts() {
-  {
-    echo '=== CHANGED PRODUCTION/TEST FILE EXCERPTS ==='
-    while IFS= read -r path; do
-      [ -n "$path" ] || continue
-      case "$path" in
-        scripts/*.gd|scripts/**/*.gd|tests/*.gd|tests/**/*.gd)
-          if git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
-            echo "--- $path ---"
-            # `head -c` intentionally closes the pipe once the evidence budget
-            # is reached. Under `set -o pipefail`, git-show then receives
-            # SIGPIPE (141), so explicitly accept that expected bounded-read
-            # termination while still retaining evidence from every file.
-            show_file "$path" | head -c "$GENERIC_EXCERPT_BYTES" || true
-            echo
-          fi
-          ;;
-      esac
-    done <<< "$changed_paths"
-  } >> "$OUT"
+  local code_paths code_count per_file path tmp
+  code_paths="$(printf '%s\n' "$changed_paths" | grep -E '^(scripts|tests)/.*\.gd$' || true)"
+  code_count="$(nonempty_line_count "$code_paths")"
+  [ "$code_count" -gt 0 ] || return 0
+  per_file=$((GENERIC_EXCERPT_TOTAL_BYTES / code_count))
+  if [ "$per_file" -gt "$MAX_EXCERPT_PER_FILE_BYTES" ]; then
+    per_file="$MAX_EXCERPT_PER_FILE_BYTES"
+  fi
+  if [ "$per_file" -lt 500 ]; then
+    per_file=500
+  fi
+
+  echo '=== CHANGED PRODUCTION/TEST HEAD EXCERPTS ===' >> "$OUT"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if git cat-file -e "$HEAD_REF:$path" 2>/dev/null; then
+      echo "--- HEAD EXCERPT: $path ---" >> "$OUT"
+      tmp="$(mktemp)"
+      show_file "$path" > "$tmp"
+      bounded_bytes "$tmp" "$per_file" >> "$OUT"
+      rm -f "$tmp"
+      echo >> "$OUT"
+    fi
+  done <<< "$code_paths"
 }
 
 append_header
