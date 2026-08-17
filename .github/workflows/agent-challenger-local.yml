@@ -119,38 +119,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          jq -n \
-            --arg analysis "$(head -c 12000 /tmp/review-analysis.txt)" \
-            --arg context "$(git diff --stat origin/main...HEAD; git diff --name-only origin/main...HEAD)" \
-            --arg packet "$(head -c 26000 /tmp/review-packet.txt)" \
-            '{
-              model:"qwen2.5-coder:3b",
-              stream:false,
-              prompt:("Normalize this independent adversarial review into a verdict. Do not invent a defect unsupported by the analysis or exact packet. If the analysis identifies a concrete reproducible defect, verdict must be NEEDS_FIX only when the packet contains direct evidence for it. For NEEDS_FIX, evidence_anchor MUST be a contiguous 16-240 character verbatim quote from the packet that directly demonstrates the claimed defect; do not use section headings, unrelated pre-existing code, or a quote that contradicts the claim. If no such direct anchor exists, return VERIFIED rather than inventing a defect. For VERIFIED, set evidence_anchor to NO_CONCRETE_DEFECT. Return only the requested JSON object; no prose and no Markdown fence. Context:\n" + $context + "\nAnalysis:\n" + $analysis + "\nExact packet excerpt:\n" + $packet),
-              format:{
-                type:"object",
-                properties:{
-                  verdict:{type:"string",enum:["VERIFIED","NEEDS_FIX"]},
-                  defect:{type:"string"},
-                  min_test:{type:"string"},
-                  evidence:{type:"string"},
-                  evidence_anchor:{type:"string"}
-                },
-                required:["verdict","defect","min_test","evidence","evidence_anchor"],
-                additionalProperties:false
-              }
-            }' > /tmp/normalize-request.json
-
-          curl -fsS http://127.0.0.1:11434/api/generate \
-            -H 'Content-Type: application/json' \
-            --data-binary @/tmp/normalize-request.json > /tmp/normalize-response.json
-
-          response="$(jq -er '.response' /tmp/normalize-response.json)"
-          printf '%s' "$response" > /tmp/verdict-response.txt
+          # Normalization/grounding logic belongs to current main so verifier
+          # fixes can review an unchanged older product candidate safely.
           git show origin/main:tools/extract_local_challenger_json.py > /tmp/extract-local-challenger-json.py
-          python3 /tmp/extract-local-challenger-json.py /tmp/verdict-response.txt /tmp/verdict.json
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
-          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
+          git show origin/main:tools/should_retry_local_challenger.sh > /tmp/should-retry-local-challenger.sh
+          git show origin/main:tools/normalize_local_challenger_verdict.sh > /tmp/normalize-local-challenger-verdict.sh
+          chmod +x /tmp/validate-local-challenger-verdict.sh /tmp/should-retry-local-challenger.sh /tmp/normalize-local-challenger-verdict.sh
+          EXTRACTOR=/tmp/extract-local-challenger-json.py \
+          VALIDATOR=/tmp/validate-local-challenger-verdict.sh \
+          RETRY_CLASSIFIER=/tmp/should-retry-local-challenger.sh \
+            bash /tmp/normalize-local-challenger-verdict.sh \
+              /tmp/review-analysis.txt \
+              /tmp/review-packet.txt \
+              /tmp/verdict.json
+
           verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
           defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
           min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
