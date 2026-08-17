@@ -56,6 +56,23 @@ func run() -> Array[String]:
 				var mouth_mesh := mouth.mesh as CylinderMesh
 				if mouth_mesh.cap_top or mouth_mesh.cap_bottom:
 					failures.append("RED: %s BottleMouthRim must stay open instead of drawing a cyan/opaque cap disk" % kind)
+			if kind == "clear_bottle":
+				var market_cap := product.get_node_or_null("MarketGreenCap") as MeshInstance3D
+				if market_cap == null:
+					failures.append("RED: market clear bottle must carry the reference-defining green cap")
+				else:
+					if not (market_cap.mesh is CylinderMesh):
+						failures.append("RED: market green cap must use a cylindrical screw-cap silhouette")
+					if not (market_cap.material_override is StandardMaterial3D):
+						failures.append("RED: market green cap needs a bounded opaque material")
+					else:
+						var cap_mat := market_cap.material_override as StandardMaterial3D
+						var cap_color := cap_mat.albedo_color
+						if cap_color.g < 0.34 or cap_color.g < cap_color.r*1.35 or cap_color.g < cap_color.b*1.12:
+							failures.append("RED: market cap must read green at thumbnail scale; color=%s" % cap_color)
+			else:
+				if product.get_node_or_null("MarketGreenCap") != null:
+					failures.append("RED: amber bar bottle must not inherit the market green cap")
 			var edge := product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
 			if edge == null:
 				failures.append("RED: %s must expose a continuous BottleEdgeFresnel shell" % kind)
