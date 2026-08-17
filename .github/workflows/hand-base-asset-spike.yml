@@ -1,0 +1,37 @@
+name: Hand Base Asset Spike
+
+on:
+  push:
+    branches:
+      - diag/hand-surface-quality-v88
+    paths:
+      - .github/workflows/hand-base-asset-spike.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-official-blender-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download official Blender Human Base Meshes bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://download.blender.org/demo/bundles/bundles-3.6/human-base-meshes-bundle-v1.0.0.zip'
+          curl --fail --location --retry 3 --retry-delay 2 "$url" -o human-base-meshes-bundle-v1.0.0.zip
+          sha256sum human-base-meshes-bundle-v1.0.0.zip | tee bundle.sha256
+          unzip -l human-base-meshes-bundle-v1.0.0.zip | tee bundle-manifest.txt
+          test -s human-base-meshes-bundle-v1.0.0.zip
+      - name: Upload inspected upstream bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-human-base-meshes-upstream
+          path: |
+            human-base-meshes-bundle-v1.0.0.zip
+            bundle.sha256
+            bundle-manifest.txt
+          if-no-files-found: error
+          retention-days: 7
