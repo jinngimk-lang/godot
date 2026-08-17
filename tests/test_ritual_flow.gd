@@ -67,6 +67,14 @@ func run() -> Array[String]:
 	if settle_skip.consume_reward_event():
 		failures.append("settle skip must not fabricate a crumple reward event")
 
+	var early_squeeze = load(required).new()
+	early_squeeze.on_label_detached()
+	early_squeeze.update(0.22)
+	if not early_squeeze.begin_crumple():
+		failures.append("RED: explicit squeeze intent during PEEL_SETTLE must enter optional crumple without a timer lockout")
+	if early_squeeze.get_phase_name() != "CRUMPLING":
+		failures.append("early explicit squeeze must expose CRUMPLING immediately")
+
 	var skip_flow = load(required).new()
 	skip_flow.on_label_detached()
 	skip_flow.update(1.0)

@@ -40,7 +40,12 @@ func update(delta: float) -> void:
 		_phase = Phase.CRUMPLE_READY
 
 func begin_crumple() -> bool:
-	if _phase != Phase.CRUMPLE_READY or _leaving_current:
+	# The calm settle is a visual invitation, not a mandatory input lockout.
+	# Explicit squeeze intent may enter the optional ritual immediately after
+	# detach, just as an explicit next request may already leave PEEL_SETTLE.
+	# With no input, update() still preserves the full 0.45 s calm beat before
+	# exposing CRUMPLE_READY.
+	if _phase not in [Phase.PEEL_SETTLE, Phase.CRUMPLE_READY] or _leaving_current:
 		return false
 	_phase = Phase.CRUMPLING
 	return true
