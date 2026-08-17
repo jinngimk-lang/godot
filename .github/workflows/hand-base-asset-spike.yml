@@ -34,8 +34,12 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y blender >/dev/null
+          # Ubuntu's Blender glTF importer imports numpy from the system Python
+          # path. Keep this dependency explicit so the comparison fails only on
+          # actual model/rig incompatibility, not runner packaging.
+          sudo apt-get install -y blender python3-numpy >/dev/null
           blender --version | head -n 2 | tee blender-version.txt
+          blender -b --python-expr 'import numpy; print("BLENDER_NUMPY=" + numpy.__version__)' 2>&1 | tee blender-numpy.txt
 
       - name: Compare official hand topology with current authored rig
         shell: bash
@@ -74,8 +78,6 @@ jobs:
           finally:
               evaluated.to_mesh_clear()
 
-          # Import the exact authored runtime asset used today. Keep both scenes
-          # in one Blender process so coordinate/bounds comparisons are factual.
           before = set(bpy.data.objects)
           bpy.ops.import_scene.gltf(filepath=str(Path('assets/models/hands/hand_left.glb').resolve()))
           imported = [o for o in bpy.data.objects if o not in before]
@@ -105,6 +107,7 @@ jobs:
             bundle.sha256
             bundle-manifest.txt
             blender-version.txt
+            blender-numpy.txt
             hand-rig-transfer-inspection.txt
             blender-inspect.log
           if-no-files-found: error
