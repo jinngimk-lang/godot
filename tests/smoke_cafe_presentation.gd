@@ -93,6 +93,27 @@ func _run() -> void:
 			if note == null or not note.text.contains("OAT"):
 				failures.append("CAFE_RED: Café receipt needs tactile order-detail copy rather than generic PICKUP")
 
+	var peel_label := scene.get_node_or_null("PeelLabel") as LabelVisual
+	if peel_label == null:
+		failures.append("CAFE_RED: missing PeelLabel for receipt readability contract")
+	elif not peel_label.has_method("get_front_fill") or not peel_label.has_method("get_front_material"):
+		failures.append("CAFE_READABILITY_RED: LabelVisual must expose bounded front-fill material state")
+	else:
+		var front_fill := float(peel_label.call("get_front_fill"))
+		if front_fill < 0.20 or front_fill > 0.65:
+			failures.append("CAFE_READABILITY_RED: Café receipt front_fill must stay in 0.20..0.65, got %.3f" % front_fill)
+		var front_material = peel_label.call("get_front_material")
+		if not (front_material is StandardMaterial3D):
+			failures.append("CAFE_READABILITY_RED: Café receipt front material must remain StandardMaterial3D")
+		else:
+			var paper := front_material as StandardMaterial3D
+			if not paper.emission_enabled:
+				failures.append("CAFE_READABILITY_RED: pale thermal paper needs bounded emission bounce")
+			if paper.emission_texture == null or paper.albedo_texture == null or paper.emission_texture != paper.albedo_texture:
+				failures.append("CAFE_READABILITY_RED: receipt print texture must mask both albedo and emission so dark ink stays dark")
+			if paper.emission_energy_multiplier < 0.20 or paper.emission_energy_multiplier > 0.65:
+				failures.append("CAFE_READABILITY_RED: receipt emission energy must remain bounded, got %.3f" % paper.emission_energy_multiplier)
+
 	var key := scene.get_node_or_null("KeyLight") as DirectionalLight3D
 	if key == null:
 		failures.append("CAFE_RED: missing KeyLight")
@@ -100,7 +121,7 @@ func _run() -> void:
 		failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
 
 	if failures.is_empty():
-		print("PASS: cafe backdrop, soft grounding, paper-cup structure and receipt print layout")
+		print("PASS: cafe backdrop, soft grounding, paper-cup structure, receipt layout and bounded paper readability")
 		scene.queue_free()
 		await process_frame
 		quit(0)
