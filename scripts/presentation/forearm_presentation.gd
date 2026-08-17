@@ -63,7 +63,7 @@ func _apply() -> void:
 		return
 	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
 	_scale_hand_preserve_pinch(parent.get_node_or_null("RightHand") as HandVisual)
-	_scale_hand_preserve_pinch(parent.get_node_or_null("LeftHand") as HandVisual)
+	_scale_support_hand_keep_root(parent.get_node_or_null("LeftHand") as HandVisual)
 	_build_for_hand("RightHand",true)
 	_build_for_hand("LeftHand",false)
 	_applied = true
@@ -81,6 +81,18 @@ func _scale_hand_preserve_pinch(hand: HandVisual) -> void:
 	var new_pinch := hand.get_pinch_world_position()
 	hand.position += old_pinch-new_pinch
 	hand.set_grip_target(old_pinch)
+
+func _scale_support_hand_keep_root(hand: HandVisual) -> void:
+	# The left hand is staged around the vessel by its HandVisual root. Its
+	# semantic contract is Cup support, not the thumb/index pinch anchor. Scale
+	# only the authored child so a valid support grasp is never translated away
+	# from the cup by peel-hand-specific anchor preservation.
+	if hand == null:
+		return
+	var authored := hand.get_node_or_null("AuthoredHand") as Node3D
+	if authored == null:
+		return
+	authored.scale = Vector3.ONE*AUTHORED_HAND_SCALE
 
 func _build_for_hand(hand_name: String, dynamic_hand: bool) -> void:
 	var parent := get_parent()
