@@ -66,11 +66,15 @@ func run() -> Array[String]:
 		failures.append("GUIDE_RED: café guide must show scene 1 / 3 and venue name")
 	if not String(guide.get_action_text()).to_lower().contains("peel"):
 		failures.append("GUIDE_RED: attached café guide must instruct peeling")
+	if rail.visible:
+		failures.append("GUIDE_RED: bottom journey rail must hide during active peel so the reference interaction frame stays visually quiet")
 
 	guide.set_state(0, "HELD", "crumple", 1.0, true)
 	var cafe_post: String = String(guide.get_action_text()).to_lower()
 	if not cafe_post.contains("squeeze") or not cafe_post.contains("continue"):
 		failures.append("GUIDE_RED: completed café must explain optional squeeze and Continue")
+	if not rail.visible:
+		failures.append("GUIDE_RED: journey rail must return after detach so touch users can navigate scenes")
 
 	guide.set_state(1, "HELD", "inspect", 1.0, true)
 	var bar_post: String = String(guide.get_action_text()).to_lower()
@@ -82,6 +86,8 @@ func run() -> Array[String]:
 	guide.set_state(2, "PEEL", "inspect", 0.0, false)
 	if guide.get_active_scene_index() != 2 or not scene_status.text.contains("3 / 3"):
 		failures.append("GUIDE_RED: market must report scene 3 / 3")
+	if not rail.visible:
+		failures.append("GUIDE_RED: journey rail must remain available before peeling starts")
 
 	var requested: Array[int] = [-1]
 	if not guide.has_signal("scene_requested"):

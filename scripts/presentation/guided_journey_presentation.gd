@@ -11,6 +11,8 @@ var _action_text := "PEEL THE LABEL"
 var _scene_status: Label
 var _action: Label
 var _buttons: Array[Button] = []
+var _rail: Panel
+var _rail_visible := true
 var _parent_connected := false
 var _reward: Label
 var _continue_button: Button
@@ -31,8 +33,9 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	var progress := clampf(peel_progress if is_finite(peel_progress) else 0.0, 0.0, 1.0)
 	var phase := phase_name.to_upper()
 	var post := post_action.to_lower()
+	var post_interaction := detached or phase in ["DETACHING", "HELD", "PEEL_SETTLE", "CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]
 
-	if detached or phase in ["DETACHING", "HELD", "PEEL_SETTLE", "CRUMPLE_READY", "CRUMPLING", "RITUAL_COMPLETE"]:
+	if post_interaction:
 		if post == "crumple":
 			_action_text = "LABEL OFF  •  OPTIONAL SQUEEZE  •  CONTINUE"
 		else:
@@ -42,6 +45,9 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	else:
 		_action_text = "PEEL THE LABEL  •  CLICK / DRAG"
 
+	# Keep the target-like peel moment visually quiet while preserving scene
+	# navigation before engagement and after detach for pointer/touch users.
+	_rail_visible = not (progress > 0.001 and not post_interaction)
 	_apply_state_to_ui()
 
 func get_active_scene_index() -> int:
@@ -124,19 +130,19 @@ func _ensure_ui() -> void:
 	_action.add_theme_color_override("font_color", Color(1.0, 0.91, 0.72, 0.96))
 	guide.add_child(_action)
 
-	var rail := Panel.new()
-	rail.name = "JourneyRail"
-	rail.anchor_left = 0.5
-	rail.anchor_top = 1.0
-	rail.anchor_right = 0.5
-	rail.anchor_bottom = 1.0
-	rail.offset_left = -294.0
-	rail.offset_top = -62.0
-	rail.offset_right = 294.0
-	rail.offset_bottom = -12.0
-	rail.mouse_filter = Control.MOUSE_FILTER_PASS
-	rail.add_theme_stylebox_override("panel", _panel_style(Color(0.014, 0.013, 0.012, 0.32), Color(1.0, 1.0, 1.0, 0.045), 9))
-	layer.add_child(rail)
+	_rail = Panel.new()
+	_rail.name = "JourneyRail"
+	_rail.anchor_left = 0.5
+	_rail.anchor_top = 1.0
+	_rail.anchor_right = 0.5
+	_rail.anchor_bottom = 1.0
+	_rail.offset_left = -294.0
+	_rail.offset_top = -62.0
+	_rail.offset_right = 294.0
+	_rail.offset_bottom = -12.0
+	_rail.mouse_filter = Control.MOUSE_FILTER_PASS
+	_rail.add_theme_stylebox_override("panel", _panel_style(Color(0.014, 0.013, 0.012, 0.32), Color(1.0, 1.0, 1.0, 0.045), 9))
+	layer.add_child(_rail)
 
 	for i in range(SCENE_NAMES.size()):
 		var button := Button.new()
@@ -155,7 +161,7 @@ func _ensure_ui() -> void:
 		button.add_theme_stylebox_override("hover", _button_style(Color(1.0, 0.83, 0.58, 0.08), Color(1.0, 0.87, 0.66, 0.18)))
 		button.add_theme_stylebox_override("pressed", _button_style(Color(0.91, 0.56, 0.22, 0.18), Color(1.0, 0.82, 0.56, 0.34)))
 		button.pressed.connect(_request_scene.bind(i))
-		rail.add_child(button)
+		_rail.add_child(button)
 		_buttons.append(button)
 
 	_built = true
@@ -201,6 +207,8 @@ func _apply_state_to_ui() -> void:
 		return
 	_scene_status.text = "SCENE %d / %d  •  %s" % [_active_scene_index + 1, SCENE_NAMES.size(), SCENE_NAMES[_active_scene_index]]
 	_action.text = _action_text
+	if _rail != null:
+		_rail.visible = _rail_visible
 	for i in range(_buttons.size()):
 		_buttons[i].button_pressed = i == _active_scene_index
 
