@@ -10,6 +10,10 @@ func run() -> Array[String]:
 	visual.label_width = 1.0
 	visual.label_height = 0.36
 	visual.segments = 24
+	# This focused unit fixture is not mounted into SceneTree, so initialize the
+	# MeshInstance3D exactly once before asserting runtime mesh surfaces. The
+	# product path reaches the same code via SceneTree _ready().
+	visual._ready()
 	for method in ["get_backing_material", "get_backing_signature", "has_distinct_peeled_backing"]:
 		if not visual.has_method(method):
 			failures.append("LABEL_BACKING_RED: LabelVisual missing %s" % method)
@@ -68,8 +72,9 @@ func run() -> Array[String]:
 	visual.set_peel(0.52,visual.get_front_position(0.52)+Vector3(-0.70,0.08,0.48))
 	if not bool(visual.has_distinct_peeled_backing()):
 		failures.append("LABEL_BACKING_RED: a partially peeled label must build a separate visible underside surface")
-	if visual.mesh == null or visual.mesh.get_surface_count() < 4:
-		failures.append("LABEL_BACKING_RED: partial peel needs front + distinct backing + physical paper edge surfaces")
+	var surface_count := visual.mesh.get_surface_count() if visual.mesh != null else 0
+	if surface_count < 4:
+		failures.append("LABEL_BACKING_RED: partial peel needs front + distinct backing + glue-side/physical paper edge surfaces; got %d" % surface_count)
 
 	visual.free()
 	return failures
