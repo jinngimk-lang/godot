@@ -125,7 +125,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	outer.name = "BottleOuterGlass"
 	outer.mesh = outer_mesh
 	var outer_color := body_color.lightened(0.10) if amber else body_color
-	outer.material_override = _glass_mat(outer_color,source_alpha*(0.36 if amber else 0.62),roughness)
+	outer.material_override = _glass_mat(outer_color,source_alpha*(0.30 if amber else 0.62),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
 
