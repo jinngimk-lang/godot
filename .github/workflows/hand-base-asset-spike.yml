@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download official Blender Human Base Meshes bundle
         shell: bash
         run: |
@@ -35,87 +37,75 @@ jobs:
           sudo apt-get install -y blender >/dev/null
           blender --version | head -n 2 | tee blender-version.txt
 
-      - name: Inspect Realistic Hand asset topology and multires detail
+      - name: Compare official hand topology with current authored rig
         shell: bash
         run: |
           set -euo pipefail
           cat > inspect_hand.py <<'PY'
-          import bpy
+          import bpy, mathutils
+          from pathlib import Path
 
           lines = []
           lines.append(f'BLENDER_VERSION={bpy.app.version_string}')
-          hand_candidates = [obj for obj in bpy.data.objects if 'hand' in obj.name.lower()]
-          lines.append('HAND_OBJECT_NAMES=' + repr([(o.name, o.type) for o in hand_candidates]))
+          source = bpy.data.objects.get('Hand  - Realistic')
+          if source is None:
+              raise RuntimeError('official Realistic Hand object not found')
 
+          def world_bounds(obj):
+              pts = [obj.matrix_world @ mathutils.Vector(corner) for corner in obj.bound_box]
+              mins = [min(p[i] for p in pts) for i in range(3)]
+              maxs = [max(p[i] for p in pts) for i in range(3)]
+              return mins, maxs, [maxs[i]-mins[i] for i in range(3)]
+
+          lines.append('OFFICIAL name=%s base_vertices=%d base_polygons=%d bounds=%r' % (
+              source.name, len(source.data.vertices), len(source.data.polygons), world_bounds(source)))
+          for modifier in source.modifiers:
+              if modifier.type == 'MULTIRES':
+                  lines.append('OFFICIAL_MULTIRES levels=%d sculpt=%d render=%d total=%d' % (
+                      modifier.levels, modifier.sculpt_levels, modifier.render_levels, modifier.total_levels))
+                  modifier.levels = modifier.total_levels
+                  modifier.render_levels = modifier.total_levels
+          bpy.context.view_layer.update()
           depsgraph = bpy.context.evaluated_depsgraph_get()
-          for obj in hand_candidates:
-              lines.append(f'OBJECT name={obj.name} type={obj.type} parent={obj.parent.name if obj.parent else "none"}')
-              modifier_rows = []
-              for modifier in obj.modifiers:
-                  row = [modifier.name, modifier.type]
-                  if modifier.type == 'MULTIRES':
-                      row.extend([
-                          f'levels={modifier.levels}',
-                          f'sculpt_levels={modifier.sculpt_levels}',
-                          f'render_levels={modifier.render_levels}',
-                          f'total_levels={modifier.total_levels}',
-                      ])
-                  modifier_rows.append(tuple(row))
-              lines.append('  modifiers=' + repr(modifier_rows))
-              if obj.type != 'MESH':
-                  continue
-              mesh = obj.data
-              lines.append(f'  BASE vertices={len(mesh.vertices)} edges={len(mesh.edges)} polygons={len(mesh.polygons)} loops={len(mesh.loops)}')
-              lines.append(f'  uv_layers={len(mesh.uv_layers)} materials={len(mesh.materials)} vertex_groups={len(obj.vertex_groups)}')
-              lines.append(f'  smooth_polygons={sum(1 for p in mesh.polygons if p.use_smooth)}/{len(mesh.polygons)}')
+          evaluated = source.evaluated_get(depsgraph)
+          evaluated_mesh = evaluated.to_mesh()
+          try:
+              lines.append('OFFICIAL_EVAL vertices=%d polygons=%d' % (len(evaluated_mesh.vertices), len(evaluated_mesh.polygons)))
+          finally:
+              evaluated.to_mesh_clear()
 
-              original_levels = {}
-              multires = [m for m in obj.modifiers if m.type == 'MULTIRES']
-              for m in multires:
-                  original_levels[m.name] = (m.levels, m.render_levels)
+          # Import the exact authored runtime asset used today. Keep both scenes
+          # in one Blender process so coordinate/bounds comparisons are factual.
+          before = set(bpy.data.objects)
+          bpy.ops.import_scene.gltf(filepath=str(Path('assets/models/hands/hand_left.glb').resolve()))
+          imported = [o for o in bpy.data.objects if o not in before]
+          lines.append('CURRENT_IMPORTED=' + repr([(o.name,o.type) for o in imported]))
+          for obj in imported:
+              if obj.type == 'MESH':
+                  lines.append('CURRENT_MESH name=%s vertices=%d polygons=%d groups=%d bounds=%r' % (
+                      obj.name, len(obj.data.vertices), len(obj.data.polygons), len(obj.vertex_groups), world_bounds(obj)))
+                  lines.append('CURRENT_GROUPS=' + repr([g.name for g in obj.vertex_groups]))
+              elif obj.type == 'ARMATURE':
+                  lines.append('CURRENT_ARMATURE name=%s bones=%d bounds=%r' % (obj.name,len(obj.data.bones),world_bounds(obj)))
+                  lines.append('CURRENT_BONES=' + repr([(b.name, tuple(round(v,5) for v in b.head_local), tuple(round(v,5) for v in b.tail_local)) for b in obj.data.bones]))
 
-              max_level = max([m.total_levels for m in multires] or [0])
-              sample_levels = sorted(set([0, min(1,max_level), min(2,max_level), max_level]))
-              for sample_level in sample_levels:
-                  for m in multires:
-                      m.levels = sample_level
-                      m.render_levels = sample_level
-                  bpy.context.view_layer.update()
-                  evaluated = obj.evaluated_get(depsgraph)
-                  evaluated_mesh = evaluated.to_mesh()
-                  try:
-                      lines.append(
-                          f'  EVAL level={sample_level} vertices={len(evaluated_mesh.vertices)} '
-                          f'polygons={len(evaluated_mesh.polygons)} loops={len(evaluated_mesh.loops)}'
-                      )
-                  finally:
-                      evaluated.to_mesh_clear()
-
-              for m in multires:
-                  levels, render_levels = original_levels[m.name]
-                  m.levels = levels
-                  m.render_levels = render_levels
-
-          armatures = [o for o in bpy.data.objects if o.type == 'ARMATURE']
-          lines.append('ARMATURES=' + repr([(o.name, len(o.data.bones)) for o in armatures]))
-
-          with open('realistic-hand-inspection.txt', 'w', encoding='utf-8') as f:
-              f.write('\n'.join(lines) + '\n')
+          with open('hand-rig-transfer-inspection.txt','w',encoding='utf-8') as f:
+              f.write('\n'.join(lines)+'\n')
           print('\n'.join(lines))
           PY
           blender -b human_base_meshes_bundle.blend --python inspect_hand.py 2>&1 | tee blender-inspect.log
-          test -s realistic-hand-inspection.txt
-          cat realistic-hand-inspection.txt
+          test -s hand-rig-transfer-inspection.txt
+          cat hand-rig-transfer-inspection.txt
 
-      - name: Upload inspected upstream bundle evidence
+      - name: Upload hand transfer evidence
         uses: actions/upload-artifact@v4
         with:
-          name: blender-human-base-meshes-inspection
+          name: blender-hand-rig-transfer-inspection
           path: |
             bundle.sha256
             bundle-manifest.txt
             blender-version.txt
-            realistic-hand-inspection.txt
+            hand-rig-transfer-inspection.txt
             blender-inspect.log
           if-no-files-found: error
           retention-days: 7
