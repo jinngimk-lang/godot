@@ -72,7 +72,7 @@ func run() -> Array[String]:
 	visual.set_peel(0.52,visual.get_front_position(0.52)+Vector3(-0.70,0.08,0.48))
 	if not bool(visual.has_distinct_peeled_backing()):
 		failures.append("LABEL_BACKING_RED: a partially peeled label must build a separate visible underside surface")
-	var surface_count := visual.mesh.get_surface_count() if visual.mesh != null else 0
+	var surface_count: int = visual.mesh.get_surface_count() if visual.mesh != null else 0
 	if surface_count < 4:
 		failures.append("LABEL_BACKING_RED: partial peel needs front + distinct backing + glue-side/physical paper edge surfaces; got %d" % surface_count)
 
