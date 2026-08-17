@@ -49,6 +49,43 @@ func _on_crumple_changed(progress: float) -> void:
 	if _has_peel_home and _peel_hand != null:
 		_peel_hand.position = _peel_home + Vector3(peel_inward, -down, 0.0)
 
+	# The authored root choreography above establishes the ritual silhouette,
+	# but a fixed offset cannot track a deforming paper shell. Once the cup is
+	# visibly crumpling, finish each motion by translating the whole hand so its
+	# actual rendered pinch anchor lands on the nearest vertex of the current
+	# CrumpledCup ArrayMesh. This is a geometry-derived residual, not an IK or
+	# parameter search, and it leaves the authored skeleton pose untouched.
+	if safe_progress > 0.001:
+		_ground_visible_pinch_on_shell(_support_hand)
+		if _has_peel_home and _peel_hand != null:
+			_ground_visible_pinch_on_shell(_peel_hand)
+
+func _ground_visible_pinch_on_shell(hand: Node3D) -> void:
+	if _source == null or not (hand is HandVisual):
+		return
+	var shell := _source.get_node_or_null("CrumpledCup") as MeshInstance3D
+	if shell == null or not shell.visible or not (shell.mesh is ArrayMesh):
+		return
+	var mesh := shell.mesh as ArrayMesh
+	if mesh.get_surface_count() <= 0:
+		return
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	if vertices.is_empty():
+		return
+
+	var visual := hand as HandVisual
+	var pinch_world := visual.get_pinch_world_position()
+	var target_world := pinch_world
+	var best_distance_squared := INF
+	for vertex in vertices:
+		var candidate_world := shell.to_global(vertex)
+		var distance_squared := candidate_world.distance_squared_to(pinch_world)
+		if distance_squared < best_distance_squared:
+			best_distance_squared = distance_squared
+			target_world = candidate_world
+	visual.global_position += target_world - pinch_world
+
 func reset_staging() -> void:
 	if _has_support_home and _support_hand != null:
 		_support_hand.position = _support_home
