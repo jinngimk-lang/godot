@@ -25,9 +25,7 @@ func run() -> Array[String]:
 	if effective.distance_to(front) > available + 0.0001:
 		failures.append("effective grip exceeds physically peeled label length")
 
-	var peel_points: PackedVector3Array = geometry.peeling_points(
-		progress, far_grip, width, radius, label_y, offset, segments
-	)
+	var peel_points: PackedVector3Array = geometry.peeling_points(progress, far_grip, width, radius, label_y, offset, segments)
 	if peel_points.size() != segments + 1:
 		failures.append("peeling centerline should return segments + 1 points")
 	else:
@@ -68,6 +66,32 @@ func run() -> Array[String]:
 	var visual = load(visual_path).new()
 	visual.segments = segments
 	visual.label_height = 0.36
+	if not visual.has_method("apply_profile") or not visual.has_method("get_substrate_signature") or not visual.has_method("get_surface_roughness"):
+		failures.append("LABEL_IDENTITY_RED: LabelVisual needs profile-driven substrate/material identity")
+		visual.free()
+		return failures
+
+	var profiles := [
+		{"substrate":"thermal_paper","roughness":0.94,"thickness_scale":0.92,"fiber_scale":0.82,"edge_tint":Color(0.78,0.74,0.64)},
+		{"substrate":"uncoated_fiber","roughness":0.88,"thickness_scale":1.22,"fiber_scale":1.35,"edge_tint":Color(0.62,0.48,0.32)},
+		{"substrate":"coated_citrus","roughness":0.66,"thickness_scale":0.72,"fiber_scale":0.58,"edge_tint":Color(0.82,0.86,0.72)}
+	]
+	var signatures: Array[String] = []
+	var thicknesses: Array[float] = []
+	var roughnesses: Array[float] = []
+	for profile in profiles:
+		visual.apply_profile(profile)
+		signatures.append(String(visual.get_substrate_signature()))
+		thicknesses.append(float(visual.get_paper_thickness()))
+		roughnesses.append(float(visual.get_surface_roughness()))
+	if signatures[0] == signatures[1] or signatures[1] == signatures[2] or signatures[0] == signatures[2]:
+		failures.append("LABEL_IDENTITY_RED: café/bar/market substrate signatures must be distinct")
+	if not (thicknesses[1] > thicknesses[0] + 0.0005 and thicknesses[0] > thicknesses[2] + 0.0003):
+		failures.append("LABEL_IDENTITY_RED: bar fibrous label should be thickest and market coated label thinnest")
+	if roughnesses.max() - roughnesses.min() < 0.20:
+		failures.append("LABEL_IDENTITY_RED: label surface roughness needs a material scene-to-scene range")
+
+	visual.apply_profile(profiles[0])
 	var attached_edges: PackedVector2Array = visual.get_edge_offsets(0.0)
 	var peeled_edges: PackedVector2Array = visual.get_edge_offsets(progress)
 	var repeated_edges: PackedVector2Array = visual.get_edge_offsets(progress)
@@ -92,8 +116,8 @@ func run() -> Array[String]:
 		if boundary.x > -0.001 and boundary.y < 0.001:
 			failures.append("RED: peel front should narrow/notch the paper edge instead of staying rectangular")
 	var thickness := float(visual.get_paper_thickness())
-	if thickness < 0.003 or thickness > 0.007:
-		failures.append("RED: label needs a thin but visible paper sidewall; got %.4f" % thickness)
+	if thickness < 0.0025 or thickness > 0.0075:
+		failures.append("RED: label needs a thin but visible substrate sidewall; got %.4f" % thickness)
 
 	if not visual.has_method("get_torn_front_fringe"):
 		failures.append("RED: partially peeled label needs a deterministic torn-front fiber fringe")
