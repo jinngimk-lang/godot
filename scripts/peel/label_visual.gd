@@ -11,6 +11,8 @@ class_name LabelVisual
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
 var _edge_material := StandardMaterial3D.new()
+var _back_material := StandardMaterial3D.new()
+var _back_glue_material := StandardMaterial3D.new()
 var _phase_name := "ATTACHED"
 var _detach_alpha := 0.0
 var _held_direction := Vector3.LEFT
@@ -21,18 +23,143 @@ var _cup_bottom_radius := 0.0
 var _cup_top_radius := 0.0
 var _cup_height := 0.0
 var _cup_center_y := 0.0
+var _substrate := "thermal_paper"
+var _surface_roughness := 0.90
+var _thickness_scale := 1.0
+var _fiber_scale := 1.0
+var _edge_tint := Color(0.76,0.72,0.63,1.0)
+var _backing_tint := Color(0.94,0.91,0.83,1.0)
+var _backing_roughness := 0.96
+var _adhesive_tint := Color(0.84,0.78,0.62,1.0)
+var _profile_signature := ""
+var _has_backing_surface := false
 
 func _ready() -> void:
 	mesh = _mesh
 	_material.albedo_color = Color(0.97,0.955,0.90,1.0)
-	_material.roughness = 0.90
+	_material.roughness = _surface_roughness
+	_material.metallic = 0.0
+	_material.metallic_specular = 0.16
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	_edge_material.albedo_color = Color(0.76,0.72,0.63,1.0)
+	_edge_material.albedo_color = _edge_tint
 	_edge_material.roughness = 0.98
+	_edge_material.metallic = 0.0
+	_edge_material.metallic_specular = 0.08
 	_edge_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_back_material.albedo_color = _backing_tint
+	_back_material.roughness = _backing_roughness
+	_back_material.metallic = 0.0
+	_back_material.metallic_specular = 0.10
+	_back_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_back_glue_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_back_glue_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_back_glue_material.roughness = 0.18
+	_back_glue_material.metallic = 0.0
+	_back_glue_material.metallic_specular = 0.78
+	_back_glue_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,0.20)
+	_back_glue_material.render_priority = 5
+	_sync_profile_from_parent()
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
+
+func apply_profile(profile: Dictionary) -> void:
+	_set_profile_fields(profile)
+	var grip := _last_grip
+	if grip.length_squared() <= 0.000001:
+		grip = get_front_position(_last_progress)
+	if mesh != null:
+		set_peel(_last_progress,grip)
+
+func _set_profile_fields(profile: Dictionary) -> void:
+	_substrate = String(profile.get("substrate",_substrate))
+	_surface_roughness = clampf(float(profile.get("roughness",_surface_roughness)),0.35,1.0)
+	_thickness_scale = clampf(float(profile.get("thickness_scale",_thickness_scale)),0.55,1.55)
+	_fiber_scale = clampf(float(profile.get("fiber_scale",_fiber_scale)),0.45,1.60)
+	var tint_value = profile.get("edge_tint",_edge_tint)
+	if tint_value is Color:
+		_edge_tint = tint_value
+	var backing_value = profile.get("backing_tint",_default_backing_tint(_substrate))
+	if backing_value is Color:
+		_backing_tint = backing_value
+	_backing_roughness = clampf(float(profile.get("backing_roughness",_default_backing_roughness(_substrate))),0.82,1.0)
+	var adhesive_value = profile.get("adhesive_tint",_adhesive_tint)
+	if adhesive_value is Color:
+		_adhesive_tint = adhesive_value
+	_profile_signature = _profile_key(profile)
+	_material.roughness = _surface_roughness
+	_material.metallic_specular = lerpf(0.10,0.28,clampf((0.96-_surface_roughness)/0.36,0.0,1.0))
+	_edge_material.albedo_color = _edge_tint
+	_edge_material.roughness = clampf(_surface_roughness+0.08,0.0,1.0)
+	_back_material.albedo_color = _backing_tint
+	_back_material.roughness = _backing_roughness
+	_back_glue_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,0.20)
+
+func _default_backing_tint(substrate: String) -> Color:
+	match substrate:
+		"uncoated_fiber":
+			return Color(0.91,0.82,0.66,1.0)
+		"coated_citrus":
+			return Color(0.95,0.96,0.88,1.0)
+		_:
+			return Color(0.94,0.91,0.83,1.0)
+
+func _default_backing_roughness(substrate: String) -> float:
+	match substrate:
+		"uncoated_fiber": return 0.99
+		"coated_citrus": return 0.90
+		_: return 0.96
+
+func _sync_profile_from_parent() -> void:
+	if not is_inside_tree():
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var session = parent.get("_session")
+	if session == null or not session.has_method("current_variant"):
+		return
+	var variant: Dictionary = session.current_variant()
+	var profile: Dictionary = variant.get("label_profile",{})
+	if profile.is_empty():
+		return
+	var key := _profile_key(profile)
+	if key == _profile_signature:
+		return
+	_set_profile_fields(profile)
+
+func _profile_key(profile: Dictionary) -> String:
+	return "%s/%.4f/%.4f/%.4f" % [
+		String(profile.get("substrate","")),
+		float(profile.get("roughness",0.0)),
+		float(profile.get("thickness_scale",0.0)),
+		float(profile.get("fiber_scale",0.0))
+	]
+
+func get_substrate_signature() -> String:
+	return "%s/%.3f/%.3f/%.3f" % [_substrate,_surface_roughness,_thickness_scale,_fiber_scale]
+
+func get_surface_roughness() -> float:
+	return _surface_roughness
+
+func get_backing_material() -> StandardMaterial3D:
+	return _back_material
+
+func get_backing_signature() -> String:
+	return "%s/%.3f/%.3f/%.3f" % [_substrate,_backing_tint.get_luminance(),_backing_roughness,_fiber_scale]
+
+func has_distinct_peeled_backing() -> bool:
+	return _has_backing_surface
+
+func get_peel_roll_angle(u: float, progress: float) -> float:
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	var x := clampf(u if is_finite(u) else 0.0,0.0,1.0)
+	if p <= 0.025 or x >= p:
+		return 0.0
+	var free_weight := 1.0-x/maxf(p,0.0001)
+	var smooth_weight := free_weight*free_weight*(3.0-2.0*free_weight)
+	var progress_weight := clampf(p/0.18,0.0,1.0)
+	return deg_to_rad(150.0)*smooth_weight*progress_weight
 
 func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
 	_cup_bottom_radius = maxf(bottom_radius,0.001)
@@ -101,7 +228,8 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 	return LabelGeometry.peeling_points(p,desired_grip,label_width,center_radius,label_y,surface_offset,segments)
 
 func get_paper_thickness() -> float:
-	return clampf(label_height * 0.014, 0.0032, 0.0060)
+	var base := clampf(label_height * 0.014,0.0032,0.0060)
+	return clampf(base*_thickness_scale,0.0024,0.0075)
 
 func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var fringe := PackedVector2Array()
@@ -111,10 +239,10 @@ func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var fiber_count := 7
 	for i in range(fiber_count):
 		var t := float(i+1)/float(fiber_count+1)
-		var y_jitter := _edge_noise(i,41)*label_height*0.026
+		var y_jitter := _edge_noise(i,41)*label_height*0.026*_fiber_scale
 		var y_offset := lerpf(-label_height*0.42,label_height*0.42,t)+y_jitter
 		var length_noise := (_edge_noise(i,47)+1.0)*0.5
-		var length := 0.0085+length_noise*0.0115
+		var length := (0.0085+length_noise*0.0115)*_fiber_scale
 		fringe.append(Vector2(y_offset,length))
 	return fringe
 
@@ -129,15 +257,17 @@ func get_edge_offsets(progress: float) -> PackedVector2Array:
 		var boundary := exp(-(distance*distance)) * p
 		var top_noise := _edge_noise(i,3)
 		var bottom_noise := _edge_noise(i,11)
-		var amplitude := 0.0012 + 0.0058*peeled_weight + 0.0075*boundary
-		var notch_top := boundary * (0.0022 + 0.0034*absf(bottom_noise))
-		var notch_bottom := boundary * (0.0020 + 0.0032*absf(top_noise))
+		var fiber_factor := lerpf(0.80,1.16,clampf((_fiber_scale-0.45)/1.15,0.0,1.0))
+		var amplitude := (0.0012 + 0.0058*peeled_weight + 0.0075*boundary)*fiber_factor
+		var notch_top := boundary * (0.0022 + 0.0034*absf(bottom_noise))*fiber_factor
+		var notch_bottom := boundary * (0.0020 + 0.0032*absf(top_noise))*fiber_factor
 		var top_offset := clampf(top_noise*amplitude-notch_top,-0.016,0.012)
 		var bottom_offset := clampf(bottom_noise*amplitude+notch_bottom,-0.012,0.016)
 		result.append(Vector2(top_offset,bottom_offset))
 	return result
 
 func set_peel(progress: float, grip_local: Vector3) -> void:
+	_sync_profile_from_parent()
 	_last_progress = clampf(progress,0.0,1.0)
 	_last_grip = grip_local
 	var points := get_sample_points(_last_progress,grip_local)
@@ -148,20 +278,33 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 	var bottom_vertices := PackedVector3Array()
 	var top_normals := PackedVector3Array()
 	var bottom_normals := PackedVector3Array()
+	_has_backing_surface = false
 
 	_mesh.clear_surfaces()
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_material)
 	for i in range(points.size()):
 		var center := points[i]
-		var curve_normal := _normal_from_points(points,i)
+		var tangent := _tangent_from_points(points,i)
+		var curve_normal := tangent.cross(Vector3.UP).normalized()
+		if curve_normal.length_squared()<=0.000001:
+			curve_normal = Vector3.FORWARD
 		var u := float(i)/float(points.size()-1)
 		var offsets := edge_offsets[mini(i,edge_offsets.size()-1)]
 		var top_y_offset := label_height*0.5+offsets.x
 		var bottom_y_offset := -label_height*0.5+offsets.y
-		var top_vertex := center+Vector3.UP*top_y_offset
-		var bottom_vertex := center+Vector3.UP*bottom_y_offset
+		var height_axis := Vector3.UP
 		var top_normal := curve_normal
 		var bottom_normal := curve_normal
+		if not _is_attached_u(u):
+			var roll_angle := get_peel_roll_angle(u,_last_progress)
+			if absf(roll_angle)>0.000001 and tangent.length_squared()>0.000001:
+				height_axis = Vector3.UP.rotated(tangent,roll_angle).normalized()
+				var rolled_normal := tangent.cross(height_axis).normalized()
+				if rolled_normal.length_squared()>0.000001:
+					top_normal = rolled_normal
+					bottom_normal = rolled_normal
+		var top_vertex := center+height_axis*top_y_offset
+		var bottom_vertex := center+height_axis*bottom_y_offset
 		if _is_attached_u(u):
 			top_vertex = _frustum_edge_point(u,label_y+top_y_offset)
 			bottom_vertex = _frustum_edge_point(u,label_y+bottom_y_offset)
@@ -179,9 +322,56 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
 
+	_draw_peeled_backing(top_vertices,bottom_vertices,top_normals,bottom_normals,_last_progress)
 	_draw_paper_edge(top_vertices,top_normals,true)
 	_draw_paper_edge(bottom_vertices,bottom_normals,false)
 	_draw_torn_front_fringe(points,_last_progress)
+
+func _draw_peeled_backing(top_vertices: PackedVector3Array, bottom_vertices: PackedVector3Array, top_normals: PackedVector3Array, bottom_normals: PackedVector3Array, progress: float) -> void:
+	if progress <= 0.025 or top_vertices.size()<2 or bottom_vertices.size()!=top_vertices.size():
+		return
+	var last_index := clampi(int(floor(progress*float(top_vertices.size()-1))),1,top_vertices.size()-1)
+	var thickness := get_paper_thickness()
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_back_material)
+	for i in range(last_index+1):
+		var u := float(i)/float(top_vertices.size()-1)
+		var top_back := top_vertices[i]-top_normals[i]*thickness*0.96
+		var bottom_back := bottom_vertices[i]-bottom_normals[i]*thickness*0.96
+		_mesh.surface_set_normal(-top_normals[i])
+		_mesh.surface_set_uv(Vector2(u,0.0))
+		_mesh.surface_add_vertex(top_back)
+		_mesh.surface_set_normal(-bottom_normals[i])
+		_mesh.surface_set_uv(Vector2(u,1.0))
+		_mesh.surface_add_vertex(bottom_back)
+	_mesh.surface_end()
+	_has_backing_surface = true
+	_draw_backing_glue(top_vertices,bottom_vertices,top_normals,bottom_normals,last_index,thickness)
+
+func _draw_backing_glue(top_vertices: PackedVector3Array, bottom_vertices: PackedVector3Array, top_normals: PackedVector3Array, bottom_normals: PackedVector3Array, last_index: int, thickness: float) -> void:
+	if last_index < 2:
+		return
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_back_glue_material)
+	for i in range(last_index+1):
+		var u := float(i)/float(top_vertices.size()-1)
+		var normal := (top_normals[i]+bottom_normals[i]).normalized()
+		if normal.length_squared() <= 0.000001:
+			normal = top_normals[i]
+		var vertical := top_vertices[i]-bottom_vertices[i]
+		if vertical.length_squared() <= 0.000001:
+			vertical = Vector3.UP
+		else:
+			vertical = vertical.normalized()
+		var base_center := (top_vertices[i]+bottom_vertices[i])*0.5-normal*thickness*1.08
+		var wave := sin(float(i)*1.73+float(_substrate.hash()%7))*label_height*0.055
+		var center := base_center+vertical*wave
+		var half_height := label_height*(0.035+0.018*(0.5+0.5*_edge_noise(i,73)))
+		_mesh.surface_set_normal(-normal)
+		_mesh.surface_set_uv(Vector2(u,0.0))
+		_mesh.surface_add_vertex(center+vertical*half_height)
+		_mesh.surface_set_normal(-normal)
+		_mesh.surface_set_uv(Vector2(u,1.0))
+		_mesh.surface_add_vertex(center-vertical*half_height)
+	_mesh.surface_end()
 
 func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array, top_edge: bool) -> void:
 	if vertices.size()<2 or normals.size()!=vertices.size():
@@ -215,9 +405,9 @@ func _draw_torn_front_fringe(points: PackedVector3Array, progress: float) -> voi
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_edge_material)
 	for i in range(fringe.size()):
 		var fiber := fringe[i]
-		var half_width := 0.0018+0.0010*float(i%3)
+		var half_width := (0.0018+0.0010*float(i%3))*clampf(_fiber_scale,0.65,1.35)
 		var base_center := boundary_center+Vector3.UP*fiber.x+normal*0.0015
-		var tip := base_center+peel_direction*fiber.y+Vector3.UP*_edge_noise(i,59)*0.0028
+		var tip := base_center+peel_direction*fiber.y+Vector3.UP*_edge_noise(i,59)*0.0028*_fiber_scale
 		_mesh.surface_set_normal(normal)
 		_mesh.surface_set_uv(Vector2(0.0,0.0))
 		_mesh.surface_add_vertex(base_center+Vector3.UP*half_width)
@@ -272,13 +462,17 @@ func _frustum_edge_point(u: float, y: float) -> Vector3:
 func _frustum_edge_normal(point: Vector3) -> Vector3:
 	return CupSurface.frustum_surface_normal(point,_cup_bottom_radius,_cup_top_radius,_cup_height)
 
-func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
+func _tangent_from_points(points: PackedVector3Array, index: int) -> Vector3:
 	var left_index := maxi(index-1,0)
 	var right_index := mini(index+1,points.size()-1)
 	var tangent := points[right_index]-points[left_index]
 	if tangent.length_squared()<=0.000001:
-		return Vector3.FORWARD
-	var normal := tangent.normalized().cross(Vector3.UP).normalized()
+		return Vector3.RIGHT
+	return tangent.normalized()
+
+func _normal_from_points(points: PackedVector3Array, index: int) -> Vector3:
+	var tangent := _tangent_from_points(points,index)
+	var normal := tangent.cross(Vector3.UP).normalized()
 	if normal.length_squared()<=0.000001:
 		return Vector3.FORWARD
 	return normal
