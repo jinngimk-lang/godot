@@ -17,6 +17,7 @@ func _process(_delta: float) -> void:
 	# authority, so reassert the small three-light profile instead of allowing
 	# that later venue write to leave the hero product permanently orange.
 	_apply(root,next_id)
+	_apply_label_front_fill(root)
 
 func _apply(root: Node, venue_id: String) -> void:
 	var key := root.get_node_or_null("KeyLight") as DirectionalLight3D
@@ -61,6 +62,27 @@ func _apply(root: Node, venue_id: String) -> void:
 			rim.light_color = Color(1.0,0.80,0.61)
 			rim.light_energy = 0.34
 		_set_ambient(world,Color(0.54,0.48,0.41),0.42)
+
+func _apply_label_front_fill(root: Node) -> void:
+	var label := root.get_node_or_null("PeelLabel") as LabelVisual
+	if label == null:
+		return
+	var front_material = label.get("_material")
+	if not (front_material is StandardMaterial3D):
+		return
+	var material := front_material as StandardMaterial3D
+	var front_fill := 0.0
+	var session = root.get("_session")
+	if session != null and session.has_method("current_variant"):
+		var variant: Dictionary = session.current_variant()
+		var profile: Dictionary = variant.get("label_profile",{}) as Dictionary
+		front_fill = clampf(float(profile.get("front_fill",0.0)),0.0,0.65)
+	var texture := material.albedo_texture
+	var enabled := front_fill > 0.001 and texture != null
+	material.emission_enabled = enabled
+	material.emission = Color.WHITE
+	material.emission_energy_multiplier = front_fill if enabled else 0.0
+	material.emission_texture = texture if enabled else null
 
 func _set_ambient(world: WorldEnvironment, color: Color, energy: float) -> void:
 	if world == null or world.environment == null:
