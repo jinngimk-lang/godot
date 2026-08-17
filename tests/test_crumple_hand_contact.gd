@@ -71,9 +71,9 @@ func run() -> Array[String]:
 		var support_gap := _surface_gap(shell, support.get_pinch_world_position())
 		var peel_gap := _surface_gap(shell, peel.get_pinch_world_position())
 		if support_gap > MAX_CONTACT_GAP:
-			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f" % support_gap)
+			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), str(staging.get("_active"))])
 		if peel_gap > MAX_CONTACT_GAP:
-			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f" % peel_gap)
+			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), str(staging.get("_active"))])
 
 	source.reset_visual()
 	if not support.position.is_equal_approx(support_home):
