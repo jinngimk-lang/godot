@@ -2,6 +2,26 @@ extends Node3D
 class_name ProductPresentation
 
 const BOTTLE_SEGMENTS := 80
+const PAPER_BODY_SHADER := """shader_type spatial;
+render_mode cull_back;
+uniform vec4 paper_color : source_color = vec4(0.95, 0.935, 0.895, 1.0);
+uniform float paper_roughness = 0.95;
+uniform float fiber_strength = 0.022;
+
+float paper_hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+void fragment() {
+	vec2 fiber_cell = floor(UV * vec2(420.0, 860.0));
+	float fleck = (paper_hash(fiber_cell) - 0.5) * 2.0;
+	float strand = sin((UV.y + sin(UV.x * 31.0) * 0.004) * 920.0) * 0.5;
+	float fiber = (fleck * 0.64 + strand * 0.36) * fiber_strength;
+	ALBEDO = clamp(paper_color.rgb + vec3(fiber), vec3(0.0), vec3(1.0));
+	ROUGHNESS = clamp(paper_roughness + abs(fiber) * 0.55, 0.90, 1.0);
+	SPECULAR = 0.18;
+}
+"""
 const GLASS_EDGE_SHADER := """shader_type spatial;
 render_mode blend_mix, cull_disabled, depth_draw_never;
 uniform vec4 edge_color : source_color = vec4(1.0, 0.78, 0.52, 1.0);
@@ -57,18 +77,15 @@ func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionar
 	var paper := kind == "paper_cup"
 	body.visible = paper
 	if paper:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(profile.get("body_color",Color(0.89,0.84,0.74)))
-		mat.roughness = float(profile.get("roughness",0.90))
-		mat.metallic = 0.0
-		body.material_override = mat
+		body.material_override = _paper_material(profile)
 	if lid != null:
 		lid.visible = paper
 		if paper:
 			var lid_mat := StandardMaterial3D.new()
 			lid_mat.albedo_color = Color(profile.get("lid_color",Color(0.025,0.024,0.022)))
-			lid_mat.roughness = 0.16
-			lid_mat.metallic = 0.02
+			lid_mat.roughness = 0.30
+			lid_mat.metallic = 0.0
+			lid_mat.metallic_specular = 0.54
 			lid.material_override = lid_mat
 
 func set_inspection_yaw(yaw: float) -> void:
@@ -78,7 +95,7 @@ func _build_contact_shadow(kind: String) -> void:
 	var shadow := MeshInstance3D.new()
 	shadow.name = "ProductContactShadow"
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.98,0.50) if kind == "paper_cup" else Vector2(0.76,0.41)
+	quad.size = Vector2(0.92,0.48) if kind == "paper_cup" else Vector2(0.76,0.41)
 	shadow.mesh = quad
 	shadow.position = Vector3(0.0,-0.632,0.015)
 	shadow.rotation_degrees = Vector3(-90.0,0.0,0.0)
@@ -101,17 +118,60 @@ func _build_paper(profile: Dictionary) -> void:
 	var root := Node3D.new()
 	root.name = "CupPaperDetails"
 	add_child(root)
-	var body_color := Color(profile.get("body_color",Color(0.89,0.84,0.74)))
-	_add_ring(root,"PaperBaseFold",Vector3(0,-0.655,0),0.445,0.020,body_color.darkened(0.055),0.93)
-	_add_ring(root,"PaperLip",Vector3(0,0.735,0),0.535,0.025,body_color.lightened(0.025),0.74)
+	var body_color := Color(profile.get("body_color",Color(0.95,0.935,0.895)))
+	var top_radius := float(profile.get("top_radius",0.49))
+	var bottom_radius := float(profile.get("bottom_radius",0.415))
+	var height := float(profile.get("height",1.40))
+	var cup_center_y := 0.05
+	var bottom_y := cup_center_y-height*0.5
+	var top_y := cup_center_y+height*0.5
+	_add_ring(root,"PaperBaseFold",Vector3(0,bottom_y-0.004,0),bottom_radius+0.004,0.018,body_color.darkened(0.045),0.97)
+	_add_ring(root,"PaperLip",Vector3(0,top_y+0.006,0),top_radius+0.007,0.018,body_color.lightened(0.018),0.82)
 	var seam := MeshInstance3D.new()
 	seam.name = "PaperSeam"
 	var seam_mesh := BoxMesh.new()
-	seam_mesh.size = Vector3(0.010,1.12,0.007)
+	seam_mesh.size = Vector3(0.007,height*0.80,0.004)
 	seam.mesh = seam_mesh
-	seam.position = Vector3(0.0,0.02,-0.526)
-	seam.material_override = _mat(body_color.darkened(0.055),0.96)
+	seam.position = Vector3(0.0,cup_center_y-0.02,-top_radius+0.006)
+	seam.material_override = _mat(body_color.darkened(0.035),0.98)
 	root.add_child(seam)
+
+	var lid_color := Color(profile.get("lid_color",Color(0.022,0.021,0.020)))
+	var lid_mat := _molded_lid_material(lid_color)
+	_add_lid_layer("CupLidSnapRing",top_y+0.038,top_radius+0.032,top_radius+0.030,0.030,lid_mat)
+	_add_lid_layer("CupLidCrown",top_y+0.086,top_radius-0.005,top_radius+0.015,0.090,lid_mat)
+	_add_lid_layer("CupLidTopBead",top_y+0.134,top_radius-0.003,top_radius-0.003,0.014,lid_mat)
+
+func _paper_material(profile: Dictionary) -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = PAPER_BODY_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("paper_color",Color(profile.get("body_color",Color(0.95,0.935,0.895))))
+	material.set_shader_parameter("paper_roughness",clampf(float(profile.get("roughness",0.95)),0.90,1.0))
+	material.set_shader_parameter("fiber_strength",clampf(float(profile.get("paper_fiber_strength",0.022)),0.008,0.035))
+	return material
+
+func _molded_lid_material(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.30
+	material.metallic = 0.0
+	material.metallic_specular = 0.56
+	return material
+
+func _add_lid_layer(node_name: String, y: float, top_radius: float, bottom_radius: float, height: float, material: Material) -> void:
+	var layer := MeshInstance3D.new()
+	layer.name = node_name
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top_radius
+	mesh.bottom_radius = bottom_radius
+	mesh.height = height
+	mesh.radial_segments = 96
+	layer.mesh = mesh
+	layer.position = Vector3(0.0,y,0.0)
+	layer.material_override = material
+	add_child(layer)
 
 func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var body_color := Color(profile.get("body_color",Color(0.38,0.11,0.024) if amber else Color(0.94,0.985,0.98)))
