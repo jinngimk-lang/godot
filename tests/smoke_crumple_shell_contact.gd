@@ -18,12 +18,14 @@ func _run() -> void:
 
 	var source := scene.get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
 	var staging := scene.get_node_or_null("CrumpleHandStaging") as CrumpleHandStaging
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as HandChoreographyPresentation
+	var venue := scene.get_node_or_null("VenuePresentation") as VenuePresentation
 	var support := scene.get_node_or_null("LeftHand") as HandVisual
 	var peel := scene.get_node_or_null("RightHand") as HandVisual
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var lifecycle = scene.get("_lifecycle")
 	var ritual = scene.get("_ritual")
-	if source == null or staging == null or support == null or peel == null or label == null or lifecycle == null or ritual == null:
+	if source == null or staging == null or choreography == null or venue == null or support == null or peel == null or label == null or lifecycle == null or ritual == null:
 		push_error("CRUMPLE_CONTACT_RED: live Café scene is missing crumple presentation, lifecycle, ritual, or hand nodes")
 		quit(1)
 		return
@@ -48,6 +50,12 @@ func _run() -> void:
 		push_error("CRUMPLE_CONTACT_RED: 55% Café crumple must expose the rendered CrumpledCup shell")
 		quit(1)
 		return
+	print("CRUMPLE_OWNER_TRACE venue=%s source=%.3f yields=%s choreo_processing=%s" % [
+		venue.get_active_profile_id(),
+		source.get_progress(),
+		str(choreography.call("_cafe_crumple_owns_peel_hand",venue.get_active_profile_id())),
+		str(choreography.is_processing())
+	])
 	_trace_gaps("signal",shell,support,peel)
 	for frame_index in range(4):
 		await process_frame
