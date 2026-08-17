@@ -14,9 +14,9 @@ func run() -> Array[String]:
 	if model.get_unlocked_count() != 1:
 		failures.append("session should start with one unlocked tactile profile")
 
-	for key in ["cup_shell", "cup_dimensions", "crumple_profile", "contents_profile", "reward_theme"]:
+	for key in ["cup_shell", "cup_dimensions", "crumple_profile", "contents_profile", "reward_theme", "label_profile"]:
 		if not first.has(key):
-			failures.append("RED: tactile profile missing V5 sensory field %s" % key)
+			failures.append("RED: tactile profile missing sensory field %s" % key)
 	if failures.size() > 0:
 		return failures
 
@@ -58,9 +58,10 @@ func run() -> Array[String]:
 	if String(model.current_variant().get("id", "")) != "crisp_seal":
 		failures.append("POST_PEEL_RED: second Continue must rotate amber bar to market")
 
-	# V6 sensory profile contract: each tactile cup must read as a distinct silhouette,
-	# and only the final profile may introduce a small contained ice layer.
+	# V6/V7 sensory profile contract: each tactile object and label must read as a
+	# distinct physical item, not the same sticker with different print text.
 	var silhouette_signatures: Array[String] = []
+	var label_signatures: Array[String] = []
 	for i in range(model.VARIANTS.size()):
 		var variant: Dictionary = model.VARIANTS[i]
 		var dims: Dictionary = variant.get("cup_dimensions", {})
@@ -72,6 +73,23 @@ func run() -> Array[String]:
 		if signature in silhouette_signatures:
 			failures.append("RED: tactile cup silhouettes must be materially distinct, duplicate=%s" % signature)
 		silhouette_signatures.append(signature)
+
+		var label_profile: Dictionary = variant.get("label_profile", {})
+		for key in ["substrate", "roughness", "thickness_scale", "fiber_scale", "adhesive_trace", "adhesive_tint", "fiber_tint", "fiber_gain"]:
+			if not label_profile.has(key):
+				failures.append("LABEL_IDENTITY_RED: %s label profile missing %s" % [String(variant.get("id", "unknown")), key])
+		var label_signature := "%s/%.2f/%.2f/%.2f/%.2f" % [
+			String(label_profile.get("substrate", "")),
+			float(label_profile.get("roughness", 0.0)),
+			float(label_profile.get("thickness_scale", 0.0)),
+			float(label_profile.get("fiber_scale", 0.0)),
+			float(label_profile.get("adhesive_trace", 0.0))
+		]
+		if label_signature in label_signatures:
+			failures.append("LABEL_IDENTITY_RED: scene labels must have distinct substrate/tack signatures")
+		label_signatures.append(label_signature)
+		if float(label_profile.get("adhesive_trace", 0.0)) <= 0.05:
+			failures.append("ADHESIVE_RED: %s needs a visible clean adhesive-contact trace" % String(variant.get("id", "unknown")))
 
 		var contents: Dictionary = variant.get("contents_profile", {})
 		if i < model.VARIANTS.size() - 1:
@@ -90,6 +108,15 @@ func run() -> Array[String]:
 			if motion_gain < 0.0 or motion_gain > 1.0:
 				failures.append("ice motion gain must be bounded 0..1, got %.3f" % motion_gain)
 
+	if label_signatures.size() == 3:
+		var cafe_label: Dictionary = model.VARIANTS[0].get("label_profile", {})
+		var bar_label: Dictionary = model.VARIANTS[1].get("label_profile", {})
+		var market_label: Dictionary = model.VARIANTS[2].get("label_profile", {})
+		if not (float(bar_label.get("thickness_scale", 0.0)) > float(cafe_label.get("thickness_scale", 0.0)) and float(cafe_label.get("thickness_scale", 0.0)) > float(market_label.get("thickness_scale", 0.0))):
+			failures.append("LABEL_IDENTITY_RED: bar label should be thickest, café intermediate, market coated label thinnest")
+		if float(bar_label.get("adhesive_trace", 0.0)) <= float(market_label.get("adhesive_trace", 0.0)) + 0.06:
+			failures.append("ADHESIVE_RED: bar label should expose materially stronger tack than market label")
+
 	# Every current tactile cup should take a short sequence of deliberate squeezes,
 	# not jump from fresh to complete on one representative 50 px inward drag.
 	var crumple_script := load("res://scripts/cup/cup_crumple_model.gd")
@@ -106,7 +133,6 @@ func run() -> Array[String]:
 		if not crumple.is_complete():
 			failures.append("%s should still reach completion within a short six-squeeze ritual" % String(variant.get("id", "unknown")))
 
-	# Legacy score API stays compatible for old callers, but score is no longer required for progression.
 	model.restart_run()
 	var legacy_result: Dictionary = model.record_clean_peel(75)
 	if model.get_clean_peels() != 1 or model.get_total_score() != 75:
