@@ -10,6 +10,7 @@ class_name LabelVisual
 
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
+var _edge_material := StandardMaterial3D.new()
 var _phase_name := "ATTACHED"
 var _detach_alpha := 0.0
 var _held_direction := Vector3.LEFT
@@ -27,6 +28,9 @@ func _ready() -> void:
 	_material.roughness = 0.90
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	_edge_material.albedo_color = Color(0.76,0.72,0.63,1.0)
+	_edge_material.roughness = 0.98
+	_edge_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_sync_from_runtime_cup()
 	set_peel(0.0,get_front_position(0.0))
 
@@ -54,8 +58,6 @@ func get_front_position(progress: float) -> Vector3:
 
 func set_phase(phase_name: String) -> void:
 	if phase_name == _phase_name:
-		# ATTACHED is also the lifecycle reset command. A prior presentation stage
-		# may have hidden the label, so idempotent resets must restore visibility.
 		if phase_name == "ATTACHED":
 			visible = true
 		return
@@ -98,28 +100,62 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 		return blended
 	return LabelGeometry.peeling_points(p,desired_grip,label_width,center_radius,label_y,surface_offset,segments)
 
+func get_paper_thickness() -> float:
+	return clampf(label_height * 0.014, 0.0032, 0.0060)
+
+func get_edge_offsets(progress: float) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	var count := maxi(segments,1)
+	for i in range(count+1):
+		var u := float(i)/float(count)
+		var peeled_weight := clampf((p + 0.08 - u) / 0.08,0.0,1.0) * p
+		var distance := (u-p)/0.065
+		var boundary := exp(-(distance*distance)) * p
+		var top_noise := _edge_noise(i,3)
+		var bottom_noise := _edge_noise(i,11)
+		var amplitude := 0.0012 + 0.0058*peeled_weight + 0.0075*boundary
+		var notch_top := boundary * (0.0022 + 0.0034*absf(bottom_noise))
+		var notch_bottom := boundary * (0.0020 + 0.0032*absf(top_noise))
+		var top_offset := clampf(top_noise*amplitude-notch_top,-0.016,0.012)
+		var bottom_offset := clampf(bottom_noise*amplitude+notch_bottom,-0.012,0.016)
+		result.append(Vector2(top_offset,bottom_offset))
+	return result
+
 func set_peel(progress: float, grip_local: Vector3) -> void:
 	_last_progress = clampf(progress,0.0,1.0)
 	_last_grip = grip_local
 	var points := get_sample_points(_last_progress,grip_local)
 	if points.size()<2:
 		return
+	var edge_offsets := get_edge_offsets(_last_progress)
+	var top_vertices := PackedVector3Array()
+	var bottom_vertices := PackedVector3Array()
+	var top_normals := PackedVector3Array()
+	var bottom_normals := PackedVector3Array()
+
 	_mesh.clear_surfaces()
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_material)
-	var vertical := Vector3(0.0,label_height*0.5,0.0)
 	for i in range(points.size()):
 		var center := points[i]
 		var curve_normal := _normal_from_points(points,i)
 		var u := float(i)/float(points.size()-1)
-		var top_vertex := center+vertical
-		var bottom_vertex := center-vertical
+		var offsets := edge_offsets[mini(i,edge_offsets.size()-1)]
+		var top_y_offset := label_height*0.5+offsets.x
+		var bottom_y_offset := -label_height*0.5+offsets.y
+		var top_vertex := center+Vector3.UP*top_y_offset
+		var bottom_vertex := center+Vector3.UP*bottom_y_offset
 		var top_normal := curve_normal
 		var bottom_normal := curve_normal
 		if _is_attached_u(u):
-			top_vertex = _frustum_edge_point(u,label_y+label_height*0.5)
-			bottom_vertex = _frustum_edge_point(u,label_y-label_height*0.5)
+			top_vertex = _frustum_edge_point(u,label_y+top_y_offset)
+			bottom_vertex = _frustum_edge_point(u,label_y+bottom_y_offset)
 			top_normal = _frustum_edge_normal(top_vertex)
 			bottom_normal = _frustum_edge_normal(bottom_vertex)
+		top_vertices.append(top_vertex)
+		bottom_vertices.append(bottom_vertex)
+		top_normals.append(top_normal)
+		bottom_normals.append(bottom_normal)
 		_mesh.surface_set_normal(top_normal)
 		_mesh.surface_set_uv(Vector2(u,0.0))
 		_mesh.surface_add_vertex(top_vertex)
@@ -127,6 +163,31 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 		_mesh.surface_set_uv(Vector2(u,1.0))
 		_mesh.surface_add_vertex(bottom_vertex)
 	_mesh.surface_end()
+
+	_draw_paper_edge(top_vertices,top_normals,true)
+	_draw_paper_edge(bottom_vertices,bottom_normals,false)
+
+func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array, top_edge: bool) -> void:
+	if vertices.size()<2 or normals.size()!=vertices.size():
+		return
+	var thickness := get_paper_thickness()
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP,_edge_material)
+	for i in range(vertices.size()):
+		var u := float(i)/float(vertices.size()-1)
+		var front := vertices[i]
+		var back := front-normals[i]*thickness
+		var side_normal := Vector3.UP if top_edge else Vector3.DOWN
+		_mesh.surface_set_normal(side_normal)
+		_mesh.surface_set_uv(Vector2(u,0.0))
+		_mesh.surface_add_vertex(front)
+		_mesh.surface_set_normal(side_normal)
+		_mesh.surface_set_uv(Vector2(u,1.0))
+		_mesh.surface_add_vertex(back)
+	_mesh.surface_end()
+
+func _edge_noise(index: int, salt: int) -> float:
+	var hashed := posmod((index+1)*37 + salt*53 + (index+salt)*(index+3)*11,97)
+	return float(hashed)/48.0-1.0
 
 func _sync_from_runtime_cup() -> void:
 	if not is_inside_tree():

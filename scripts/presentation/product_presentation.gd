@@ -2,6 +2,33 @@ extends Node3D
 class_name ProductPresentation
 
 const BOTTLE_SEGMENTS := 80
+const GLASS_EDGE_SHADER := """shader_type spatial;
+render_mode blend_mix, cull_disabled, depth_draw_never;
+uniform vec4 edge_color : source_color = vec4(1.0, 0.78, 0.52, 1.0);
+uniform float edge_alpha = 0.24;
+uniform float fresnel_power = 3.2;
+void fragment() {
+	float grazing = clamp(1.0 - dot(NORMAL, VIEW), 0.0, 1.0);
+	float fresnel = pow(grazing, fresnel_power);
+	ALBEDO = edge_color.rgb;
+	ALPHA = edge_alpha * fresnel;
+	ROUGHNESS = mix(0.075, 0.022, fresnel);
+	SPECULAR = 0.92;
+	CLEARCOAT = 0.94;
+	CLEARCOAT_ROUGHNESS = 0.05;
+}
+"""
+const CONTACT_SHADOW_SHADER := """shader_type spatial;
+render_mode unshaded, blend_mix, cull_disabled, depth_draw_never;
+uniform vec4 shadow_color : source_color = vec4(0.035, 0.020, 0.012, 0.24);
+void fragment() {
+	vec2 p = (UV - vec2(0.5)) * 2.0;
+	float radial = dot(p, p);
+	float feather = 1.0 - smoothstep(0.10, 1.0, radial);
+	ALBEDO = shadow_color.rgb;
+	ALPHA = shadow_color.a * feather;
+}
+"""
 
 var _active_kind := "paper_cup"
 
@@ -21,6 +48,7 @@ func apply_profile(profile: Dictionary) -> void:
 		_build_bottle(profile,false)
 	else:
 		_build_paper(profile)
+	_build_contact_shadow(requested)
 
 func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionary) -> void:
 	if body == null:
@@ -46,6 +74,29 @@ func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionar
 func set_inspection_yaw(yaw: float) -> void:
 	rotation.y = yaw if is_finite(yaw) else 0.0
 
+func _build_contact_shadow(kind: String) -> void:
+	var shadow := MeshInstance3D.new()
+	shadow.name = "ProductContactShadow"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.98,0.50) if kind == "paper_cup" else Vector2(0.76,0.41)
+	shadow.mesh = quad
+	shadow.position = Vector3(0.0,-0.632,0.015)
+	shadow.rotation_degrees = Vector3(-90.0,0.0,0.0)
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var shader := Shader.new()
+	shader.code = CONTACT_SHADOW_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var tone := Color(0.045,0.024,0.012,0.26)
+	if kind == "amber_bottle":
+		tone = Color(0.030,0.012,0.006,0.29)
+	elif kind == "clear_bottle":
+		tone = Color(0.060,0.075,0.080,0.20)
+	material.set_shader_parameter("shadow_color",tone)
+	material.render_priority = -2
+	shadow.material_override = material
+	add_child(shadow)
+
 func _build_paper(profile: Dictionary) -> void:
 	var root := Node3D.new()
 	root.name = "CupPaperDetails"
@@ -68,15 +119,22 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var source_alpha := float(profile.get("glass_alpha",0.36 if amber else 0.16))
 	var roughness := float(profile.get("roughness",0.048 if amber else 0.040))
 	var outer_profile := _bottle_profile(neck_radius,amber)
+	var outer_mesh := _build_lathe_mesh(outer_profile,false,false)
 
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
-	# The bottle is open at the mouth. A top cap turns into a bright flat disk in
-	# the product camera and reads as a plastic stopper instead of glass.
-	outer.mesh = _build_lathe_mesh(outer_profile,false,false)
-	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.46),roughness)
+	outer.mesh = outer_mesh
+	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.62),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
+
+	var edge := MeshInstance3D.new()
+	edge.name = "BottleEdgeFresnel"
+	edge.mesh = outer_mesh
+	edge.scale = Vector3.ONE * 1.006
+	edge.material_override = _glass_edge_material(body_color, source_alpha, amber)
+	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(edge)
 
 	var inner_profile: Array[Vector2] = []
 	for sample in outer_profile:
@@ -275,3 +333,17 @@ func _glass_mat(color: Color, alpha: float, roughness: float) -> StandardMateria
 	mat.clearcoat_roughness = 0.055
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
+
+func _glass_edge_material(body_color: Color, source_alpha: float, amber: bool) -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = GLASS_EDGE_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var edge_color := body_color.lightened(0.48 if amber else 0.03)
+	if not amber:
+		edge_color = Color(0.74,0.86,0.90,1.0)
+	material.set_shader_parameter("edge_color", edge_color)
+	material.set_shader_parameter("edge_alpha", clampf(source_alpha * (0.82 if amber else 1.46), 0.13, 0.34))
+	material.set_shader_parameter("fresnel_power", 3.15 if amber else 3.25)
+	material.render_priority = 1
+	return material

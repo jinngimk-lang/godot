@@ -8,6 +8,14 @@ on:
 permissions:
   contents: read
 
+# Visual iteration produces several commits quickly. Only the newest head for a
+# branch is useful; stale full Godot/capture runs waste minutes and delay the
+# feedback loop. Push and PR events for the same head branch intentionally share
+# one concurrency key.
+concurrency:
+  group: godot-check-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
