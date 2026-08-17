@@ -13,6 +13,7 @@ var _action: Label
 var _buttons: Array[Button] = []
 var _rail: Panel
 var _rail_visible := true
+var _inspection_active := false
 var _parent_connected := false
 var _reward: Label
 var _continue_button: Button
@@ -50,6 +51,10 @@ func set_state(scene_index: int, phase_name: String, post_action: String, peel_p
 	_rail_visible = not (progress > 0.001 and not post_interaction)
 	_apply_state_to_ui()
 
+func set_inspection_active(active: bool) -> void:
+	_inspection_active = active
+	_apply_state_to_ui()
+
 func get_active_scene_index() -> int:
 	return _active_scene_index
 
@@ -74,6 +79,8 @@ func _pull_runtime_state() -> void:
 	var phase := ritual_phase if ritual_phase != "PEEL" else lifecycle_phase
 	var detached := bool(lab.get("_detach_reward_recorded"))
 	set_state(index, phase, String(variant.get("post_peel_action", "inspect")), progress, detached)
+	var inspection = lab.get("_inspection")
+	set_inspection_active(inspection != null and inspection.has_method("is_active") and bool(inspection.is_active()))
 
 func _connect_parent_navigation() -> void:
 	if _parent_connected:
@@ -208,7 +215,7 @@ func _apply_state_to_ui() -> void:
 	_scene_status.text = "SCENE %d / %d  •  %s" % [_active_scene_index + 1, SCENE_NAMES.size(), SCENE_NAMES[_active_scene_index]]
 	_action.text = _action_text
 	if _rail != null:
-		_rail.visible = _rail_visible
+		_rail.visible = _rail_visible and not _inspection_active
 	for i in range(_buttons.size()):
 		_buttons[i].button_pressed = i == _active_scene_index
 
