@@ -1,7 +1,8 @@
 extends Node3D
 class_name CrumpleHandStaging
 
-const MAX_INWARD_OFFSET := 0.085
+const SUPPORT_MAX_INWARD_OFFSET := 0.085
+const PEEL_MAX_INWARD_OFFSET := 0.150
 const MAX_DOWN_OFFSET := 0.018
 
 var _support_hand: Node3D
@@ -41,11 +42,12 @@ func _on_crumple_changed(progress: float) -> void:
 	# paper shell yields. Only presentation roots move; the independently
 	# verified authored skeleton poses remain untouched.
 	var eased := safe_progress * safe_progress * (3.0 - 2.0 * safe_progress)
-	var inward := MAX_INWARD_OFFSET * eased
+	var support_inward := SUPPORT_MAX_INWARD_OFFSET * eased
+	var peel_inward := PEEL_MAX_INWARD_OFFSET * eased
 	var down := MAX_DOWN_OFFSET * eased
-	_support_hand.position = _support_home + Vector3(-inward, -down, 0.0)
+	_support_hand.position = _support_home + Vector3(-support_inward, -down, 0.0)
 	if _has_peel_home and _peel_hand != null:
-		_peel_hand.position = _peel_home + Vector3(inward, -down, 0.0)
+		_peel_hand.position = _peel_home + Vector3(peel_inward, -down, 0.0)
 
 func reset_staging() -> void:
 	if _has_support_home and _support_hand != null:
