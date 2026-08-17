@@ -6,7 +6,11 @@ const TEXTURES := {
 	"night_bar":"res://art/reference_backdrops/bar_backdrop.jpg",
 	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg"
 }
-const TARGET_WORLD_WIDTH := 7.45
+# Cover the widest live reference framing (48-degree bottle camera at 16:9)
+# with a small raster overscan margin.  The previous 7.45-world-unit plate was
+# sized for the tighter cafe framing and exposed world-clear black wedges in
+# Bar/Market after bottle framing widened.
+const TARGET_WORLD_WIDTH := 8.40
 
 var _active_id := ""
 
@@ -40,8 +44,8 @@ func _apply(profile_id: String) -> void:
 	if loaded != null:
 		texture = loaded
 		# The source plates have different pixel dimensions. Scale by their actual
-		# width so a low-resolution dedicated bar plate covers the same physical
-		# viewport as the larger café/market plates and never exposes black side bars.
+		# width so every dedicated plate covers the same physical viewport and the
+		# widest bottle reference camera never exposes world-clear side wedges.
 		pixel_size = TARGET_WORLD_WIDTH / maxf(float(loaded.get_width()),1.0)
 	if profile_id == "market_coldcase":
 		modulate = Color(0.97,0.97,0.97,1.0)
