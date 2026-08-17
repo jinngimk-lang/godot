@@ -4,6 +4,7 @@ Date: 2026-08-17
 Base product main: `90d225fcd124cbd80f2fe2d84222584ee4324a3a`
 Initial candidate binary commit: `5d586b52cfe94df04cc8e15df21a860f9717a997`
 Reference-envelope rescale commit: `8f12fe57c835e03f85a0177a75722e03b95f5355`
+Measured-frame aligned candidate: `9b78bb14758e9d5987027b04b2d48dd48c30de29`
 Authoring branch: `spike/cc0-makehuman-support-hand-v94`
 
 ## Why this spike exists
@@ -14,36 +15,66 @@ This v94 spike changes the *source structure* rather than tuning the old pose. I
 
 ## Non-negotiable stop condition
 
-This spike does not authorize CCD, endpoint chasing, wrist/orbit/yaw/translation sweeps, per-finger numeric grids, or other disguised pose search. One fixed source-rig Cup pose is tested in the current runtime. If the source normalization is clearly mirrored or axis-inverted, one evidence-driven structural sign/basis correction is allowed; a grid is not.
+This spike does not authorize CCD, endpoint chasing, wrist/orbit/yaw/translation sweeps, per-finger numeric grids, or other disguised pose search. One fixed source-rig Cup pose is tested in the current runtime. A single evidence-driven structural frame correction is permitted when a runtime capture proves the source frame is not mapped to the existing cup frame; a grid is not.
 
-## Build receipts before Godot visual acceptance
+## Build / failure / correction receipts
 
 ### Structural source build
 
-The successful source-normalization build produced a left-only GLB with:
+The first successful source-normalization build produced a left-only GLB with:
 
 - selected substantial source component: 2,049 vertices / 2,038 polygons;
-- 1,621 vertices / 1,609 polygons after arm-side crop;
+- 1,621 vertices / 1,609 polygons after the original spatial arm-side crop;
 - 50-bone armature;
 - semantic actions `Default pose`, `Pinch Up`, `Cup`, `Pinch Tight`;
-- 20 real fingertip polygons on `HandNail`;
-- maximum distal-bone-tail to selected real fingertip-surface distance about `0.028423` source units.
+- 20 real fingertip polygons on `HandNail`.
 
 The first Godot candidate passed import, default launch, and deterministic unit tests, including the authored-hand asset contract, but failed `Scene smoke`: runtime support-hand mesh extent was `1.719`, above the existing `<=1.40` hero-hand presentation envelope. The tests were not changed.
 
-### One structural scale correction
+### One scale-only correction
 
-The candidate was not position/rotation/finger tuned. `tools/build_cc0_support_hand.py` was changed once to derive export scale from the actual cropped mesh envelope:
+The source scale was corrected once from measured mesh envelope data, without changing pose/position/rotation/finger values. That rebuilt GLB passed the complete Godot 4.7.1 machine gate and produced nine fresh runtime frames in run `32020404963`, artifact `9285129666`.
 
-- fixed `HandVisual` authored-root multiplier: `2.25`;
-- cropped source max extent before export scale: `2.0975327491760254`;
-- target runtime max extent: `1.20`;
-- derived export pre-scale: `0.2542669875084634`;
-- predicted runtime extent after the fixed 2.25× presentation multiplier: `1.20`.
+The visual gate **rejected** that machine-green candidate. Fresh `cafe.png` showed two Macro failures:
 
-The target is deliberately below the existing `1.40` smoke ceiling and below the Café cup height (~`1.40`), matching the locked composition where the visible support hand is shorter than the cup. No pose, position, rotation, CCD, endpoint, or per-finger values changed in this correction.
+1. a large bare source forearm crossed the hero composition despite the intended wrist crop;
+2. the fixed frame-20 hand curled around empty air on the cup's right side instead of enclosing the cup.
 
-The rebuilt GLB was committed at `8f12fe57c835e03f85a0177a75722e03b95f5355`. This document update exists to trigger the exact-head Godot 4.7.1 recheck after the bot-authored binary commit.
+Machine green was therefore not treated as visual acceptance.
+
+### Structural root cause 1 — crop semantics
+
+The spatial `z` crop was removed. The aligned builder now deletes vertices only when they have no non-trivial skin membership in the real left `hand.L`, palm, thumb, index, middle, ring, or pinky deform groups. Build run `32021039608` reports:
+
+- source component: 2,049 vertices / 2,038 polygons;
+- 1,657 vertices retained by actual hand/finger skin bones;
+- 392 vertices removed as forearm-only;
+- final hand mesh: 1,657 vertices / 1,632 polygons;
+- 20 real fingertip polygons remain assigned to `HandNail`.
+
+No spatial wrist threshold is involved in this crop.
+
+### Structural root cause 2 — semantic Cup frame mismatch
+
+A one-off Godot diagnostic measured the actual Café cup target directly in `LeftHand/AuthoredHand` local space at run `32020753168`. The pinned measurement is `tools/support_hand_cafe_target_v94.json`:
+
+- cup center: `(-0.0764426, 0.00385927, -0.0127513)`;
+- cup axis: `(0.686103, 0.686103, -0.241922)`;
+- cup radial from semantic wrist: `(0.262142, 0.0770450, 0.961949)`.
+
+This diagnostic also exposed a legacy presentation detail that the earlier evidence text had simplified incorrectly: `HandVisual` initially sets authored scale `2.25`, but `ForearmPresentation` subsequently sets the runtime authored-hand scale to `4.15`. The aligned candidate therefore keeps the previously machine-green asset scale fixed instead of attempting another scale optimization. This pass changes only crop semantics and one rigid frame mapping.
+
+`tools/build_cc0_support_hand_aligned.py` reconstructs the source frame-20 semantic Cup frame from the native Blender rig (palm center, four finger roots/tips, palm-to-finger radial, and cross-product cup axis), canonicalizes it, then computes exactly one orthonormal rigid transform from that source frame to the measured Godot frame. There is no search loop and no candidate sweep.
+
+Aligned build run `32021039608` / artifact `9285359168` proves the algebraic mapping:
+
+- center error: `6.13e-08`;
+- radial dot target: `1.00000009`;
+- cup-axis dot target: `1.00000008`;
+- semantic actions preserved: `Default pose`, `Pinch Up`, `Cup`, `Pinch Tight`;
+- output GLB: 278,292 bytes.
+
+The bot committed the aligned binary as `9b78bb14758e9d5987027b04b2d48dd48c30de29`. This evidence update intentionally triggers the exact-head Godot recheck for that binary.
 
 ## Machine gate
 
@@ -60,25 +91,27 @@ Any importer, animation-name, skeleton, semantic-material, or runtime error is a
 
 ## Visual gate — locked Café reference
 
-At minimum inspect fresh `cafe.png`, `cafe_peel38.png`, and `cafe_crumple55.png` against `art/acceptance_refs/v1/cafe_v1` / the locked original Café reference.
+At minimum inspect fresh `cafe.png`, `cafe_peel38.png`, and `cafe_crumple55.png` against the locked Café reference.
 
 ### Accept structurally only if all are true
 
 - the left palm visibly contacts the cup rather than floating beside it;
-- at least the index/middle/ring/pinky read as wrapping around the vessel silhouette instead of an open XR pose;
-- thumb opposition is visually legible on the other side / front plane of the cup;
-- hand scale is human relative to the cup and not catastrophically oversized/undersized;
-- wrist/sleeve transition is not more distracting than the previous runtime;
-- the new source materially reduces the Macro support-enclosure mismatch, even if skin/material detail remains below final reference quality.
+- index/middle/ring/pinky read as wrapping around the vessel silhouette rather than an open side-contact pose;
+- thumb opposition is visually legible;
+- hand scale is human relative to the cup;
+- bare source forearm no longer crosses the composition;
+- wrist/sleeve transition is not a new dominant Macro defect;
+- the new source materially reduces the support-enclosure mismatch.
 
 ### Reject if any are true
 
 - the hand is mirrored, inverted, exploded, off-screen, or obviously wrong scale;
-- fingers still read as an open side-contact pose;
-- the apparent improvement is only smoother skin / denser geometry while enclosure remains wrong;
+- fingers still wrap empty air / remain open beside the cup;
+- a bare source forearm remains the dominant hero shape;
+- the apparent improvement is only mesh quality while enclosure remains wrong;
 - the sleeve/wrist seam becomes a larger Macro defect;
 - machine contract is weakened to accommodate the asset.
 
-## What a pass would mean
+## What a structural pass would mean
 
-A structural pass would *not* complete Stage 1. It would only prove a better support-hand source. Remaining high-value work would include material/skin realism, final support grasp authoring if needed, and the peel-hand pinch/contact lane. Final completion still requires locked-reference convergence and owner playtest.
+A structural pass would *not* complete Stage 1. It would only prove a better support-hand source. Remaining high-value work would include material/skin realism, semantic wrist-to-sleeve integration, and the peel-hand pinch/contact lane. Final completion still requires locked-reference convergence and owner playtest.
