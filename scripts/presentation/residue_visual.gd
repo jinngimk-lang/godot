@@ -128,7 +128,6 @@ func get_fiber_island_spans(progress: float) -> PackedVector2Array:
 		width = minf(width,peeled_u*0.30)
 		var u0 := maxf(0.0,center-width*0.5)
 		var u1 := minf(peeled_u,center+width*0.5)
-		# Edge clipping should not collapse a broad island into a tiny square.
 		if u1-u0 < 0.085:
 			if u0 <= 0.0001:
 				u1 = minf(peeled_u,u0+0.085)
@@ -165,8 +164,9 @@ func _rebuild() -> void:
 
 	var adhesive_alpha := clampf(0.16+_adhesive_trace_amount*0.78+_residue_amount*0.14,0.16,0.62)
 	_adhesive_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,adhesive_alpha)
-	var fiber_alpha := clampf(0.68+_fiber_strength*0.26,0.68,0.94)
-	var readable_fiber := _fiber_tint.lerp(Color.WHITE,0.12)
+	var fiber_alpha := clampf(0.88+_fiber_strength*0.10,0.88,0.98)
+	var white_mix := 0.38 if _substrate == "uncoated_fiber" else 0.20
+	var readable_fiber := _fiber_tint.lerp(Color.WHITE,white_mix)
 	_fiber_material.albedo_color = Color(readable_fiber.r,readable_fiber.g,readable_fiber.b,fiber_alpha)
 
 	_draw_adhesive_layer()
