@@ -11,9 +11,11 @@ func _process(_delta: float) -> void:
 	if venue == null or not venue.has_method("get_active_profile_id"):
 		return
 	var next_id := String(venue.call("get_active_profile_id"))
-	if next_id == _active_id:
-		return
 	_active_id = next_id
+	# VenuePresentation owns semantic scene switching and can be reapplied by the
+	# gameplay parent after child _ready(). Lighting is the final presentation
+	# authority, so reassert the small three-light profile instead of allowing
+	# that later venue write to leave the hero product permanently orange.
 	_apply(root,next_id)
 
 func _apply(root: Node, venue_id: String) -> void:
@@ -46,16 +48,19 @@ func _apply(root: Node, venue_id: String) -> void:
 			rim.light_energy = 0.48
 		_set_ambient(world,Color(0.75,0.84,0.90),0.60)
 	else:
+		# cafe_v1 is warm because of the room and table, but the hero cup sits
+		# beside a large daylight window. Keep the foreground key/fill close to
+		# neutral so white paper and skin do not turn prototype orange.
 		if key != null:
-			key.light_color = Color(1.0,0.84,0.68)
-			key.light_energy = 0.78
+			key.light_color = Color(1.0,0.965,0.91)
+			key.light_energy = 0.80
 		if fill != null:
-			fill.light_color = Color(0.98,0.86,0.72)
-			fill.light_energy = 0.72
+			fill.light_color = Color(0.92,0.965,1.0)
+			fill.light_energy = 0.68
 		if rim != null:
-			rim.light_color = Color(0.76,0.86,1.0)
-			rim.light_energy = 0.42
-		_set_ambient(world,Color(0.50,0.38,0.27),0.46)
+			rim.light_color = Color(1.0,0.80,0.61)
+			rim.light_energy = 0.34
+		_set_ambient(world,Color(0.54,0.48,0.41),0.42)
 
 func _set_ambient(world: WorldEnvironment, color: Color, energy: float) -> void:
 	if world == null or world.environment == null:
