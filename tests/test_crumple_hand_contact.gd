@@ -82,10 +82,14 @@ func run() -> Array[String]:
 		var peel_pinch_delta := peel_pinch - peel_entry_pinch
 		var support_transform_error := support_root_delta.distance_to(support_pinch_delta)
 		var peel_transform_error := peel_root_delta.distance_to(peel_pinch_delta)
+		var support_target := _closest_surface_point(shell, support_entry_pinch)
+		var peel_target := _closest_surface_point(shell, peel_entry_pinch)
+		var support_target_error := support_pinch.distance_to(support_target)
+		var peel_target_error := peel_pinch.distance_to(peel_target)
 		if support_gap > MAX_CONTACT_GAP:
-			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f transform_error=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_transform_error, str(staging.get("_active"))])
+			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f transform_error=%.3f target_error=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_transform_error, support_target_error, str(staging.get("_active"))])
 		if peel_gap > MAX_CONTACT_GAP:
-			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f transform_error=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_transform_error, str(staging.get("_active"))])
+			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f transform_error=%.3f target_error=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_transform_error, peel_target_error, str(staging.get("_active"))])
 
 	source.reset_visual()
 	if not support.position.is_equal_approx(support_home):
@@ -97,13 +101,21 @@ func run() -> Array[String]:
 	return failures
 
 func _surface_gap(shell: MeshInstance3D, world_point: Vector3) -> float:
+	return world_point.distance_to(_closest_surface_point(shell, world_point))
+
+func _closest_surface_point(shell: MeshInstance3D, world_point: Vector3) -> Vector3:
 	if shell == null or shell.mesh == null or shell.mesh.get_surface_count() == 0:
-		return INF
+		return Vector3(INF, INF, INF)
 	var arrays := shell.mesh.surface_get_arrays(0)
 	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
 	if vertices.is_empty():
-		return INF
-	var best := INF
+		return Vector3(INF, INF, INF)
+	var best_world := shell.to_global(vertices[0])
+	var best_distance := world_point.distance_squared_to(best_world)
 	for vertex in vertices:
-		best = minf(best, world_point.distance_to(shell.to_global(vertex)))
-	return best
+		var candidate := shell.to_global(vertex)
+		var distance := world_point.distance_squared_to(candidate)
+		if distance < best_distance:
+			best_distance = distance
+			best_world = candidate
+	return best_world
