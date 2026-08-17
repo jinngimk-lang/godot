@@ -2,9 +2,8 @@ extends RefCounted
 
 const MAX_VISIBLE_CONTACT_GAP := 0.045
 
-func run() -> Array[String]:
+func run(tree: SceneTree) -> Array[String]:
 	var failures: Array[String] = []
-	var tree := Engine.get_main_loop() as SceneTree
 	var packed := load("res://scenes/peel_lab/peel_lab.tscn") as PackedScene
 	if tree == null or packed == null:
 		failures.append("RED: crumple contact test requires the live PeelLab scene tree")
