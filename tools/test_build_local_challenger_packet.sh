@@ -11,17 +11,29 @@ cd "$tmp"
 git init -q
 git config user.email challenger-test@example.invalid
 git config user.name ChallengerPacketTest
-mkdir -p scripts tests
+mkdir -p scripts/presentation scripts/peel scripts/session tests
 
-# Create five large changed files whose actual diff is small. This models a
-# normal visual/product PR where full-file excerpts, not the patch itself,
-# are what can push the local model packet over its strict safety budget.
-for path in scripts/a.gd scripts/b.gd scripts/c.gd tests/a.gd tests/b.gd; do
+# Model a real fast visual batch: several production/test files all carry
+# meaningful edits, so the exact patch itself is much larger than the model's
+# 42 KB packet ceiling. The packet builder must bound evidence per changed file
+# rather than fail or silently drop tail files.
+paths=(
+  scripts/presentation/a.gd
+  scripts/presentation/b.gd
+  scripts/peel/a.gd
+  scripts/session/a.gd
+  tests/a.gd
+  tests/b.gd
+  tests/c.gd
+  tests/d.gd
+)
+
+for path in "${paths[@]}"; do
   {
     echo 'extends RefCounted'
     echo 'const REVISION := "base"'
-    for i in $(seq 1 420); do
-      printf 'var field_%03d := "stable context line %03d for challenger packet sizing"\n' "$i" "$i"
+    for i in $(seq 1 190); do
+      printf 'var field_%03d := "base evidence line %03d with enough text to create a genuinely large product diff"\n' "$i" "$i"
     done
   } > "$path"
 done
@@ -30,13 +42,20 @@ git add .
 git commit -qm base
 base="$(git rev-parse HEAD)"
 
-for path in scripts/a.gd scripts/b.gd scripts/c.gd tests/a.gd tests/b.gd; do
+for path in "${paths[@]}"; do
   sed -i 's/const REVISION := "base"/const REVISION := "candidate"/' "$path"
+  sed -i 's/base evidence line/candidate evidence line/g' "$path"
 done
 
 git add .
 git commit -qm candidate
 head="$(git rev-parse HEAD)"
+
+raw_diff_bytes="$(git diff "$base...$head" | wc -c)"
+if [ "$raw_diff_bytes" -le 42000 ]; then
+  echo "packet self-test fixture is not large enough: raw diff=$raw_diff_bytes" >&2
+  exit 1
+fi
 
 TASK_ID_VALUE=1 PR_NUMBER_VALUE=1 EXPECTED_HEAD_VALUE="$head" ROUND_VALUE=1 \
   bash "$tmp/build_local_challenger_packet.sh" "$base" "$head" "$tmp/packet.txt"
@@ -47,14 +66,19 @@ if [ "$bytes" -ge 42000 ]; then
   exit 1
 fi
 
-# The bounded generic packet must still contain evidence from every changed
-# file rather than solving the limit by dropping tail files wholesale.
-for path in scripts/a.gd scripts/b.gd scripts/c.gd tests/a.gd tests/b.gd; do
-  grep -Fq -- "--- $path ---" "$tmp/packet.txt" || {
-    echo "packet self-test lost changed-file evidence for $path" >&2
+# Every changed file must retain both a bounded exact-diff section and a head
+# evidence excerpt. This prevents a budget fix from just chopping off later
+# files and making evidence anchoring impossible for part of the batch.
+for path in "${paths[@]}"; do
+  grep -Fq -- "--- EXACT DIFF: $path ---" "$tmp/packet.txt" || {
+    echo "packet self-test lost exact-diff evidence for $path" >&2
+    exit 1
+  }
+  grep -Fq -- "--- HEAD EXCERPT: $path ---" "$tmp/packet.txt" || {
+    echo "packet self-test lost head excerpt for $path" >&2
     exit 1
   }
 done
 
 grep -Fq 'const REVISION := "candidate"' "$tmp/packet.txt"
-echo "Local Challenger packet budget self-test PASS ($bytes bytes)"
+echo "Local Challenger large-batch packet self-test PASS (raw=$raw_diff_bytes packet=$bytes bytes)"
