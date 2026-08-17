@@ -21,6 +21,10 @@ var _peel_entry_pinch := Vector3.ZERO
 var _support_last_contact_world := Vector3(INF, INF, INF)
 var _peel_last_contact_world := Vector3(INF, INF, INF)
 var _last_contact_weight := 0.0
+var _bind_count := 0
+var _changed_count := 0
+var _activation_count := 0
+var _progress_trace: Array[float] = []
 
 func _ready() -> void:
 	process_priority = 100
@@ -31,6 +35,7 @@ func _process(_delta: float) -> void:
 		_apply_contact(_source.get_progress())
 
 func _bind() -> void:
+	_bind_count += 1
 	var parent := get_parent()
 	if parent == null:
 		return
@@ -47,6 +52,8 @@ func _bind() -> void:
 	_on_crumple_changed(_source.get_progress())
 
 func _on_crumple_changed(progress: float) -> void:
+	_changed_count += 1
+	_progress_trace.append(progress)
 	if not _has_home or _support_hand == null or _peel_hand == null:
 		return
 	var safe_progress := clampf(progress if is_finite(progress) else 0.0, 0.0, 1.0)
@@ -56,6 +63,7 @@ func _on_crumple_changed(progress: float) -> void:
 		_peel_hand.position = _peel_home
 		return
 	if not _active:
+		_activation_count += 1
 		_active = true
 		_support_entry_global = _support_hand.global_position
 		_peel_entry_global = _peel_hand.global_position
