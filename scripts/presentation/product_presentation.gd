@@ -2,6 +2,22 @@ extends Node3D
 class_name ProductPresentation
 
 const BOTTLE_SEGMENTS := 80
+const GLASS_EDGE_SHADER := """shader_type spatial;
+render_mode blend_mix, cull_disabled, depth_draw_never;
+uniform vec4 edge_color : source_color = vec4(1.0, 0.78, 0.52, 1.0);
+uniform float edge_alpha = 0.24;
+uniform float fresnel_power = 3.2;
+void fragment() {
+	float grazing = clamp(1.0 - dot(NORMAL, VIEW), 0.0, 1.0);
+	float fresnel = pow(grazing, fresnel_power);
+	ALBEDO = edge_color.rgb;
+	ALPHA = edge_alpha * fresnel;
+	ROUGHNESS = mix(0.075, 0.022, fresnel);
+	SPECULAR = 0.92;
+	CLEARCOAT = 0.94;
+	CLEARCOAT_GLOSS = 0.95;
+}
+"""
 
 var _active_kind := "paper_cup"
 
@@ -68,15 +84,28 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var source_alpha := float(profile.get("glass_alpha",0.36 if amber else 0.16))
 	var roughness := float(profile.get("roughness",0.048 if amber else 0.040))
 	var outer_profile := _bottle_profile(neck_radius,amber)
+	var outer_mesh := _build_lathe_mesh(outer_profile,false,false)
 
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
 	# The bottle is open at the mouth. A top cap turns into a bright flat disk in
 	# the product camera and reads as a plastic stopper instead of glass.
-	outer.mesh = _build_lathe_mesh(outer_profile,false,false)
+	outer.mesh = outer_mesh
 	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.46),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
+
+	# A continuous, slightly expanded copy of the same lathed bottle surface
+	# carries only grazing-angle response. This gives the glass a coherent
+	# shoulder/neck/body contour as it rotates, without fake rectangular guide
+	# highlights or a screen-space overlay that could detach from the bottle.
+	var edge := MeshInstance3D.new()
+	edge.name = "BottleEdgeFresnel"
+	edge.mesh = outer_mesh
+	edge.scale = Vector3.ONE * 1.006
+	edge.material_override = _glass_edge_material(body_color, source_alpha, amber)
+	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(edge)
 
 	var inner_profile: Array[Vector2] = []
 	for sample in outer_profile:
@@ -275,3 +304,17 @@ func _glass_mat(color: Color, alpha: float, roughness: float) -> StandardMateria
 	mat.clearcoat_roughness = 0.055
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
+
+func _glass_edge_material(body_color: Color, source_alpha: float, amber: bool) -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = GLASS_EDGE_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var edge_color := body_color.lightened(0.48 if amber else 0.03)
+	if not amber:
+		edge_color = Color(0.92,0.985,1.0,1.0)
+	material.set_shader_parameter("edge_color", edge_color)
+	material.set_shader_parameter("edge_alpha", clampf(source_alpha * (0.82 if amber else 1.18), 0.13, 0.34))
+	material.set_shader_parameter("fresnel_power", 3.15 if amber else 3.65)
+	material.render_priority = 1
+	return material
