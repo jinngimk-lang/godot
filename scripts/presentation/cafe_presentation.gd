@@ -31,6 +31,7 @@ func _apply() -> void:
 	_build_world_environment()
 	_build_backdrop()
 	_build_lid_detail()
+	_sync_product_paper_details()
 	_build_ground_shadow()
 	_build_cup_structure()
 	_tune_parent_lighting()
@@ -124,6 +125,31 @@ func _build_lid_detail() -> void:
 	lid_center.position = Vector3(lid.position.x, lid_top_y + 0.033, lid.position.z)
 	lid_center.material_override = _material(Color(0.115, 0.103, 0.094, 1.0), 0.48)
 	add_child(lid_center)
+
+func _sync_product_paper_details() -> void:
+	# ProductPresentation owns generic paper construction cues. Once the café
+	# cup changes proportion, keep those cues fitted to the real production mesh
+	# so a stale wide PaperLip cannot visually mask the black molded lid.
+	var parent := get_parent()
+	if parent == null:
+		return
+	var cup := parent.get_node_or_null("Cup") as MeshInstance3D
+	var product := parent.get_node_or_null("ProductPresentation") as Node3D
+	if cup == null or product == null or not (cup.mesh is CylinderMesh):
+		return
+	var cup_mesh := cup.mesh as CylinderMesh
+	var paper_lip := product.get_node_or_null("CupPaperDetails/PaperLip") as MeshInstance3D
+	if paper_lip != null and paper_lip.mesh is CylinderMesh:
+		var lip_mesh := paper_lip.mesh as CylinderMesh
+		lip_mesh.top_radius = cup_mesh.top_radius + 0.015
+		lip_mesh.bottom_radius = cup_mesh.top_radius + 0.012
+		paper_lip.position.y = cup.position.y + cup_mesh.height * 0.5 - lip_mesh.height * 0.5
+	var paper_base := product.get_node_or_null("CupPaperDetails/PaperBaseFold") as MeshInstance3D
+	if paper_base != null and paper_base.mesh is CylinderMesh:
+		var base_mesh := paper_base.mesh as CylinderMesh
+		base_mesh.top_radius = cup_mesh.bottom_radius + 0.008
+		base_mesh.bottom_radius = cup_mesh.bottom_radius + 0.006
+		paper_base.position.y = cup.position.y - cup_mesh.height * 0.5 + base_mesh.height * 0.5
 
 func _build_ground_shadow() -> void:
 	# With the hard directional shadow removed, use one controlled translucent
