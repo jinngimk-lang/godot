@@ -45,11 +45,7 @@ func _init() -> void:
 	]:
 		if ResourceLoader.exists(suite_path):
 			var suite = load(suite_path).new()
-			var suite_failures: Array[String] = suite.run()
-			for failure in suite_failures:
-				var grounded := "%s :: %s" % [suite_path, failure]
-				print("::error title=Godot deterministic test::%s" % grounded)
-				failures.append(grounded)
+			failures.append_array(suite.run())
 
 	if failures.is_empty():
 		print("PASS: all deterministic tests")
