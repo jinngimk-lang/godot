@@ -103,6 +103,21 @@ func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3A
 func get_paper_thickness() -> float:
 	return clampf(label_height * 0.014, 0.0032, 0.0060)
 
+func get_torn_front_fringe(progress: float) -> PackedVector2Array:
+	var fringe := PackedVector2Array()
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	if p <= 0.025:
+		return fringe
+	var fiber_count := 7
+	for i in range(fiber_count):
+		var t := float(i+1)/float(fiber_count+1)
+		var y_jitter := _edge_noise(i,41)*label_height*0.026
+		var y_offset := lerpf(-label_height*0.42,label_height*0.42,t)+y_jitter
+		var length_noise := (_edge_noise(i,47)+1.0)*0.5
+		var length := 0.0085+length_noise*0.0115
+		fringe.append(Vector2(y_offset,length))
+	return fringe
+
 func get_edge_offsets(progress: float) -> PackedVector2Array:
 	var result := PackedVector2Array()
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
@@ -166,6 +181,7 @@ func set_peel(progress: float, grip_local: Vector3) -> void:
 
 	_draw_paper_edge(top_vertices,top_normals,true)
 	_draw_paper_edge(bottom_vertices,bottom_normals,false)
+	_draw_torn_front_fringe(points,_last_progress)
 
 func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array, top_edge: bool) -> void:
 	if vertices.size()<2 or normals.size()!=vertices.size():
@@ -183,6 +199,34 @@ func _draw_paper_edge(vertices: PackedVector3Array, normals: PackedVector3Array,
 		_mesh.surface_set_normal(side_normal)
 		_mesh.surface_set_uv(Vector2(u,1.0))
 		_mesh.surface_add_vertex(back)
+	_mesh.surface_end()
+
+func _draw_torn_front_fringe(points: PackedVector3Array, progress: float) -> void:
+	var fringe := get_torn_front_fringe(progress)
+	if fringe.is_empty() or points.size()<3:
+		return
+	var boundary_index := clampi(int(round(progress*float(points.size()-1))),1,points.size()-1)
+	var boundary_center := points[boundary_index]
+	var peel_direction := points[boundary_index-1]-boundary_center
+	if peel_direction.length_squared()<=0.000001:
+		return
+	peel_direction = peel_direction.normalized()
+	var normal := _normal_from_points(points,boundary_index)
+	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_edge_material)
+	for i in range(fringe.size()):
+		var fiber := fringe[i]
+		var half_width := 0.0018+0.0010*float(i%3)
+		var base_center := boundary_center+Vector3.UP*fiber.x+normal*0.0015
+		var tip := base_center+peel_direction*fiber.y+Vector3.UP*_edge_noise(i,59)*0.0028
+		_mesh.surface_set_normal(normal)
+		_mesh.surface_set_uv(Vector2(0.0,0.0))
+		_mesh.surface_add_vertex(base_center+Vector3.UP*half_width)
+		_mesh.surface_set_normal(normal)
+		_mesh.surface_set_uv(Vector2(0.0,1.0))
+		_mesh.surface_add_vertex(base_center-Vector3.UP*half_width)
+		_mesh.surface_set_normal(normal)
+		_mesh.surface_set_uv(Vector2(1.0,0.5))
+		_mesh.surface_add_vertex(tip)
 	_mesh.surface_end()
 
 func _edge_noise(index: int, salt: int) -> float:
