@@ -18,6 +18,17 @@ void fragment() {
 	CLEARCOAT_ROUGHNESS = 0.05;
 }
 """
+const CONTACT_SHADOW_SHADER := """shader_type spatial;
+render_mode unshaded, blend_mix, cull_disabled, depth_draw_never;
+uniform vec4 shadow_color : source_color = vec4(0.035, 0.020, 0.012, 0.24);
+void fragment() {
+	vec2 p = (UV - vec2(0.5)) * 2.0;
+	float radial = dot(p, p);
+	float feather = 1.0 - smoothstep(0.10, 1.0, radial);
+	ALBEDO = shadow_color.rgb;
+	ALPHA = shadow_color.a * feather;
+}
+"""
 
 var _active_kind := "paper_cup"
 
@@ -37,6 +48,7 @@ func apply_profile(profile: Dictionary) -> void:
 		_build_bottle(profile,false)
 	else:
 		_build_paper(profile)
+	_build_contact_shadow(requested)
 
 func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionary) -> void:
 	if body == null:
@@ -61,6 +73,29 @@ func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionar
 
 func set_inspection_yaw(yaw: float) -> void:
 	rotation.y = yaw if is_finite(yaw) else 0.0
+
+func _build_contact_shadow(kind: String) -> void:
+	var shadow := MeshInstance3D.new()
+	shadow.name = "ProductContactShadow"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.98,0.50) if kind == "paper_cup" else Vector2(0.76,0.41)
+	shadow.mesh = quad
+	shadow.position = Vector3(0.0,-0.632,0.015)
+	shadow.rotation_degrees = Vector3(-90.0,0.0,0.0)
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var shader := Shader.new()
+	shader.code = CONTACT_SHADOW_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var tone := Color(0.045,0.024,0.012,0.26)
+	if kind == "amber_bottle":
+		tone = Color(0.030,0.012,0.006,0.29)
+	elif kind == "clear_bottle":
+		tone = Color(0.060,0.075,0.080,0.20)
+	material.set_shader_parameter("shadow_color",tone)
+	material.render_priority = -2
+	shadow.material_override = material
+	add_child(shadow)
 
 func _build_paper(profile: Dictionary) -> void:
 	var root := Node3D.new()
