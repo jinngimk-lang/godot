@@ -11,7 +11,11 @@ func run() -> Array[String]:
 	var hand := HandVisual.new()
 	hand.setup(false)
 	var staged_root := Vector3(0.60,0.22,0.40)
-	hand.snap_to(staged_root)
+	# This is a pure root-preservation contract. Avoid snap_to(), which reads a
+	# global transform and therefore requires the probe node to be inside a live
+	# SceneTree; direct local position is sufficient and keeps this unit test
+	# deterministic/headless.
+	hand.position = staged_root
 	presentation.call("_scale_support_hand_keep_root",hand)
 	if hand.position.distance_to(staged_root) > 0.000001:
 		failures.append("SUPPORT_SCALE_RED: support-hand scaling moved the staged HandVisual root by %.6f" % hand.position.distance_to(staged_root))
