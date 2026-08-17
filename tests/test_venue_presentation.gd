@@ -23,4 +23,25 @@ func run() -> Array[String]:
 	venue.apply_profile({"id":"unknown"})
 	if venue.get_active_profile_id() != "cafe_window": failures.append("unknown venue ids should fall back to cafe_window")
 	venue.free()
+
+	# Reference backdrop must cover the widest live reference camera, not only the
+	# original 39-degree cafe framing.  At 48 degrees the current camera reaches
+	# farther laterally at the backdrop plane; include 4% overscan so raster edge
+	# rounding cannot reveal world-clear black wedges in bottle scenes.
+	var backdrop_path := "res://scripts/presentation/reference_backdrop.gd"
+	if not ResourceLoader.exists(backdrop_path):
+		failures.append("reference backdrop presentation must exist")
+	else:
+		var backdrop = load(backdrop_path).new()
+		var camera_position := Vector3(0.0,0.80,3.55)
+		var camera_focus := Vector3(0.0,0.15,0.0)
+		var backdrop_z := -1.43
+		var forward := (camera_focus-camera_position).normalized()
+		var ray_distance := (backdrop_z-camera_position.z)/forward.z
+		var aspect := 16.0/9.0
+		var half_horizontal_tan := tan(deg_to_rad(48.0*0.5))*aspect
+		var required_width := 2.0*ray_distance*half_horizontal_tan*1.04
+		if backdrop.TARGET_WORLD_WIDTH < required_width:
+			failures.append("bottle reference backdrop must cover 48-degree camera with overscan (%.3f < %.3f)" % [backdrop.TARGET_WORLD_WIDTH,required_width])
+		backdrop.free()
 	return failures
