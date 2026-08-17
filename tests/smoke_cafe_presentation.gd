@@ -72,6 +72,34 @@ func _run() -> void:
 			if after_seam.r >= probe_material.albedo_color.r or after_fold.r >= probe_material.albedo_color.r:
 				failures.append("CAFE_RED: seam/base paper details should remain a subtle darker structural variation of the Cup palette")
 
+	# The old CafePresentation tree is intentionally hidden by PeelLab. Lid
+	# acceptance must therefore be proved on the live ProductPresentation tree,
+	# not by hidden legacy geometry that can never appear in runtime captures.
+	var product := scene.get_node_or_null("ProductPresentation") as ProductPresentation
+	if product == null:
+		failures.append("CAFE_RED: missing live ProductPresentation")
+	else:
+		var molded := product.get_node_or_null("CafeLidMoldedDetail") as Node3D
+		if molded == null or not molded.visible:
+			failures.append("CAFE_RED: live paper-cup product needs visible CafeLidMoldedDetail")
+		else:
+			var sip_tab := molded.get_node_or_null("LidSipTab") as MeshInstance3D
+			if sip_tab == null or not (sip_tab.mesh is CylinderMesh) or sip_tab.material_override == null or not sip_tab.visible:
+				failures.append("CAFE_RED: live black lid needs a visible molded LidSipTab")
+			else:
+				var sip_mesh := sip_tab.mesh as CylinderMesh
+				if sip_mesh.top_radius < 0.055 or sip_mesh.top_radius > 0.095 or sip_mesh.height < 0.008 or sip_mesh.height > 0.028:
+					failures.append("CAFE_RED: LidSipTab must stay a subtle molded drinking feature")
+				if sip_tab.position.z < 0.12:
+					failures.append("CAFE_RED: LidSipTab must sit toward the camera-facing drinking edge")
+			var vent := molded.get_node_or_null("LidVentDimple") as MeshInstance3D
+			if vent == null or not (vent.mesh is CylinderMesh) or vent.material_override == null or not vent.visible:
+				failures.append("CAFE_RED: live black lid needs a small visible LidVentDimple")
+			else:
+				var vent_mesh := vent.mesh as CylinderMesh
+				if vent_mesh.top_radius > 0.035 or vent_mesh.height > 0.018:
+					failures.append("CAFE_RED: LidVentDimple must remain quiet secondary lid detail")
+
 	var label_print := scene.get_node_or_null("LabelPrint") as SubViewport
 	if label_print == null:
 		failures.append("CAFE_RED: missing LabelPrint")
@@ -100,7 +128,7 @@ func _run() -> void:
 		failures.append("CAFE_RED: hard directional shadows should be disabled in calm close-up presentation")
 
 	if failures.is_empty():
-		print("PASS: cafe backdrop, soft grounding, paper-cup structure and receipt print layout")
+		print("PASS: cafe backdrop, visible molded lid, soft grounding, paper-cup structure and receipt print layout")
 		scene.queue_free()
 		await process_frame
 		quit(0)
