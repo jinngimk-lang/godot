@@ -97,6 +97,32 @@ func _build_lid_detail() -> void:
 	lid_center.material_override = _material(Color(0.145, 0.130, 0.118, 1.0), 0.46)
 	add_child(lid_center)
 
+	# The locked café reference reads as a molded takeaway lid rather than a
+	# stack of featureless black discs. Keep these cues small enough that the
+	# receipt and hands remain the interaction focus.
+	var sip_tab := MeshInstance3D.new()
+	sip_tab.name = "LidSipTab"
+	var sip_mesh := CylinderMesh.new()
+	sip_mesh.top_radius = 0.072
+	sip_mesh.bottom_radius = 0.078
+	sip_mesh.height = 0.014
+	sip_tab.mesh = sip_mesh
+	sip_tab.position = Vector3(0.0, 0.910, 0.205)
+	sip_tab.scale = Vector3(1.0, 1.0, 0.48)
+	sip_tab.material_override = _material(Color(0.185, 0.170, 0.155, 1.0), 0.40)
+	add_child(sip_tab)
+
+	var vent := MeshInstance3D.new()
+	vent.name = "LidVentDimple"
+	var vent_mesh := CylinderMesh.new()
+	vent_mesh.top_radius = 0.025
+	vent_mesh.bottom_radius = 0.027
+	vent_mesh.height = 0.009
+	vent.mesh = vent_mesh
+	vent.position = Vector3(-0.115, 0.907, -0.055)
+	vent.material_override = _material(Color(0.060, 0.054, 0.050, 1.0), 0.56)
+	add_child(vent)
+
 func _build_ground_shadow() -> void:
 	# With the hard directional shadow removed, use one controlled translucent
 	# ellipse to ground the cup without casting giant hand/forearm diagonals.
