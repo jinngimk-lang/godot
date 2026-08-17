@@ -50,16 +50,18 @@ func _run() -> void:
 		push_error("CRUMPLE_CONTACT_RED: 55% Café crumple must expose the rendered CrumpledCup shell")
 		quit(1)
 		return
-	print("CRUMPLE_OWNER_TRACE venue=%s source=%.3f yields=%s choreo_processing=%s" % [
+	print("CRUMPLE_OWNER_TRACE venue=%s source=%.3f yields=%s choreo_processing=%s ritual=%s target=%s" % [
 		venue.get_active_profile_id(),
 		source.get_progress(),
 		str(choreography.call("_cafe_crumple_owns_peel_hand",venue.get_active_profile_id())),
-		str(choreography.is_processing())
+		str(choreography.is_processing()),
+		String(ritual.get_phase_name()),
+		str(peel.get("_target"))
 	])
-	_trace_gaps("signal",shell,support,peel)
+	_trace_gaps("signal",shell,support,peel,ritual)
 	for frame_index in range(4):
 		await process_frame
-		_trace_gaps("frame%d" % (frame_index+1),shell,support,peel)
+		_trace_gaps("frame%d" % (frame_index+1),shell,support,peel,ritual)
 
 	var support_gap := _nearest_shell_vertex_gap(shell,support.get_pinch_world_position())
 	var peel_gap := _nearest_shell_vertex_gap(shell,peel.get_pinch_world_position())
@@ -88,13 +90,15 @@ func _run() -> void:
 	await process_frame
 	quit(1)
 
-func _trace_gaps(label: String,shell: MeshInstance3D,support: HandVisual,peel: HandVisual) -> void:
-	print("CRUMPLE_CONTACT_TRACE %s support=%.4f peel=%.4f support_root=%s peel_root=%s" % [
+func _trace_gaps(label: String,shell: MeshInstance3D,support: HandVisual,peel: HandVisual,ritual) -> void:
+	print("CRUMPLE_CONTACT_TRACE %s support=%.4f peel=%.4f support_root=%s peel_root=%s target=%s ritual=%s" % [
 		label,
 		_nearest_shell_vertex_gap(shell,support.get_pinch_world_position()),
 		_nearest_shell_vertex_gap(shell,peel.get_pinch_world_position()),
 		str(support.position),
-		str(peel.position)
+		str(peel.position),
+		str(peel.get("_target")),
+		String(ritual.get_phase_name())
 	])
 
 func _nearest_shell_vertex_gap(shell: MeshInstance3D,world_point: Vector3) -> float:
