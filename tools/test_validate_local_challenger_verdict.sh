@@ -54,3 +54,7 @@ EOF
 bash "$validator" "$tmp/verified.json" "$packet"
 
 echo "Local Challenger verdict validator self-test PASS"
+
+# Keep the packet builder inside the same permanent CI guard so a normal
+# multi-file product PR cannot silently outgrow the local review budget again.
+bash tools/test_build_local_challenger_packet.sh
