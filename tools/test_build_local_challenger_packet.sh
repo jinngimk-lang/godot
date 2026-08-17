@@ -82,3 +82,26 @@ done
 
 grep -Fq 'const REVISION := "candidate"' "$tmp/packet.txt"
 echo "Local Challenger large-batch packet self-test PASS (raw=$raw_diff_bytes packet=$bytes bytes)"
+
+# Capture fixtures are shared evidence infrastructure. Editing the capture file
+# alone must remain a generic exact-diff review; otherwise residue/table/glass
+# batches accidentally pull the entire hand contract bundle and exceed budget.
+capture_base="$head"
+cat > tests/capture_reference_frames.gd <<'CAPTURE'
+extends SceneTree
+func _stage_inspect() -> void:
+    print("residue evidence stays detached")
+CAPTURE
+git add tests/capture_reference_frames.gd
+git commit -qm capture-only
+capture_head="$(git rev-parse HEAD)"
+TASK_ID_VALUE=2 PR_NUMBER_VALUE=2 EXPECTED_HEAD_VALUE="$capture_head" ROUND_VALUE=1 \
+  bash "$tmp/build_local_challenger_packet.sh" "$capture_base" "$capture_head" "$tmp/capture-packet.txt"
+
+grep -Fq -- '--- EXACT DIFF: tests/capture_reference_frames.gd ---' "$tmp/capture-packet.txt"
+grep -Fq -- '--- HEAD EXCERPT: tests/capture_reference_frames.gd ---' "$tmp/capture-packet.txt"
+if grep -Fq '=== DIRECT PRESENTATION/INTERACTION CONTRACTS ===' "$tmp/capture-packet.txt"; then
+  echo 'capture-only packet incorrectly routed into hand-contract bundle' >&2
+  exit 1
+fi
+echo "Local Challenger capture-only routing self-test PASS ($(wc -c < "$tmp/capture-packet.txt") bytes)"
