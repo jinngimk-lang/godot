@@ -148,7 +148,12 @@ append_header
 
 if printf '%s\n' "$changed_paths" | grep -Eq '(^|/)(hud_chrome_presentation\.gd|test_hud_chrome_presentation\.gd)$'; then
   append_hud_contracts
-elif printf '%s\n' "$changed_paths" | grep -Eq '(hand_visual|hand_choreography|capture_reference_frames|authored_hand|reference.*hand|peel.*grip|partial.*peel)'; then
+# A capture fixture may be edited for residue, table, glass, HUD, or other
+# presentation evidence. That file alone must not route the packet into the
+# much larger hand-contract bundle. Exact diff + HEAD excerpt already preserve
+# the capture change in the generic packet. Only actual hand/pose/grip paths
+# opt into the broader hand ownership context.
+elif printf '%s\n' "$changed_paths" | grep -Eq '(hand_visual|hand_choreography|authored_hand|reference.*hand|peel.*grip|partial.*peel)'; then
   append_hand_contracts
 else
   append_generic_contracts
