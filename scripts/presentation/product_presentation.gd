@@ -89,7 +89,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
 	outer.mesh = outer_mesh
-	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.46),roughness)
+	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.62),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
 
@@ -306,9 +306,9 @@ func _glass_edge_material(body_color: Color, source_alpha: float, amber: bool) -
 	material.shader = shader
 	var edge_color := body_color.lightened(0.48 if amber else 0.03)
 	if not amber:
-		edge_color = Color(0.92,0.985,1.0,1.0)
+		edge_color = Color(0.74,0.86,0.90,1.0)
 	material.set_shader_parameter("edge_color", edge_color)
-	material.set_shader_parameter("edge_alpha", clampf(source_alpha * (0.82 if amber else 1.18), 0.13, 0.34))
-	material.set_shader_parameter("fresnel_power", 3.15 if amber else 3.65)
+	material.set_shader_parameter("edge_alpha", clampf(source_alpha * (0.82 if amber else 1.46), 0.13, 0.34))
+	material.set_shader_parameter("fresnel_power", 3.15 if amber else 3.25)
 	material.render_priority = 1
 	return material
