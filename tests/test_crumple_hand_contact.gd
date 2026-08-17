@@ -88,10 +88,15 @@ func run() -> Array[String]:
 		var peel_target_delta := peel_target - peel_entry_pinch
 		var support_placement_error := support_root_delta.distance_to(support_target_delta)
 		var peel_placement_error := peel_root_delta.distance_to(peel_target_delta)
+		var support_last_contact: Vector3 = staging.get("_support_last_contact_world")
+		var peel_last_contact: Vector3 = staging.get("_peel_last_contact_world")
+		var support_contact_drift := support_last_contact.distance_to(support_target)
+		var peel_contact_drift := peel_last_contact.distance_to(peel_target)
+		var contact_weight: float = staging.get("_last_contact_weight")
 		if support_gap > MAX_CONTACT_GAP:
-			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_target_delta.length(), support_transform_error, support_placement_error, str(staging.get("_active"))])
+			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f weight=%.3f active=%s" % [support_gap, support.position.distance_to(support_home), support_target_delta.length(), support_transform_error, support_placement_error, support_contact_drift, contact_weight, str(staging.get("_active"))])
 		if peel_gap > MAX_CONTACT_GAP:
-			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_target_delta.length(), peel_transform_error, peel_placement_error, str(staging.get("_active"))])
+			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f root_travel=%.3f target_travel=%.3f transform_error=%.3f placement_error=%.3f contact_drift=%.3f weight=%.3f active=%s" % [peel_gap, peel.position.distance_to(peel_home), peel_target_delta.length(), peel_transform_error, peel_placement_error, peel_contact_drift, contact_weight, str(staging.get("_active"))])
 
 	source.reset_visual()
 	if not support.position.is_equal_approx(support_home):
