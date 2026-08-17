@@ -2,6 +2,8 @@ extends SceneTree
 
 const TEST_CUBE_SIZE := 0.145
 const GLASS_ICE_MAX_CENTER_Y := 0.34
+const GLASS_MIN_VERTICAL_SPAN := TEST_CUBE_SIZE * 0.40
+const GLASS_MIN_PAIR_DISTANCE := TEST_CUBE_SIZE * 0.82
 
 func _init() -> void:
 	call_deferred("_run")
@@ -90,10 +92,9 @@ func _run() -> void:
 			if child is MeshInstance3D and not (child as MeshInstance3D).transform.is_equal_approx(base_transforms[i]):
 				failures.append("reset_visual should restore deterministic base ice transform for cube %d" % i)
 
-	# Glass bottles use the same deterministic ice presenter, but their visible
-	# shoulder/neck extends far above the cylindrical interaction proxy. Ice must
-	# remain in the liquid/body region instead of floating into the shoulder and
-	# reading as a bright plastic bottle cap in the product camera.
+	# Glass bottles use a body cluster rather than the paper-cup rim layout. The
+	# cubes must remain individually readable from the product camera instead of
+	# merging into one opaque cyan slab.
 	var glass_ice_profile := {
 		"cup_shell": "clear_glass",
 		"cup_dimensions": {"top_radius": 0.335, "bottom_radius": 0.315, "height": 1.52},
@@ -102,7 +103,8 @@ func _run() -> void:
 			"count": 3,
 			"cube_size": TEST_CUBE_SIZE,
 			"motion_gain": 0.55,
-			"max_center_y": GLASS_ICE_MAX_CENTER_Y
+			"max_center_y": GLASS_ICE_MAX_CENTER_Y,
+			"layout": "glass_cluster"
 		}
 	}
 	presentation.set_profile(glass_ice_profile)
@@ -110,11 +112,36 @@ func _run() -> void:
 	if glass_container == null or glass_container.get_child_count() != 3:
 		failures.append("glass ice profile should preserve all three deterministic cubes")
 	else:
+		var glass_positions: Array[Vector3] = []
+		var min_y := INF
+		var max_y := -INF
 		for child in glass_container.get_children():
 			if child is MeshInstance3D:
 				var cube := child as MeshInstance3D
+				glass_positions.append(cube.position)
+				min_y = minf(min_y, cube.position.y)
+				max_y = maxf(max_y, cube.position.y)
 				if cube.position.y > GLASS_ICE_MAX_CENTER_Y + 0.0001:
 					failures.append("RED: glass ice must stay below the bottle shoulder; y=%.3f max=%.3f" % [cube.position.y, GLASS_ICE_MAX_CENTER_Y])
+				var mat := cube.material_override as StandardMaterial3D
+				if mat == null:
+					failures.append("RED: glass ice must expose a dedicated StandardMaterial3D")
+				else:
+					if mat.transparency != BaseMaterial3D.TRANSPARENCY_ALPHA:
+						failures.append("RED: glass ice must use alpha transparency instead of an opaque cyan block")
+					if mat.albedo_color.a < 0.28 or mat.albedo_color.a > 0.62:
+						failures.append("RED: glass ice alpha should preserve readable edges without becoming opaque; got %.3f" % mat.albedo_color.a)
+					if mat.albedo_color.b - mat.albedo_color.r > 0.14:
+						failures.append("RED: glass ice should stay near-neutral rather than saturated blue")
+					if mat.roughness > 0.20:
+						failures.append("RED: glass ice should read as wet/glassy rather than chalky; roughness=%.3f" % mat.roughness)
+		if max_y - min_y < GLASS_MIN_VERTICAL_SPAN:
+			failures.append("RED: glass ice needs vertical staggering so three cubes do not merge into one slab; span=%.3f min=%.3f" % [max_y - min_y, GLASS_MIN_VERTICAL_SPAN])
+		for a in range(glass_positions.size()):
+			for b in range(a + 1, glass_positions.size()):
+				var distance := glass_positions[a].distance_to(glass_positions[b])
+				if distance < GLASS_MIN_PAIR_DISTANCE:
+					failures.append("RED: glass ice cubes need enough 3D separation to remain individually readable; pair=%d/%d distance=%.3f min=%.3f" % [a, b, distance, GLASS_MIN_PAIR_DISTANCE])
 		presentation.set_crumple(1.0, 1, 1.0)
 		for child in glass_container.get_children():
 			if child is MeshInstance3D and (child as MeshInstance3D).position.y > GLASS_ICE_MAX_CENTER_Y + 0.0001:
@@ -124,7 +151,7 @@ func _run() -> void:
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: contained ice is deterministic, shell-aware, bounded, finite and physics-free")
+		print("PASS: contained ice is deterministic, shell-aware, bounded, separated, translucent, finite and physics-free")
 		quit(0)
 		return
 	for failure in failures:
@@ -134,8 +161,6 @@ func _run() -> void:
 func _inside_bounded_surface_band(position: Vector3, cube_size: float, dims: Dictionary) -> bool:
 	var inner_radius := maxf(minf(float(dims.get("top_radius", 0.0)), float(dims.get("bottom_radius", 0.0))) - cube_size * 0.60, 0.01)
 	var bottom_limit := -float(dims.get("height", 0.0)) * 0.5 + cube_size * 0.75
-	# A filled cup may let the ice top peek slightly above the paper rim, but the
-	# cube center remains near/below the rim and cannot fly free vertically.
 	var top_limit := float(dims.get("height", 0.0)) * 0.5 - cube_size * 0.10
 	var radial := Vector2(position.x, position.z).length()
 	return radial <= inner_radius + 0.0001 and position.y >= bottom_limit - 0.0001 and position.y <= top_limit + 0.0001
