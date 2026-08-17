@@ -43,13 +43,15 @@ func _run() -> void:
 	var support_home := support.position
 	var peel_home := peel.position
 	source.set_crumple(0.55,-1,0.72)
-	await _settle_frames(4)
-
 	var shell := source.get_node_or_null("CrumpledCup") as MeshInstance3D
 	if shell == null or not shell.visible or not (shell.mesh is ArrayMesh):
 		push_error("CRUMPLE_CONTACT_RED: 55% Café crumple must expose the rendered CrumpledCup shell")
 		quit(1)
 		return
+	_trace_gaps("signal",shell,support,peel)
+	for frame_index in range(4):
+		await process_frame
+		_trace_gaps("frame%d" % (frame_index+1),shell,support,peel)
 
 	var support_gap := _nearest_shell_vertex_gap(shell,support.get_pinch_world_position())
 	var peel_gap := _nearest_shell_vertex_gap(shell,peel.get_pinch_world_position())
@@ -74,7 +76,18 @@ func _run() -> void:
 		return
 	for failure in failures:
 		push_error(failure)
+	scene.queue_free()
+	await process_frame
 	quit(1)
+
+func _trace_gaps(label: String,shell: MeshInstance3D,support: HandVisual,peel: HandVisual) -> void:
+	print("CRUMPLE_CONTACT_TRACE %s support=%.4f peel=%.4f support_root=%s peel_root=%s" % [
+		label,
+		_nearest_shell_vertex_gap(shell,support.get_pinch_world_position()),
+		_nearest_shell_vertex_gap(shell,peel.get_pinch_world_position()),
+		str(support.position),
+		str(peel.position)
+	])
 
 func _nearest_shell_vertex_gap(shell: MeshInstance3D,world_point: Vector3) -> float:
 	var mesh := shell.mesh as ArrayMesh
