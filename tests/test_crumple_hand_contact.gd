@@ -2,7 +2,7 @@ extends RefCounted
 
 const MAX_CONTACT_GAP := 0.045
 
-func run() -> Array[String]:
+func run(tree: SceneTree) -> Array[String]:
 	var failures: Array[String] = []
 	var root := Node3D.new()
 
@@ -29,13 +29,25 @@ func run() -> Array[String]:
 	var support := HandVisual.new()
 	support.name = "LeftHand"
 	root.add_child(support)
-	support.setup(false)
-	support.snap_to(Vector3(0.60, 0.22, 0.40))
-	support.rotation_degrees = Vector3(14.0, 42.0, 45.0)
 
 	var peel := HandVisual.new()
 	peel.name = "RightHand"
 	root.add_child(peel)
+
+	var source := CupCrumplePresentation.new()
+	source.name = "CupCrumplePresentation"
+	root.add_child(source)
+
+	var staging := CrumpleHandStaging.new()
+	staging.name = "CrumpleHandStaging"
+	root.add_child(staging)
+
+	tree.root.add_child(root)
+
+	support.setup(false)
+	support.snap_to(Vector3(0.60, 0.22, 0.40))
+	support.rotation_degrees = Vector3(14.0, 42.0, 45.0)
+
 	peel.setup(true)
 	peel.snap_to(Vector3(-0.72, 0.28, 0.88))
 	peel.rotation_degrees = Vector3(18.0, -22.0, -8.0)
@@ -44,26 +56,13 @@ func run() -> Array[String]:
 	peel.call("_apply_pose")
 	peel.call("_refresh_pinch_anchors")
 
-	var source := CupCrumplePresentation.new()
-	source.name = "CupCrumplePresentation"
-	root.add_child(source)
+	source.call("_bind_cup")
 	source.set_profile({
 		"post_peel_action": "crumple",
 		"cup_shell": "paper",
 		"cup_dimensions": {"top_radius": 0.54, "bottom_radius": 0.45, "height": 1.48},
 		"crumple_profile": {"max_compression": 0.22}
 	})
-
-	var staging := CrumpleHandStaging.new()
-	staging.name = "CrumpleHandStaging"
-	root.add_child(staging)
-
-	var tree := Engine.get_main_loop() as SceneTree
-	if tree == null:
-		root.free()
-		return ["RED: crumple hand contact test requires the live SceneTree transform path"]
-	tree.root.add_child(root)
-	source.call("_bind_cup")
 	staging.call("_bind")
 	source.set_crumple(0.0, -1, 0.0)
 
