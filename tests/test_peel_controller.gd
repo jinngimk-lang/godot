@@ -12,7 +12,7 @@ func run() -> Array[String]:
 
 	# Owner playtest contract: a casual press in the middle of a fresh label must
 	# not start a peel. The first interaction has to engage the actual peel edge.
-	var gate_controller = controller_script.new({"base_adhesion":8.0,"release_increment":0.2,"bond_response":12.0})
+	var gate_controller = controller_script.new({"base_adhesion":8.0,"release_increment":0.04,"bond_response":12.0})
 	gate_controller.set_edge_position(Vector2(100,100))
 	gate_controller.set_grab_region(Rect2(Vector2(70,70), Vector2(130,70)))
 	var gate_pointer = pointer_script.new()
@@ -24,7 +24,7 @@ func run() -> Array[String]:
 		failures.append("PEEL_ENTRY_RED: fresh label center press must not release adhesive")
 
 	_completion_count = 0
-	var controller = controller_script.new({"base_adhesion":8.0,"release_increment":0.2,"bond_response":12.0})
+	var controller = controller_script.new({"base_adhesion":8.0,"release_increment":0.04,"bond_response":12.0})
 	controller.completed.connect(_on_completed)
 	controller.set_edge_position(Vector2(100,100))
 	if not controller.has_method("set_grab_region"):
@@ -61,6 +61,8 @@ func run() -> Array[String]:
 		peel_result = controller.process_pointer(pointer, 0.016)
 	if controller.get_progress() <= 0.0:
 		failures.append("sustained drag after deliberate edge lift should begin progressive peel")
+	if controller.is_complete():
+		failures.append("test precondition: short deliberate pull must remain partial before re-grab")
 	for key in ["bond_load","integrity","residue"]:
 		if not peel_result.has(key):
 			failures.append("controller output missing physical quality field %s" % key)
@@ -81,7 +83,7 @@ func run() -> Array[String]:
 	for _i in range(6):
 		pointer.set_frame(true, Vector2(184,90), Vector2(1,-1), Vector2(100,-100), false)
 		controller.process_pointer(pointer, 0.016)
-	for i in range(90):
+	for i in range(110):
 		var pos := Vector2(190 + i * 3, 42)
 		pointer.set_frame(true, pos, Vector2(3,0), Vector2(1200,-400), false)
 		controller.process_pointer(pointer, 0.016)
