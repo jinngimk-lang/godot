@@ -224,6 +224,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	_add_bottle_mouth_rim(body_color,neck_radius,source_alpha,roughness)
 
 	if not amber:
+		_add_market_green_cap(neck_radius)
 		_add_condensation()
 
 func _bottle_profile(neck_radius: float, amber: bool) -> Array[Vector2]:
@@ -335,6 +336,27 @@ func _add_bottle_mouth_rim(body_color: Color, neck_radius: float, source_alpha: 
 	rim.material_override = _glass_mat(body_color.lightened(0.12),minf(source_alpha*0.52+0.055,0.34),maxf(roughness*0.82,0.024))
 	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(rim)
+
+func _add_market_green_cap(neck_radius: float) -> void:
+	var cap := MeshInstance3D.new()
+	cap.name = "MarketGreenCap"
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = neck_radius + 0.036
+	cap_mesh.bottom_radius = neck_radius + 0.032
+	cap_mesh.height = 0.120
+	cap_mesh.radial_segments = 72
+	cap.mesh = cap_mesh
+	# The locked market reference uses a capped clear bottle. Keep the cap just
+	# over the authored glass mouth so it reads as product identity at thumbnail
+	# scale without altering bottle framing or the glass body silhouette.
+	cap.position = Vector3(0.0,1.540,0.0)
+	var cap_mat := StandardMaterial3D.new()
+	cap_mat.albedo_color = Color(0.16,0.46,0.18,1.0)
+	cap_mat.roughness = 0.52
+	cap_mat.metallic = 0.0
+	cap_mat.metallic_specular = 0.30
+	cap.material_override = cap_mat
+	add_child(cap)
 
 func _add_condensation() -> void:
 	for i in range(20):
