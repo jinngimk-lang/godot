@@ -14,7 +14,8 @@ func _process(_delta: float) -> void:
 
 	# PeelLab owns authoritative gameplay state. This presentation layer keeps
 	# only the player-facing essentials visible so the reference photography
-	# remains primary instead of reading like a debug overlay.
+	# remains primary instead of reading like a debug overlay. Scene navigation
+	# now lives in GuidedJourneyPresentation rather than being buried in Q/E copy.
 	label.text = _compact_hud_text(label.text)
 
 	if _applied:
@@ -60,7 +61,7 @@ func _compact_hud_text(source: String) -> String:
 		return "%s  •  PAUSED\nEsc Resume  •  R Reset" % venue
 
 	# Already-compacted copy is intentionally idempotent across process frames.
-	if lines.size() <= 2 and not normalized.contains("Quality") and not normalized.contains("residue"):
+	if lines.size() <= 2 and not normalized.contains("Quality") and not normalized.contains("residue") and not normalized.to_lower().contains("q/e scene"):
 		return normalized
 
 	var venue_name := first.get_slice("•",0).strip_edges()
@@ -80,7 +81,7 @@ func _compact_hud_text(source: String) -> String:
 	if not progress_text.is_empty():
 		header += "  •  %s" % progress_text
 	header += "  •  %s" % hint
-	return "%s\nMouse / touch peel  •  RMB inspect  •  Q/E scene  •  Esc Pause  •  R Reset" % header
+	return "%s\nMouse / touch peel  •  RMB inspect  •  Esc Pause  •  R Reset" % header
 
 func _short_hint(hint: String) -> String:
 	var lower := hint.to_lower()

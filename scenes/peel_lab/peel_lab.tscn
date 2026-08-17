@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/reference_composition.gd" id="11_composition"]
 [ext_resource type="Script" path="res://scripts/presentation/reference_lighting.gd" id="12_lighting"]
 [ext_resource type="Script" path="res://scripts/presentation/hand_choreography_presentation.gd" id="13_hand_choreo"]
+[ext_resource type="Script" path="res://scripts/presentation/guided_journey_presentation.gd" id="14_journey"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -37,6 +38,9 @@ script = ExtResource("8_table")
 
 [node name="HudChromePresentation" type="Node" parent="."]
 script = ExtResource("9_hud")
+
+[node name="GuidedJourneyPresentation" type="Node" parent="."]
+script = ExtResource("14_journey")
 
 [node name="ForearmPresentation" type="Node3D" parent="."]
 script = ExtResource("3_forearm")
