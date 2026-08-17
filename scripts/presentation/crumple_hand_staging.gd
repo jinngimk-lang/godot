@@ -18,13 +18,6 @@ var _support_entry_global := Vector3.ZERO
 var _peel_entry_global := Vector3.ZERO
 var _support_entry_pinch := Vector3.ZERO
 var _peel_entry_pinch := Vector3.ZERO
-var _support_last_contact_world := Vector3(INF, INF, INF)
-var _peel_last_contact_world := Vector3(INF, INF, INF)
-var _last_contact_weight := 0.0
-var _bind_count := 0
-var _changed_count := 0
-var _activation_count := 0
-var _progress_trace: Array[float] = []
 
 func _ready() -> void:
 	process_priority = 100
@@ -35,7 +28,6 @@ func _process(_delta: float) -> void:
 		_apply_contact(_source.get_progress())
 
 func _bind() -> void:
-	_bind_count += 1
 	var parent := get_parent()
 	if parent == null:
 		return
@@ -52,8 +44,6 @@ func _bind() -> void:
 	_on_crumple_changed(_source.get_progress())
 
 func _on_crumple_changed(progress: float) -> void:
-	_changed_count += 1
-	_progress_trace.append(progress)
 	if not _has_home or _support_hand == null or _peel_hand == null:
 		return
 	var safe_progress := clampf(progress if is_finite(progress) else 0.0, 0.0, 1.0)
@@ -63,7 +53,6 @@ func _on_crumple_changed(progress: float) -> void:
 		_peel_hand.position = _peel_home
 		return
 	if not _active:
-		_activation_count += 1
 		_active = true
 		_support_entry_global = _support_hand.global_position
 		_peel_entry_global = _peel_hand.global_position
@@ -79,17 +68,15 @@ func _apply_contact(progress: float) -> void:
 		return
 	var t := clampf(progress / CONTACT_SETTLE_PROGRESS, 0.0, 1.0)
 	var contact_weight := t * t * (3.0 - 2.0 * t)
-	_last_contact_weight = contact_weight
-	_support_last_contact_world = _stage_hand(_support_hand, _support_entry_global, _support_entry_pinch, shell, contact_weight)
-	_peel_last_contact_world = _stage_hand(_peel_hand, _peel_entry_global, _peel_entry_pinch, shell, contact_weight)
+	_stage_hand(_support_hand, _support_entry_global, _support_entry_pinch, shell, contact_weight)
+	_stage_hand(_peel_hand, _peel_entry_global, _peel_entry_pinch, shell, contact_weight)
 
-func _stage_hand(hand: HandVisual, entry_global: Vector3, entry_pinch: Vector3, shell: MeshInstance3D, weight: float) -> Vector3:
+func _stage_hand(hand: HandVisual, entry_global: Vector3, entry_pinch: Vector3, shell: MeshInstance3D, weight: float) -> void:
 	var contact_world := _closest_shell_point(shell, entry_pinch)
 	if not contact_world.is_finite():
-		return contact_world
+		return
 	var target_root := entry_global + (contact_world - entry_pinch)
 	hand.global_position = entry_global.lerp(target_root, weight)
-	return contact_world
 
 func _closest_shell_point(shell: MeshInstance3D, reference_world: Vector3) -> Vector3:
 	var arrays := shell.mesh.surface_get_arrays(0)
