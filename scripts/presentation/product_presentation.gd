@@ -71,7 +71,9 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 
 	var outer := MeshInstance3D.new()
 	outer.name = "BottleOuterGlass"
-	outer.mesh = _build_lathe_mesh(outer_profile,false,true)
+	# The bottle is open at the mouth. A top cap turns into a bright flat disk in
+	# the product camera and reads as a plastic stopper instead of glass.
+	outer.mesh = _build_lathe_mesh(outer_profile,false,false)
 	outer.material_override = _glass_mat(body_color,source_alpha*(0.50 if amber else 0.46),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
@@ -81,7 +83,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 		inner_profile.append(Vector2(sample.x,maxf(sample.y-0.021,0.035)))
 	var inner := MeshInstance3D.new()
 	inner.name = "BottleInnerGlass"
-	inner.mesh = _build_lathe_mesh(inner_profile,false,true)
+	inner.mesh = _build_lathe_mesh(inner_profile,false,false)
 	inner.material_override = _glass_mat(body_color.lightened(0.16),source_alpha*0.10,0.023)
 	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(inner)
@@ -100,7 +102,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	add_child(liquid)
 
 	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.334 if amber else 0.322,0.020,body_color.lightened(0.08),0.050,minf(source_alpha*0.58+0.10,0.45))
-	_add_ring(self,"BottleLip",Vector3(0,1.485,0),neck_radius+0.026,0.032,body_color.lightened(0.20),0.040,minf(source_alpha*0.64+0.10,0.48))
+	_add_bottle_mouth_rim(body_color,neck_radius,source_alpha,roughness)
 
 	if not amber:
 		_add_condensation()
@@ -198,6 +200,22 @@ func _add_lathe_cap(vertices: PackedVector3Array, normals: PackedVector3Array, u
 			indices.append(center_index); indices.append(start+side_index); indices.append(start+side_index+1)
 		else:
 			indices.append(center_index); indices.append(start+side_index+1); indices.append(start+side_index)
+
+func _add_bottle_mouth_rim(body_color: Color, neck_radius: float, source_alpha: float, roughness: float) -> void:
+	var rim := MeshInstance3D.new()
+	rim.name = "BottleMouthRim"
+	var rim_mesh := CylinderMesh.new()
+	rim_mesh.top_radius = neck_radius + 0.020
+	rim_mesh.bottom_radius = neck_radius + 0.012
+	rim_mesh.height = 0.055
+	rim_mesh.radial_segments = 72
+	rim_mesh.cap_top = false
+	rim_mesh.cap_bottom = false
+	rim.mesh = rim_mesh
+	rim.position = Vector3(0,1.475,0)
+	rim.material_override = _glass_mat(body_color.lightened(0.12),minf(source_alpha*0.52+0.055,0.34),maxf(roughness*0.82,0.024))
+	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(rim)
 
 func _add_condensation() -> void:
 	for i in range(20):
