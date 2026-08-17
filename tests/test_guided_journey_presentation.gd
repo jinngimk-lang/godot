@@ -52,12 +52,8 @@ func run() -> Array[String]:
 		elif not button.text.contains(expected_names[i]):
 			failures.append("GUIDE_RED: scene button %d must identify %s" % [i+1, expected_names[i]])
 
-	if reward.get_theme_font_size("font_size") > 12:
-		failures.append("GUIDE_RED: completion feedback must stay visually quiet instead of large center-screen reward copy")
-	if reward.position.y >= 200.0 or reward.size.y > 30.0:
-		failures.append("GUIDE_RED: completion feedback must stay compact near the guide and clear of the bottom journey rail")
-	if reward.text.contains("\n"):
-		failures.append("GUIDE_RED: completion feedback must collapse to one line when JourneyGuide owns the next action")
+	if reward.visible:
+		failures.append("GUIDE_RED: legacy Reward chrome must be hidden when JourneyGuide owns completion status")
 	if continue_button.anchor_left != 0.5 or continue_button.anchor_top != 1.0:
 		failures.append("GUIDE_RED: Continue should be anchored beside the bottom JourneyRail instead of floating at a fixed screen corner")
 	if continue_button.offset_left < 294.0 or continue_button.offset_top > -50.0:
