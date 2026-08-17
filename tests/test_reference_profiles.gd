@@ -21,6 +21,21 @@ func run() -> Array[String]:
 		if String(variant.container_profile.get("kind","")) != expected_kinds[i]: failures.append("variant %d wrong container kind" % i)
 		if String(variant.post_peel_action) != expected_post[i]: failures.append("variant %d wrong post-peel action" % i)
 
+		# ReferenceComposition promises a hand-and-object closeup where the hero
+		# vessel occupies roughly one-half to two-thirds of frame height. The
+		# taller bottle meshes need a slightly wider vertical lens than the café
+		# cup so their mouth remains inside the 720p acceptance capture instead
+		# of being cropped by the top edge.
+		var camera_fov := float((variant.scene_profile as Dictionary).get("camera_fov",39.0))
+		if expected_kinds[i] == "paper_cup":
+			if absf(camera_fov-39.0) > 0.1:
+				failures.append("BOTTLE_FRAMING_RED: café closeup lens must remain 39 degrees, got %.2f" % camera_fov)
+		else:
+			if camera_fov < 47.0:
+				failures.append("BOTTLE_FRAMING_RED: %s needs a wider bottle lens so the full slender vessel stays in frame, got %.2f" % [expected_scenes[i],camera_fov])
+			if camera_fov > 50.0:
+				failures.append("BOTTLE_FRAMING_RED: %s lens became too wide for the reference closeup, got %.2f" % [expected_scenes[i],camera_fov])
+
 	var cafe: Dictionary = model.VARIANTS[0]
 	var cafe_width := float(cafe.get("label_width",0.0))
 	var cafe_height := float(cafe.get("label_height",0.0))
