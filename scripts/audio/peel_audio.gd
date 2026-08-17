@@ -26,6 +26,19 @@ func _ready() -> void:
 	_final = _make_player("FinalRelease", FINAL_PATH, -10.0)
 	_router.reset()
 
+func get_continuous_mix_targets(active: bool, speed: float, tension: float) -> Vector2:
+	if not active:
+		return Vector2(-80.0, -80.0)
+	var safe_speed := clampf(speed if is_finite(speed) else 0.0, 0.0, 30.0)
+	var safe_tension := clampf(tension if is_finite(tension) else 0.0, 0.0, 80.0)
+	var speed_mix := clampf(safe_speed / 9.0, 0.0, 1.0)
+	# Continuous adhesive friction is background texture; tactile release one-shots
+	# remain the foreground. Tension can lift the bed only slightly.
+	var tension_lift := clampf(safe_tension / 80.0, 0.0, 1.0) * 2.0
+	var slow_db := lerpf(-24.0 + tension_lift, -39.0, speed_mix)
+	var fast_db := lerpf(-39.0, -23.0 + tension_lift, speed_mix)
+	return Vector2(slow_db, fast_db)
+
 func set_feedback(
 	active: bool,
 	speed: float,
@@ -36,15 +49,9 @@ func set_feedback(
 ) -> void:
 	var safe_speed := clampf(speed if is_finite(speed) else 0.0, 0.0, 30.0)
 	var safe_tension := clampf(tension if is_finite(tension) else 0.0, 0.0, 80.0)
-	var speed_mix := clampf(safe_speed / 9.0, 0.0, 1.0)
-	var tension_lift := clampf(safe_tension / 80.0, 0.0, 1.0) * 5.0
-
-	if active:
-		_slow_target_db = lerpf(-13.0 + tension_lift, -35.0, speed_mix)
-		_fast_target_db = lerpf(-38.0, -14.0 + tension_lift, speed_mix)
-	else:
-		_slow_target_db = -80.0
-		_fast_target_db = -80.0
+	var targets := get_continuous_mix_targets(active, safe_speed, safe_tension)
+	_slow_target_db = targets.x
+	_fast_target_db = targets.y
 
 	for event_name in _router.update(active, safe_speed, safe_tension, released, detached_now, delta):
 		match event_name:
