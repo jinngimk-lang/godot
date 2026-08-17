@@ -21,12 +21,19 @@ var _adhesive_tint: Color = Color(0.80,0.75,0.60)
 var _fiber_tint: Color = Color(0.92,0.87,0.78)
 var _fiber_gain: float = 1.0
 var _substrate := "thermal_paper"
+var _profile_signature := ""
 
 func _ready() -> void:
 	mesh = _immediate
 	_ensure_materials()
+	_sync_profile_from_parent()
 
 func apply_profile(profile: Dictionary) -> void:
+	_set_profile_fields(profile)
+	_recompute_semantics()
+	_rebuild()
+
+func _set_profile_fields(profile: Dictionary) -> void:
 	_substrate = String(profile.get("substrate",_substrate))
 	_adhesive_trace_profile = clampf(float(profile.get("adhesive_trace",_adhesive_trace_profile)),0.0,0.40)
 	_fiber_gain = clampf(float(profile.get("fiber_gain",_fiber_gain)),0.45,1.60)
@@ -36,8 +43,32 @@ func apply_profile(profile: Dictionary) -> void:
 	var fiber_value = profile.get("fiber_tint",_fiber_tint)
 	if fiber_value is Color:
 		_fiber_tint = fiber_value
-	_recompute_semantics()
-	_rebuild()
+	_profile_signature = _profile_key(profile)
+
+func _sync_profile_from_parent() -> void:
+	if not is_inside_tree():
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var session = parent.get("_session")
+	if session == null or not session.has_method("current_variant"):
+		return
+	var variant: Dictionary = session.current_variant()
+	var profile: Dictionary = variant.get("label_profile",{})
+	if profile.is_empty():
+		return
+	var key := _profile_key(profile)
+	if key == _profile_signature:
+		return
+	_set_profile_fields(profile)
+
+func _profile_key(profile: Dictionary) -> String:
+	return "%s/%.4f/%.4f" % [
+		String(profile.get("substrate","")),
+		float(profile.get("adhesive_trace",0.0)),
+		float(profile.get("fiber_gain",0.0))
+	]
 
 func configure(bottom_radius: float, top_radius: float, body_height: float, body_center_y: float, label_width: float, label_height: float, label_y: float = 0.68) -> void:
 	_bottom_radius = maxf(bottom_radius,0.02)
@@ -50,6 +81,7 @@ func configure(bottom_radius: float, top_radius: float, body_height: float, body
 	_rebuild()
 
 func set_residue(progress: float, residue: float, integrity: float) -> void:
+	_sync_profile_from_parent()
 	_progress = clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
 	_residue_amount = clampf(residue if is_finite(residue) else 0.0,0.0,1.0)
 	_integrity = clampf(integrity if is_finite(integrity) else 1.0,0.0,1.0)
@@ -61,10 +93,6 @@ func _recompute_semantics() -> void:
 		_adhesive_trace_amount = 0.0
 		_fiber_strength = 0.0
 		return
-	# Even a careful peel separates a pressure-sensitive glue contact layer from
-	# the vessel. Damage residue is an additional failure mode, not the only way
-	# glue becomes visible. Ramp the clean trace with exposed area so a tiny lift
-	# stays subtle and mid-peel inspection reads as tack rather than paint.
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
 	_adhesive_trace_amount = clampf(_adhesive_trace_profile*reveal + _residue_amount*0.30,0.0,0.68)
 	if _residue_amount <= 0.002 and _integrity >= 0.998:
@@ -138,8 +166,6 @@ func _draw_adhesive_layer() -> void:
 		if not started:
 			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
 			started = true
-		# Glue print should read as broad irregular contact islands, with a few
-		# thicker tack streaks where damage residue accumulates.
 		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.10+0.08*_residue_amount)
 		var half_height := _label_height*(0.055+0.085*(1.0-signal_value)+0.055*_adhesive_trace_amount+0.035*_residue_amount)
 		var y0_top := _label_y+center_offset+half_height
@@ -153,7 +179,6 @@ func _draw_adhesive_layer() -> void:
 		_immediate.surface_end()
 
 func _draw_fiber_layer() -> void:
-	# Torn backing reads as a handful of broad paper islands, not a picket fence.
 	var segments := 14
 	var peeled_u := clampf(_progress,0.0,1.0)
 	var density := clampf(0.18+_fiber_strength*0.68,0.18,0.86)
