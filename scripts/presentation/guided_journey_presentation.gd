@@ -8,8 +8,6 @@ const SCENE_NAMES := ["WINDOW CAFÉ", "AMBER BAR", "MARKET COOLER"]
 var _built := false
 var _active_scene_index := 0
 var _action_text := "PEEL THE LABEL"
-var _scene_status: Label
-var _action: Label
 var _buttons: Array[Button] = []
 var _rail: Panel
 var _rail_visible := true
@@ -114,36 +112,10 @@ func _ensure_ui() -> void:
 	_continue_button = layer.get_node_or_null("Continue") as Button
 	_style_existing_hud()
 
-	var guide := Panel.new()
-	guide.name = "JourneyGuide"
-	guide.anchor_left = 0.0
-	guide.anchor_top = 0.0
-	guide.anchor_right = 0.0
-	guide.anchor_bottom = 0.0
-	guide.offset_left = 14.0
-	guide.offset_top = 68.0
-	guide.offset_right = 332.0
-	guide.offset_bottom = 120.0
-	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	guide.add_theme_stylebox_override("panel", _panel_style(Color(0.016, 0.015, 0.014, 0.28), Color(1.0, 1.0, 1.0, 0.05), 7))
-	layer.add_child(guide)
-
-	_scene_status = Label.new()
-	_scene_status.name = "SceneStatus"
-	_scene_status.position = Vector2(12, 7)
-	_scene_status.size = Vector2(294, 17)
-	_scene_status.add_theme_font_size_override("font_size", 10)
-	_scene_status.add_theme_color_override("font_color", Color(0.98, 0.97, 0.94, 0.86))
-	guide.add_child(_scene_status)
-
-	_action = Label.new()
-	_action.name = "Action"
-	_action.position = Vector2(12, 26)
-	_action.size = Vector2(294, 18)
-	_action.add_theme_font_size_override("font_size", 11)
-	_action.add_theme_color_override("font_color", Color(1.0, 0.91, 0.72, 0.96))
-	guide.add_child(_action)
-
+	# The compact ReferenceHudPanel already owns persistent top-left venue,
+	# progress and input guidance. Keep journey state internal and render only
+	# the pointer/touch scene rail so two stacked top-left panels do not repeat
+	# the same scene/action information over the acceptance photography.
 	_rail = Panel.new()
 	_rail.name = "JourneyRail"
 	_rail.anchor_left = 0.5
@@ -183,9 +155,9 @@ func _ensure_ui() -> void:
 	_refresh_existing_hud()
 
 func _style_existing_hud() -> void:
-	# JourneyGuide owns completion state and next-action copy. Keep the legacy
-	# Reward node alive for compatibility, but remove its duplicate visual chrome
-	# so it cannot compete with the guide or overlap the scene rail.
+	# Journey state and the existing compact HUD share one visual hierarchy. Keep
+	# the legacy Reward node alive for compatibility, but remove its duplicate
+	# visual chrome so it cannot compete with the persistent reference HUD.
 	if _reward != null:
 		_reward.visible = false
 	if _continue_button != null:
@@ -217,10 +189,8 @@ func _request_scene(index: int) -> void:
 	scene_requested.emit(clampi(index, 0, SCENE_NAMES.size() - 1))
 
 func _apply_state_to_ui() -> void:
-	if not _built or _scene_status == null or _action == null:
+	if not _built:
 		return
-	_scene_status.text = "SCENE %d / %d  •  %s" % [_active_scene_index + 1, SCENE_NAMES.size(), SCENE_NAMES[_active_scene_index]]
-	_action.text = _action_text
 	if _rail != null:
 		_rail.visible = _rail_visible and not _inspection_active
 	for i in range(_buttons.size()):
