@@ -168,6 +168,7 @@ func _style_existing_hud() -> void:
 		_reward.size = Vector2(310, 24)
 		_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_reward.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_reward.autowrap_mode = TextServer.AUTOWRAP_OFF
 		_reward.add_theme_font_size_override("font_size", 10)
 		_reward.add_theme_color_override("font_color", Color(0.98, 0.91, 0.76, 0.78))
 	if _continue_button != null:
@@ -194,6 +195,11 @@ func _refresh_existing_hud() -> void:
 			_style_existing_hud()
 	if _reward != null and not _reward.text.is_empty():
 		_reward.text = _compact_reward(_reward.text)
+		# A multi-line message can expand Label's minimum height before this
+		# presentation frame gets to compact it. Reclaim the visual footprint after
+		# compaction so the stale three-line size cannot overlap JourneyRail.
+		_reward.position = Vector2(18, 126)
+		_reward.size = Vector2(310, 24)
 
 func _compact_reward(source: String) -> String:
 	var upper := source.to_upper()
