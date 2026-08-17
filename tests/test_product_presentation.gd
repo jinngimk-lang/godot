@@ -88,6 +88,14 @@ func run() -> Array[String]:
 				var outer_mat := outer.material_override as StandardMaterial3D
 				if outer_mat.albedo_color.a < 0.09 or outer_mat.albedo_color.a > 0.13:
 					failures.append("RED: clear bottle outer shell needs enough bounded density to survive the bright cold-case background; alpha=%.3f" % outer_mat.albedo_color.a)
+			if kind == "amber_bottle" and outer != null and outer.material_override is StandardMaterial3D:
+				var outer_mat := outer.material_override as StandardMaterial3D
+				var liquid := product.get_node_or_null("BottleLiquid") as MeshInstance3D
+				var liquid_mat := liquid.material_override as StandardMaterial3D if liquid != null else null
+				if outer_mat.albedo_color.a > 0.15:
+					failures.append("RED: amber outer glass must stay translucent enough for shoulder/neck separation; alpha=%.3f" % outer_mat.albedo_color.a)
+				if liquid_mat == null or liquid_mat.albedo_color.a > 0.16:
+					failures.append("RED: amber liquid must not turn the bottle body into an opaque brown mass")
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y,0.7):
 		failures.append("product decoration should follow inspection yaw")
