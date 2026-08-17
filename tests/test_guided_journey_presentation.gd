@@ -76,6 +76,13 @@ func run() -> Array[String]:
 	if not rail.visible:
 		failures.append("GUIDE_RED: journey rail must return after detach so touch users can navigate scenes")
 
+	guide.set_state(0, "CRUMPLING", "crumple", 1.0, true)
+	if rail.visible:
+		failures.append("GUIDE_RED: bottom journey rail must hide during active café crumple so the hand-and-cup ritual owns the frame")
+	guide.set_state(0, "CRUMPLE_READY", "crumple", 1.0, true)
+	if not rail.visible:
+		failures.append("GUIDE_RED: journey rail must return when café crumple is idle so touch users retain scene navigation")
+
 	guide.set_state(1, "HELD", "inspect", 1.0, true)
 	var bar_post: String = String(guide.get_action_text()).to_lower()
 	if guide.get_active_scene_index() != 1 or not scene_status.text.contains("2 / 3"):
