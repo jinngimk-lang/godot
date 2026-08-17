@@ -22,11 +22,15 @@ permissions:
   pull-requests: write
   issues: write
 
+concurrency:
+  group: local-challenger-pr-${{ inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   challenge:
-    name: qwen7b-exact-head-challenger
+    name: qwen3b-schema-exact-head-challenger
     runs-on: ubuntu-latest
-    timeout-minutes: 28
+    timeout-minutes: 12
     steps:
       - name: Validate exact PR head
         env:
@@ -37,7 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           current_head="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
-          test "$current_head" = "$EXPECTED_HEAD_SHA"
+          test "$current_head" = "$EXPECTED_HEAD_SHA" || {
+            echo "Stale challenge: current=$current_head expected=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          }
 
       - uses: actions/checkout@v4
         with:
@@ -58,7 +65,21 @@ jobs:
           git show origin/main:tools/build_local_challenger_packet.sh > /tmp/build-local-challenger-packet.sh
           bash /tmp/build-local-challenger-packet.sh origin/main HEAD /tmp/review-packet.txt
 
-      - name: Install Ollama and pull reviewer
+          # The full packet remains the authority for grounding. The compact
+          # model sees every changed file's bounded exact-diff section plus the
+          # first available contract context, which keeps CPU review latency
+          # practical without letting early large files hide later changes.
+          head -c 18000 /tmp/review-packet.txt > /tmp/model-packet.txt
+          full_exact_count="$(grep -c '^--- EXACT DIFF:' /tmp/review-packet.txt || true)"
+          model_exact_count="$(grep -c '^--- EXACT DIFF:' /tmp/model-packet.txt || true)"
+          test "$full_exact_count" -gt 0
+          test "$model_exact_count" -eq "$full_exact_count" || {
+            echo "Compact model packet lost changed-file exact diff sections: full=$full_exact_count model=$model_exact_count" >&2
+            exit 1
+          }
+          echo "model packet bytes=$(wc -c < /tmp/model-packet.txt), exact diff sections=$model_exact_count"
+
+      - name: Install Ollama and pull compact reviewer
         shell: bash
         run: |
           set -euo pipefail
@@ -68,45 +89,62 @@ jobs:
             ollama list >/dev/null 2>&1 && break
             sleep 1
           done
-          ollama pull qwen2.5-coder:7b
+          ollama pull qwen2.5-coder:3b
 
-      - name: Run one bounded independent review
+      - name: Run schema-constrained independent review
         shell: bash
         run: |
           set -euo pipefail
-          packet="$(head -c 30000 /tmp/review-packet.txt)"
+          packet="$(cat /tmp/model-packet.txt)"
           prompt="$(cat <<'PROMPT'
-          You are an independent code-review Challenger. The exact packet below is the ONLY source of truth. Try to falsify the candidate by checking changed-path boundaries, reset/scene-switch state, presentation-vs-gameplay authority, coordinate-space mistakes, and whether tests actually exercise the claimed path. Never invent code or symbols. Do not output replacement code.
+          You are an independent code-review Challenger. The exact packet below is the ONLY source of truth. Try to falsify the candidate. Check changed-path boundaries, reset/scene-switch cleanup, presentation-vs-gameplay authority, coordinate-space errors, capture/test false positives, and whether tests actually exercise claims. Never invent code or symbols. Do not output replacement code.
 
-          Return ONLY these five labelled lines and nothing else:
-          PROVISIONAL_VERDICT: VERIFIED | NEEDS_FIX
-          DEFECT: NONE | one concrete reproducible defect
-          MIN_TEST: NONE | one concrete falsifiable regression check
-          EVIDENCE: one concise sentence
-          EVIDENCE_ANCHOR: NO_CONCRETE_DEFECT | one contiguous 16-240 character verbatim quote from the exact packet proving the defect
-
-          If no exact-packet quote proves a concrete defect, use VERIFIED / NONE / NONE / NO_CONCRETE_DEFECT.
+          Return one short JSON object matching the supplied schema. NEEDS_FIX is allowed only for an ACTUAL reproducible contradiction proven by a contiguous verbatim implementation/test quote from the packet. A possibility, risk, stylistic concern, untested hypothetical, or wording containing could/may/might/potential/potentially is NOT a defect: use VERIFIED instead. For VERIFIED use defect="NONE", min_test="NONE", evidence_anchor="NO_CONCRETE_DEFECT". For NEEDS_FIX, min_test must say exactly what observable assertion would fail and evidence_anchor must be code/test content, never a diff header or filename. Keep every field concise.
           PROMPT
           )"
-          jq -n --arg prompt "$prompt\n\nEXACT PACKET:\n$packet" '{model:"qwen2.5-coder:7b",stream:false,prompt:$prompt,options:{temperature:0,num_predict:420,num_ctx:16384}}' > /tmp/review-request.json
+          schema='{"type":"object","properties":{"verdict":{"type":"string","enum":["VERIFIED","NEEDS_FIX"]},"defect":{"type":"string","maxLength":160},"min_test":{"type":"string","maxLength":150},"evidence":{"type":"string","maxLength":160},"evidence_anchor":{"type":"string","maxLength":150}},"required":["verdict","defect","min_test","evidence","evidence_anchor"],"additionalProperties":false}'
+          jq -n --arg prompt "$prompt\n\nEXACT PACKET:\n$packet" --argjson schema "$schema" \
+            '{model:"qwen2.5-coder:3b",stream:false,prompt:$prompt,format:$schema,options:{temperature:0,num_predict:280,num_ctx:8192}}' > /tmp/review-request.json
+          start="$(date +%s)"
           curl -fsS http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' --data-binary @/tmp/review-request.json > /tmp/review-response.json
-          jq -er '.response' /tmp/review-response.json | tee /tmp/review-analysis.txt
-          test -s /tmp/review-analysis.txt
+          end="$(date +%s)"
+          echo "SCHEMA_REVIEW_SECONDS=$((end-start))"
+          jq -er '.response' /tmp/review-response.json | tee /tmp/review-analysis.json
+          test -s /tmp/review-analysis.json
 
       - name: Parse and ground verdict
         shell: bash
         run: |
           set -euo pipefail
-          git show origin/main:tools/extract_local_challenger_report.py > /tmp/extract-local-challenger-report.py
+          git show origin/main:tools/extract_local_challenger_json.py > /tmp/extract-local-challenger-json.py
           git show origin/main:tools/validate_local_challenger_verdict.sh > /tmp/validate-local-challenger-verdict.sh
           chmod +x /tmp/validate-local-challenger-verdict.sh
-          python3 /tmp/extract-local-challenger-report.py /tmp/review-analysis.txt /tmp/verdict.json
-          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt
-          verdict="$(jq -er '.verdict' /tmp/verdict.json)"
-          defect="$(jq -er '.defect' /tmp/verdict.json)"
-          min_test="$(jq -er '.min_test' /tmp/verdict.json)"
-          evidence="$(jq -er '.evidence' /tmp/verdict.json)"
-          anchor="$(jq -er '.evidence_anchor' /tmp/verdict.json)"
+
+          set +e
+          python3 /tmp/extract-local-challenger-json.py /tmp/review-analysis.json /tmp/verdict.json 2> /tmp/challenger-parser.err
+          parser_rc=$?
+          set -e
+          if [ "$parser_rc" -ne 0 ]; then
+            echo "parser exit=$parser_rc" > /tmp/challenger-infra-summary.txt
+            cat /tmp/challenger-parser.err >> /tmp/challenger-infra-summary.txt || true
+            exit "$parser_rc"
+          fi
+
+          set +e
+          bash /tmp/validate-local-challenger-verdict.sh /tmp/verdict.json /tmp/review-packet.txt 2> /tmp/challenger-validator.err
+          validator_rc=$?
+          set -e
+          if [ "$validator_rc" -ne 0 ]; then
+            echo "validator exit=$validator_rc" > /tmp/challenger-infra-summary.txt
+            cat /tmp/challenger-validator.err >> /tmp/challenger-infra-summary.txt || true
+            exit "$validator_rc"
+          fi
+
+          verdict="$(jq -er '.verdict | select(. == "VERIFIED" or . == "NEEDS_FIX")' /tmp/verdict.json)"
+          defect="$(jq -er '.defect | strings' /tmp/verdict.json)"
+          min_test="$(jq -er '.min_test | strings' /tmp/verdict.json)"
+          evidence="$(jq -er '.evidence | strings' /tmp/verdict.json)"
+          anchor="$(jq -er '.evidence_anchor | strings' /tmp/verdict.json)"
           printf 'VERDICT: %s\nDEFECT: %s\nMIN_TEST: %s\nEVIDENCE: %s | ANCHOR: %s\n' "$verdict" "$defect" "$min_test" "$evidence" "$anchor" | tee /tmp/review-report.txt
 
       - name: Comment exact-head report on PR
@@ -125,11 +163,19 @@ jobs:
             echo "Exact head: \`$EXPECTED_HEAD_SHA\`"
             echo
             echo '```text'
-            if [ -s /tmp/review-report.txt ]; then cat /tmp/review-report.txt; else
+            if [ -s /tmp/review-report.txt ] && grep -Eq '^VERDICT: (VERIFIED|NEEDS_FIX)$' /tmp/review-report.txt; then
+              cat /tmp/review-report.txt
+            else
               echo 'VERDICT: INFRA_FAILURE'
-              echo 'DEFECT: reviewer did not produce a grounded verdict'
-              echo 'MIN_TEST: rerun after verifier repair'
-              echo 'EVIDENCE: no accepted exact-packet verdict'
+              echo 'DEFECT: local Challenger did not produce a grounded schema verdict'
+              echo 'MIN_TEST: rerun after verifier infrastructure is repaired'
+              if [ -s /tmp/challenger-infra-summary.txt ]; then
+                printf 'EVIDENCE: '
+                tr '\n' ' ' < /tmp/challenger-infra-summary.txt | head -c 1000 || true
+                echo
+              else
+                echo 'EVIDENCE: no accepted exact-packet verdict'
+              fi
             fi
             echo '```'
           } > /tmp/pr-comment.md
