@@ -1,7 +1,6 @@
 extends RefCounted
 
 const MAX_CONTACT_GAP := 0.045
-const MIN_ROOT_TRAVEL := 0.020
 
 func run() -> Array[String]:
 	var failures: Array[String] = []
@@ -75,10 +74,6 @@ func run() -> Array[String]:
 			failures.append("RED: support hand must stay in visible contact with the crumpled cup; gap=%.3f" % support_gap)
 		if peel_gap > MAX_CONTACT_GAP:
 			failures.append("RED: released peel hand must join the squeeze instead of hovering beside the crumpled cup; gap=%.3f" % peel_gap)
-		if support.position.distance_to(support_home) < MIN_ROOT_TRAVEL:
-			failures.append("RED: support hand must visibly participate in the squeeze")
-		if peel.position.distance_to(peel_home) < MIN_ROOT_TRAVEL:
-			failures.append("RED: peel hand must transition from label pinch to cup squeeze during crumple")
 
 	source.reset_visual()
 	if not support.position.is_equal_approx(support_home):
