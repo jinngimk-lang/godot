@@ -38,7 +38,7 @@ const VARIANTS := [
 		"crumple_profile":{"rigidity":0.04,"dent_gain":0.0042,"max_compression":0.22},
 		"contents_profile":{"type":"none"},
 		"reward_theme":"warm",
-		"hint":"peel anywhere • slow pull keeps the paper clean"
+		"hint":"grab edge • lift to arm • slow pull keeps the paper clean"
 	},
 	{
 		"id":"silky_long",
@@ -76,7 +76,7 @@ const VARIANTS := [
 		"crumple_profile":{"rigidity":0.025,"dent_gain":0.0052,"max_compression":0.28},
 		"contents_profile":{"type":"none"},
 		"reward_theme":"amber",
-		"hint":"fibrous label • fast pulls leave torn backing"
+		"hint":"grab edge • lift • fibrous label • fast pulls leave torn backing"
 	},
 	{
 		"id":"crisp_seal",
@@ -114,7 +114,7 @@ const VARIANTS := [
 		"crumple_profile":{"rigidity":0.055,"dent_gain":0.0035,"max_compression":0.18},
 		"contents_profile":{"type":"ice","count":3,"cube_size":0.145,"motion_gain":0.55,"max_center_y":0.34,"layout":"glass_cluster"},
 		"reward_theme":"crisp",
-		"hint":"cool glass • inspect residue and ice from every angle"
+		"hint":"grab edge • lift • cool glass • inspect residue and ice"
 	}
 ]
 
