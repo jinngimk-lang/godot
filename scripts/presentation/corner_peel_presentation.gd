@@ -4,6 +4,7 @@ class_name CornerPeelPresentation
 const U_SEGMENTS := 40
 const V_SEGMENTS := 28
 const SURFACE_OFFSET := 0.025
+const VISUAL_AREA_SCALE := 0.62
 
 var _label: LabelVisual
 var _cup: MeshInstance3D
@@ -89,12 +90,12 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	if _visual == null or _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
 		return
 	var cup_mesh := _cup.mesh as CylinderMesh
-	# Show a tiny pre-lifted top-right corner at rest so the hand cursor has a clear
-	# affordance. Gameplay progress itself remains exactly zero.
-	var visual_progress := maxf(progress,0.012)
+	# Scalar gameplay progress intentionally maps to a smaller diagonal visible area:
+	# the approved reference keeps most printed copy readable even around 38%.
+	var visual_progress := maxf(progress*VISUAL_AREA_SCALE,0.012)
 	var threshold := _area_threshold(visual_progress)
 	var safe_drag := drag_delta
-	var max_drag := maxf(_label.label_width*0.20,0.090)
+	var max_drag := maxf(_label.label_width*0.18,0.082)
 	if safe_drag.length()>max_drag:
 		safe_drag = safe_drag.normalized()*max_drag
 	if progress<=0.001 and safe_drag.length_squared()<0.000001:
@@ -116,15 +117,13 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var u := float(u_index)/float(U_SEGMENTS)
 			var attached := CupSurface.attached_point_on_frustum(u,_label.label_width,y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
 			var outward := CupSurface.frustum_surface_normal(attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
-			var d := (1.0-u)+(1.0-v)
+			var edge_variation := 0.018*sin(v*17.0+u*5.0)+0.009*sin(v*41.0)
+			var d := (1.0-u)+(1.0-v)+edge_variation
 			var t := clampf((threshold-d)/maxf(threshold,0.001),0.0,1.0)
 			var eased := t*t*(3.0-2.0*t)
-			# A detached triangular paper patch: the hinge edge stays on the vessel while
-			# the free corner follows the pointer. Because the attached and lifted cells
-			# are separate surfaces, printed copy outside the peeled area never stretches.
 			var moved := attached+safe_drag*eased
-			moved += outward*(0.012+progress*0.030)*sin(eased*PI*0.5)
-			moved += Vector3.UP*(0.004+progress*0.012)*sin(eased*PI)
+			moved += outward*(0.010+progress*0.026)*sin(eased*PI*0.5)
+			moved += Vector3.UP*(0.003+progress*0.010)*sin(eased*PI)
 			base_positions.append(attached)
 			flap_positions.append(moved)
 			adhesive_positions.append(attached+outward*0.0015)
@@ -140,7 +139,8 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 		var center_v := (float(v_index)+0.5)/float(V_SEGMENTS)
 		for u_index in range(U_SEGMENTS):
 			var center_u := (float(u_index)+0.5)/float(U_SEGMENTS)
-			var center_d := (1.0-center_u)+(1.0-center_v)
+			var edge_variation := 0.018*sin(center_v*17.0+center_u*5.0)+0.009*sin(center_v*41.0)
+			var center_d := (1.0-center_u)+(1.0-center_v)+edge_variation
 			var target := flap_indices if center_d<threshold else base_indices
 			var a := v_index*row+u_index
 			var b := a+1
