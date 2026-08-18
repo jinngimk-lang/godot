@@ -29,7 +29,7 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"grain_strength": 0.020,
 				"grain_scale": 34.0,
 				"stone_mode": 1.0,
-				"grain_bump_strength": 0.015,
+				"grain_bump_strength": 0.018,
 				"surface_alpha": 1.0
 			}
 		"market_coldcase":
@@ -39,7 +39,7 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"grain_strength": 0.016,
 				"grain_scale": 18.0,
 				"stone_mode": 1.0,
-				"grain_bump_strength": 0.014,
+				"grain_bump_strength": 0.018,
 				"surface_alpha": 1.0
 			}
 		"market_can":
