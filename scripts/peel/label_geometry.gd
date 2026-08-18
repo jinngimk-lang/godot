@@ -41,10 +41,10 @@ static func peeling_points(
 	var grip := resolve_grip(p,desired_grip,width,cup_radius,label_y,surface_offset)
 	var front_normal := CupSurface.attached_normal(p,width,cup_radius,surface_offset)
 	var free_length := width*p
-	# The approved object-only mockup shows a broad sheet close to the vessel with
-	# one controlled lifted corner. Keep curvature subtle enough that label copy
-	# stays readable while still showing real depth and an underside.
-	var curve_amp := minf(0.052,free_length*0.070)
+	# Broad, readable sheet with enough arc to reveal real paper depth. This stays
+	# intentionally below the old ribbon-like curl while clearing the tactile arc
+	# floor used by the deterministic geometry tests.
+	var curve_amp := minf(0.058,free_length*0.078)
 	for i in range(safe_segments+1):
 		var u := float(i)/float(safe_segments)
 		if p<=0.00001 or u>p:
