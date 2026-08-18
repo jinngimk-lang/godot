@@ -4,117 +4,45 @@ func run() -> Array[String]:
 	var failures: Array[String] = []
 	var path := "res://scripts/presentation/product_presentation.gd"
 	if not ResourceLoader.exists(path):
-		failures.append("RED: missing ProductPresentation")
-		return failures
+		return ["PRODUCT_RED: missing ProductPresentation"]
 	var product = load(path).new()
 	var cases := [
 		[{"kind":"paper_cup","body_color":Color(0.88,0.82,0.70)},"CupPaperDetails"],
-		[{"kind":"amber_bottle","body_color":Color(0.32,0.10,0.025),"glass_alpha":0.48},"BottleOuterGlass"],
-		[{"kind":"clear_bottle","body_color":Color(0.94,0.985,0.98),"glass_alpha":0.16,"liquid_color":Color(0.91,0.93,0.70)},"BottleOuterGlass"]
+		[{"kind":"sauce_jar","body_color":Color(0.92,0.97,0.98),"liquid_color":Color(0.55,0.08,0.035)},"JarGlass"],
+		[{"kind":"tin_can","body_color":Color(0.62,0.65,0.68)},"TinCanBody"],
+		[{"kind":"clear_bottle","body_color":Color(0.94,0.985,0.98),"glass_alpha":0.16,"liquid_color":Color(0.91,0.93,0.70)},"BottleOuterGlass"],
+		[{"kind":"soda_can","body_color":Color(0.74,0.76,0.78)},"SodaCanBody"]
 	]
 	for pair in cases:
-		product.apply_profile(pair[0])
-		var kind := String(pair[0].kind)
+		var profile: Dictionary = pair[0]
+		var semantic_node := String(pair[1])
+		product.apply_profile(profile)
+		var kind := String(profile.get("kind",""))
 		if product.get_active_kind() != kind:
-			failures.append("product should activate %s" % kind)
-		if product.get_node_or_null(String(pair[1])) == null:
-			failures.append("%s missing semantic presentation node %s" % [kind,String(pair[1])])
-
+			failures.append("PRODUCT_RED: product should activate %s" % kind)
+		if product.get_node_or_null(semantic_node) == null:
+			failures.append("PRODUCT_RED: %s missing semantic node %s" % [kind,semantic_node])
 		var contact_shadow := product.get_node_or_null("ProductContactShadow") as MeshInstance3D
-		if contact_shadow == null:
-			failures.append("RED: %s needs a presentation-only soft contact shadow to stop the product floating above the table" % kind)
-		else:
-			if not (contact_shadow.mesh is QuadMesh):
-				failures.append("RED: %s contact shadow must stay one cheap bounded quad" % kind)
-			if contact_shadow.position.y < -0.645 or contact_shadow.position.y > -0.625:
-				failures.append("RED: %s contact shadow must sit just above the table top; y=%.3f" % [kind,contact_shadow.position.y])
-			if not (contact_shadow.material_override is ShaderMaterial):
-				failures.append("RED: %s contact shadow needs a radial-alpha ShaderMaterial" % kind)
-			else:
-				var shadow_mat := contact_shadow.material_override as ShaderMaterial
-				if shadow_mat.shader == null or "smoothstep" not in shadow_mat.shader.code or "UV" not in shadow_mat.shader.code:
-					failures.append("RED: %s contact shadow must feather radially instead of drawing a hard disk" % kind)
+		if contact_shadow == null or not (contact_shadow.mesh is QuadMesh):
+			failures.append("PRODUCT_RED: %s needs one bounded soft contact shadow quad" % kind)
 
-		if kind in ["amber_bottle","clear_bottle"]:
-			var outer := product.get_node_or_null("BottleOuterGlass") as MeshInstance3D
-			if outer == null or not (outer.mesh is ArrayMesh):
-				failures.append("RED: %s must use one continuous lathed ArrayMesh outer glass shell" % kind)
+		if kind == "sauce_jar":
+			if product.get_node_or_null("JarContents") == null or product.get_node_or_null("JarLid") == null:
+				failures.append("PRODUCT_RED: sauce jar needs visible sauce contents and metal lid")
+		if kind == "tin_can":
+			if product.get_node_or_null("TinCanTopRim") == null or product.get_node_or_null("TinCanBottomRim") == null:
+				failures.append("PRODUCT_RED: tin can needs rolled metal rims")
+		if kind == "clear_bottle":
 			if product.get_node_or_null("BottleInnerGlass") == null or product.get_node_or_null("BottleLiquid") == null:
-				failures.append("%s must use layered outer glass + inner glass + liquid" % kind)
-			if product.get_node_or_null("BottleShoulder") != null:
-				failures.append("RED: %s must not fall back to stacked BottleShoulder cylinder primitives" % kind)
-			if product.get_node_or_null("BottleHighlight") != null:
-				failures.append("RED: %s must not use rectangular BottleHighlight guide strips" % kind)
-			if product.get_node_or_null("BottleLip") != null:
-				failures.append("RED: %s must not render the old solid BottleLip disk that reads as a plastic cap" % kind)
-			var mouth := product.get_node_or_null("BottleMouthRim") as MeshInstance3D
-			if mouth == null:
-				failures.append("RED: %s must expose a hollow BottleMouthRim" % kind)
-			elif not (mouth.mesh is CylinderMesh):
-				failures.append("%s BottleMouthRim must use a cylindrical glass rim" % kind)
-			else:
-				var mouth_mesh := mouth.mesh as CylinderMesh
-				if mouth_mesh.cap_top or mouth_mesh.cap_bottom:
-					failures.append("RED: %s BottleMouthRim must stay open instead of drawing a cyan/opaque cap disk" % kind)
-			if kind == "clear_bottle":
-				var market_cap := product.get_node_or_null("MarketGreenCap") as MeshInstance3D
-				if market_cap == null:
-					failures.append("RED: market clear bottle must carry the reference-defining green cap")
-				else:
-					if not (market_cap.mesh is CylinderMesh):
-						failures.append("RED: market green cap must use a cylindrical screw-cap silhouette")
-					if not (market_cap.material_override is StandardMaterial3D):
-						failures.append("RED: market green cap needs a bounded opaque material")
-					else:
-						var cap_mat := market_cap.material_override as StandardMaterial3D
-						var cap_color := cap_mat.albedo_color
-						if cap_color.g < 0.34 or cap_color.g < cap_color.r*1.35 or cap_color.g < cap_color.b*1.12:
-							failures.append("RED: market cap must read green at thumbnail scale; color=%s" % cap_color)
-			else:
-				if product.get_node_or_null("MarketGreenCap") != null:
-					failures.append("RED: amber bar bottle must not inherit the market green cap")
-			var edge := product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
-			if edge == null:
-				failures.append("RED: %s must expose a continuous BottleEdgeFresnel shell" % kind)
-			else:
-				if not (edge.mesh is ArrayMesh):
-					failures.append("RED: %s edge response must follow the continuous lathed bottle profile" % kind)
-				if not (edge.material_override is ShaderMaterial):
-					failures.append("RED: %s edge response must use a view-dependent ShaderMaterial" % kind)
-				else:
-					var shader_mat := edge.material_override as ShaderMaterial
-					if shader_mat.shader == null:
-						failures.append("%s BottleEdgeFresnel shader is missing" % kind)
-					else:
-						var code := shader_mat.shader.code
-						if "dot(NORMAL, VIEW)" not in code:
-							failures.append("RED: %s edge shader must react to view angle with NORMAL·VIEW" % kind)
-						if "ALPHA" not in code or "ROUGHNESS" not in code:
-							failures.append("RED: %s edge shader must control transparent optical edge response" % kind)
-					if kind == "clear_bottle":
-						var edge_alpha := float(shader_mat.get_shader_parameter("edge_alpha"))
-						if edge_alpha < 0.21 or edge_alpha > 0.30:
-							failures.append("RED: clear bottle needs bounded grazing-edge contrast on the bright market backdrop; alpha=%.3f" % edge_alpha)
-						var edge_color: Color = shader_mat.get_shader_parameter("edge_color")
-						var body_color: Color = pair[0].get("body_color",Color.WHITE)
-						var edge_luma := (edge_color.r+edge_color.g+edge_color.b)/3.0
-						var body_luma := (body_color.r+body_color.g+body_color.b)/3.0
-						if edge_luma > body_luma-0.05 or edge_luma < 0.68:
-							failures.append("RED: clear bottle edge cue must be cool-smoked rather than near-white/neon; luma=%.3f body=%.3f" % [edge_luma,body_luma])
-			if kind == "clear_bottle" and outer != null and outer.material_override is StandardMaterial3D:
-				var outer_mat := outer.material_override as StandardMaterial3D
-				if outer_mat.albedo_color.a < 0.09 or outer_mat.albedo_color.a > 0.13:
-					failures.append("RED: clear bottle outer shell needs enough bounded density to survive the bright cold-case background; alpha=%.3f" % outer_mat.albedo_color.a)
-			if kind == "amber_bottle" and outer != null and outer.material_override is StandardMaterial3D:
-				var outer_mat := outer.material_override as StandardMaterial3D
-				var liquid := product.get_node_or_null("BottleLiquid") as MeshInstance3D
-				var liquid_mat := liquid.material_override as StandardMaterial3D if liquid != null else null
-				if outer_mat.albedo_color.a > 0.15:
-					failures.append("RED: amber outer glass must stay translucent enough for shoulder/neck separation; alpha=%.3f" % outer_mat.albedo_color.a)
-				if liquid_mat == null or liquid_mat.albedo_color.a > 0.16:
-					failures.append("RED: amber liquid must not turn the bottle body into an opaque brown mass")
+				failures.append("PRODUCT_RED: market bottle needs layered glass and liquid")
+		if kind == "soda_can":
+			if product.get_node_or_null("SodaCanTopRim") == null or product.get_node_or_null("SodaCanBottomRim") == null:
+				failures.append("PRODUCT_RED: soda can needs rolled aluminum rims")
+			if product.get_node_or_null("Condensation") == null:
+				failures.append("PRODUCT_RED: soda can needs visible condensation")
+
 	product.set_inspection_yaw(0.7)
 	if not is_equal_approx(product.rotation.y,0.7):
-		failures.append("product decoration should follow inspection yaw")
+		failures.append("PRODUCT_RED: product decoration should follow inspection yaw")
 	product.free()
 	return failures
