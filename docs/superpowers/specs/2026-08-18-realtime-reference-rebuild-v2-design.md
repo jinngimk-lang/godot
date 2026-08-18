@@ -1,182 +1,213 @@
-# Realtime Reference Rebuild v2
+# Peel Calm Object-Only North Star
 
-## Goal
+## Purpose
 
-Rebuild Peel Calm so the supplied reference images are a visual target, not a rendered overlay. The shipped game must remain fully interactive in Godot while all three scenes read as one coherent photoreal first-person peeling experience.
+This file is the durable product-direction source of truth for the current rebuild. If implementation context is lost, re-read this file before changing presentation, interaction, scene composition, or scope.
 
-## Non-goals
+The owner-approved visual direction is the latest no-hands gameplay mockup: a photoreal hero container centered in a real-feeling environment, a partially lifted label, a small hand-shaped mouse cursor at the peel edge, dark translucent UI chrome at left/right/bottom, and no visible character hands or arms.
 
-- Do not play or swap full-screen reference stills/video frames during gameplay.
-- Do not replace gameplay authority with canned animation.
-- Do not add unrelated progression systems.
-- Do not build low-poly procedural room geometry that competes with the photographic venue plates.
+## Non-negotiable direction
 
-## Reference-derived acceptance target
+- **No visible hand or arm models in gameplay.** Delete the previous hand rendering/choreography/polishing stack from the runtime and remove its obsolete tests/assets once no references remain.
+- **No video/still playback used as gameplay presentation.** Reference imagery is acceptance evidence only.
+- **The mouse is the interaction authority.** Pointer screen position projects directly to the real 3D label grip point. There is no hidden hand proxy between mouse and label.
+- **Use a small white outlined hand-shaped cursor** when interacting, matching the owner-supplied cursor reference.
+- **Everything visible in the center is real-time Godot content:** product geometry, label geometry, residue, lighting, table/contact surface, and backdrop.
+- **The latest object-only mockup is the visual north star.** A change is not done because tests pass; it is done when exact-head Godot screenshots converge on that reference.
 
-### Café
+## Core interaction
 
-- Warm window café plate, shallow depth of field, wood table.
-- Large paper takeaway cup centered slightly right of frame center.
-- Black molded lid with visible stepped rim.
-- Two human hands: support hand holds cup; peel hand pinches a lifted paper corner.
-- Paper label is physically attached to the cup and visibly curls as it peels.
-- Forearms exit naturally toward the lower corners and do not form long tubes across the viewport.
+### Primary controls
 
-### Amber bar
-
-- Warm dark bar background with bottle bokeh.
-- Brown/amber glass bottle, glossy highlights and visible thickness/fresnel.
-- Large vertical fibrous paper label rather than a small horizontal strip.
-- Support hand grips the bottle shoulder/body; peel hand pulls a damaged fibrous flap.
-- Torn backing/residue must be visible when the player pulls too fast.
-
-### Market yuzu
-
-- Bright convenience-store/cold-case plate.
-- Clear glass bottle with pale yuzu liquid, condensation and green/metal cap treatment.
-- Large white/green label on the bottle body.
-- Clean coated peel should expose translucent adhesive residue without the heavy fibrous backing used by the bar variant.
-- Hands and lighting must use the same visual language as Café/Bar.
-
-## Runtime architecture
-
-### 1. Real-time render authority
-
-`ReferencePeelPlayback` is removed from the scene and no reference motion image is rendered over gameplay. Reference images remain external acceptance evidence only.
-
-The render stack becomes:
-
-1. photographic venue backdrop (`ReferenceBackdrop`),
-2. real 3D table/contact plane,
-3. real-time product geometry,
-4. real-time label geometry + residue,
-5. authored XR hand skeleton/mesh,
-6. PBR hand/sleeve presentation,
-7. HUD.
-
-### 2. Hands
-
-The repository hand GLBs remain the source of topology, skeleton and authored `Cup`, `Pinch Up`, and `Pinch Tight` poses.
-
-The presentation layer must:
-
-- keep the continuous authored hand mesh visible;
-- use shaded PBR skin instead of an unshaded color shader;
-- preserve imported smooth geometry and skinning;
-- use a short tapered forearm/sleeve that exits the lower corners;
-- use believable warm skin roughness/specular and a separate nail material;
-- never reveal the procedural fallback unless the authored asset fails to load.
-
-Hand pose and label grip remain coupled through `HandVisual.get_pinch_world_position()`.
-
-### 3. Product rendering
-
-`ProductPresentation` remains procedural but is upgraded as a deterministic real-time model generator.
-
-Paper cup:
-- correct taper and height;
-- molded multi-ring black lid;
-- fibrous paper shader;
-- grounded contact shadow.
-
-Amber bottle:
-- denser smooth lathe silhouette;
-- physically lit amber glass shell + subtle inner shell + amber liquid;
-- neck/lip geometry and highlights;
-- large paper-label fit.
-
-Market bottle:
-- clear glass shell + pale liquid;
-- cap and mouth details;
-- condensation;
-- large coated label fit.
-
-### 4. Label interaction
-
-The label mesh remains the authoritative object. LMB press on the visible label/edge arms a peel, then drag controls the real 3D flap. The flap is regenerated continuously from progress and the current hand pinch target.
-
-Requirements:
-
-- no discrete reference-frame stepping;
-- no visual teleport at the start of a peel;
-- hand pinch and rendered flap tip remain within a small deterministic tolerance;
-- release allows re-grab;
-- Café uses mostly clean paper separation;
-- Bar can leave fibrous backing;
-- Market leaves cleaner coated adhesive residue.
-
-### 5. Camera and composition
-
-- Product should occupy the central 45–60% of frame height depending on scene.
-- Café uses a tighter FOV than bottles.
-- Support hand stays on the opposite side of the peel hand and both remain in front of the product.
-- Forearms leave the frame diagonally instead of running laterally through the scene.
-- Reference backdrop covers the viewport with small overscan and no black wedges.
-
-### 6. Unified HUD / controls
-
-The HUD follows the supplied Peel Calm concept rather than the current tiny debug strip.
-
-Persistent controls:
-
-- LMB: grab / peel
-- RMB + drag: rotate product
-- R: inspect / return
-- T: reset current item
-- 1 / 2 / 3: Café / Bar / Market
+- LMB: grab / peel the visible label
+- RMB + drag: rotate the hero object
+- Mouse wheel: zoom the camera in/out within a bounded range
+- R: reset current object
+- 1 / 2 / 3 / 4 / 5: select scene directly
 - Esc: pause / resume
 
-HUD hierarchy:
+### Peel data flow
 
-- upper-left: product name + peel progress + quality summary;
-- left objective panel: remove label, minimize residue, preserve intactness;
-- upper/right helper: concise control legend;
-- right how-to-play panel: Grab Edge, Peel Gently, Inspect, Clean Peel;
-- bottom scene rail: three consistent scene choices with active state.
+The intended runtime path is:
 
-The panels must use translucent dark glass styling and stay readable without covering the hand-label contact area.
+`mouse -> screen-to-world projection -> LabelVisual effective grip -> peel simulation -> label deformation/residue/audio`
 
-## Input changes
+Do **not** reintroduce:
 
-RMB rotation becomes the default inspect/rotation gesture during play. Keyboard `R` toggles inspection presentation and `T` resets. Existing code paths are adapted so pointer state remains isolated while paused and resetting.
+`mouse -> hand model -> pinch anchor -> label`
 
-## Performance requirements
+When LMB is held, the visible flap follows the direct pointer-derived grip continuously. On release, the current peel state remains and can be re-grabbed.
 
-- No per-frame image decoding.
-- No full-screen reference texture swaps.
-- No creation/freeing of hand/product meshes every frame.
-- Rebuild label geometry only when progress/grip changes.
-- Static materials and product geometry are reused within a scene run.
+## Scene set
 
-## Tests
+The bottom rail exposes five deterministic scenes. These are the current product set and order.
 
-Deterministic tests must cover:
+### 1. Coffee Shop — paper cup
 
-- reference playback no longer exists in the default scene;
-- authored hand assets remain active and shaded;
-- no visible primitive/procedural shell when authored assets load;
-- forearm presentation span stays within cinematic bounds;
-- product profiles match paper/amber/clear kinds;
-- label dimensions differ appropriately per variant;
-- input contract maps LMB/RMB/R/T/1/2/3/Esc correctly;
-- hand pinch target remains aligned to label flap tip;
-- scene reset and pause isolation continue to pass.
+- Warm cinematic coffee-shop backdrop with shallow depth of field.
+- Beige/tan paper takeaway cup centered as the hero object.
+- Black molded plastic lid with stepped rings.
+- Rectangular order sticker/receipt; hero copy reads **Cocoa Cloud** with secondary drink/order details.
+- Paper tears/fibers and adhesive residue are visible during a partial peel.
+- Warm polished wood table and grounded contact shadow.
+
+### 2. Jar — tomato basil sauce jar
+
+- Pantry/kitchen feeling; warm-neutral presentation.
+- Clear cylindrical glass jar with metal lid and red tomato sauce interior.
+- Rustic paper label with **Tomato Basil** / **Sauce** identity.
+- Fibrous paper peel and glue residue on glass.
+
+### 3. Tin Can — grocery can
+
+- Pantry/grocery counter presentation.
+- Silver tin can with top/bottom rolled rims.
+- Printed paper wrap label, e.g. **Golden Peaches**.
+- Peeling exposes bare brushed metal and patchy glue residue.
+
+### 4. Supermarket — Yuzu glass bottle
+
+- Bright convenience-store/cold-case backdrop.
+- Clear glass bottle with pale yellow liquid and cool highlights.
+- White/green **YUZU SPARKLING** citrus label.
+- Cleaner coated-paper peel with translucent adhesive residue rather than heavy fibers.
+
+### 5. Can — chilled soda can
+
+- Modern convenience/café cold-display environment.
+- Aluminum soda can with condensation and readable metallic rims.
+- Bright lemon/citrus printed wrap label, e.g. **Lemon Sparkling Soda**.
+- Thin wrap peels away to reveal bare aluminum with subtle adhesive.
+
+## Product rendering architecture
+
+`ProductPresentation` is the deterministic real-time hero-object generator. It supports these semantic kinds:
+
+- `paper_cup`
+- `sauce_jar`
+- `tin_can`
+- `clear_bottle`
+- `soda_can`
+
+Each kind must expose one stable semantic root/detail node for tests and presentation tuning. Geometry is built once per variant switch, not every frame.
+
+### Material priorities
+
+1. silhouette and real-world proportions,
+2. product-specific surface response,
+3. readable label contact,
+4. grounded contact shadow,
+5. small secondary details.
+
+Avoid expensive effects that do not materially improve the reference match.
+
+## Cursor
+
+Add a repository-owned cursor asset under `assets/ui/` and install it at runtime with Godot's custom cursor API. The hotspot should sit near the index-finger tip so the label visibly follows the cursor contact point. The cursor remains lightweight and independent of scene content.
+
+## Camera and composition
+
+- Hero object occupies roughly 55–70% of viewport height in the owner-approved reference style.
+- Camera remains centered on the object; no human limbs enter the frame.
+- Mouse wheel zoom adjusts FOV or camera distance only within a narrow reference-safe range.
+- Backdrop must cover the entire viewport with overscan and no black wedges.
+- Table/contact plane must visually integrate with the backdrop rather than read as a separate low-poly stage.
+
+## HUD north star
+
+The HUD follows the owner-approved object-only mockup.
+
+### Upper-left
+
+- `SCENE: <NAME>`
+- `Peel Progress NN%`
+- horizontal progress bar with warm gold fill
+
+### Left control stack
+
+- LMB Peel
+- RMB Rotate
+- Wheel Zoom
+- R Reset
+- 1 2 3 4 5 Change Scene
+- Esc Pause / Menu
+
+### Right tutorial panel
+
+Title: `HOW TO PLAY`
+
+1. `GRAB EDGE` — move to/click the label edge
+2. `PEEL GENTLY` — click and drag slowly
+3. `INSPECT` — rotate and zoom to inspect residue
+4. `CLEAN PEEL` — remove the label with minimal residue
+
+The center peel contact zone must stay unobstructed.
+
+### Bottom rail
+
+Five persistent buttons:
+
+1. COFFEE SHOP
+2. JAR
+3. TIN CAN
+4. SUPERMARKET
+5. CAN
+
+The active scene uses a warm gold border/fill accent. The rail remains visible during an active peel, matching the reference.
+
+## Cleanup contract
+
+The following previous directions are obsolete and must not be reintroduced:
+
+- visible `HandVisual` runtime hands,
+- cinematic hand/forearm overlays,
+- hand choreography,
+- hand surface smoothing,
+- crumple hand staging,
+- reference peel playback,
+- tests that require visible hands or hand-label pinch alignment.
+
+Once runtime references are removed, delete obsolete scripts/tests/assets rather than leaving dead code.
+
+## Testing contract
+
+Deterministic tests must prove:
+
+- scene contains no visible hand presentation nodes;
+- `PeelLab` reports `visible_hands = false` and `pointer_grip = mouse_direct`;
+- control contract includes Wheel zoom and scene keys `1/2/3/4/5`;
+- five variants exist in the required order and kinds;
+- all five product kinds build their semantic real-time geometry;
+- HUD contains progress, controls, tutorial, and five-button scene rail;
+- reference playback is absent;
+- pause/reset input isolation remains intact;
+- peel progress/residue still run through the existing real simulation.
 
 ## Runtime evidence gate
 
-The GitHub Actions Godot job must:
+GitHub Actions is the execution environment when the local container cannot run the repository directly. Exact-head CI must:
 
-1. import and launch the configured project;
-2. run deterministic/unit/smoke tests;
-3. capture Café, Bar and Market at 0% peel;
-4. capture each scene at a representative mid-peel state with the hand positioned on the flap;
-5. upload exact-head screenshots.
+1. install Godot 4.7.1;
+2. import/parse and launch the configured project;
+3. run deterministic and smoke tests;
+4. capture each of the five scenes at 0% peel;
+5. capture representative mid-peel frames for visual comparison;
+6. upload the screenshot artifact.
 
-A change is not accepted from green tests alone. Exact-head screenshots must be inspected for:
+### Visual RED conditions
 
-- no reference overlay/video look;
-- believable hands and short forearms;
-- correct product silhouette/material;
-- label scale and peel direction matching the target concept;
-- no black background wedges or low-poly room geometry;
-- consistent UI hierarchy across all scenes.
+Do not merge while any of these are visible:
+
+- human hand/arm geometry,
+- frozen/reference-video presentation,
+- low-poly blockout objects that dominate the frame,
+- product too small or off-center,
+- label flap disconnected from cursor contact,
+- scene rail missing during active peel,
+- unreadable HUD hierarchy,
+- materials that read as flat plastic instead of paper/glass/metal,
+- backgrounds/lighting that make the five scenes feel like different prototypes.
+
+## Completion rule
+
+The rebuild is complete only when the game is genuinely playable in Godot and the exact-head runtime screenshots visually match the approved object-only reference direction closely enough that remaining differences are minor polish, not architecture, interaction, composition, or material failures.
