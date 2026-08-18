@@ -17,13 +17,15 @@ func run() -> Array[String]:
 	var expected := {
 		"peel":"LMB",
 		"rotate":"RMB",
-		"inspect":"R",
-		"reset":"T",
-		"scenes":"1/2/3",
+		"zoom":"Wheel",
+		"reset":"R",
+		"scenes":"1/2/3/4/5",
 		"pause":"Esc"
 	}
 	for key in expected.keys():
 		if String(contract.get(key,"")) != String(expected[key]):
 			failures.append("INPUT_RED: %s must map to %s" % [key,expected[key]])
+	if contract.has("inspect"):
+		failures.append("INPUT_RED: object-only design should inspect via RMB rotate + Wheel zoom, not a separate inspect key")
 	lab.free()
 	return failures
