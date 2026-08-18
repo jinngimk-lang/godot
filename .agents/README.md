@@ -21,16 +21,19 @@ The Codex Action dependency is pinned to the immutable commit behind v1.11: `52f
 
 Before acting, both agents must read:
 
-1. `.agents/PROJECT_KNOWLEDGE.md`
-2. `.agents/protocol.md`
-3. `.agents/CONTACTS.md`
-4. the canonical `[AGENT-TASK]` Issue and its comments
-5. the latest relevant files under `docs/superpowers/specs/`
-6. the latest relevant files under `docs/superpowers/plans/`
-7. `README.md`
-8. current production files, tests and Godot verification workflow
+1. `.agents/PROJECT_NORTH_STAR.md` — persistent whole-project memory; reread after long-context compaction/handoff or before a major pivot.
+2. `.agents/PROJECT_KNOWLEDGE.md`
+3. `.agents/protocol.md`
+4. `.agents/CONTACTS.md`
+5. `.agents/skills/peel-calm-reference-realism/SKILL.md` for visual/tactile Peel Calm work
+6. the canonical `[AGENT-TASK]` Issue and its comments
+7. the latest relevant handoff/checkpoints/specs/plans under `.agents/skills/` and `docs/superpowers/`
+8. `README.md`
+9. current production files, tests and Godot verification workflow
 
-Repository history and exact GitHub artifacts are evidence. Summaries are not substitutes for inspecting the current head.
+Repository history and exact GitHub artifacts are evidence. Summaries and conversation memory are not substitutes for inspecting the current head.
+
+If owner-level direction, major architecture, acceptance criteria, merged milestone, or highest-priority next work changes, update `.agents/PROJECT_NORTH_STAR.md` so a later agent can recover without relying on a long chat transcript.
 
 ## Communication
 
@@ -49,7 +52,9 @@ A complete-version task is not `ACCEPTED` until all of these are true:
 5. Merge is performed with the reviewed expected head SHA and refuses head drift.
 6. Challenger explicitly dispatches `Godot Check` against merged `main` and observes success.
 7. Only then is the task closed with `ACCEPTED`.
-8. Subjective hand feel, Foley pleasantness, visual naturalness and overall tactile satisfaction remain experiential `UNVERIFIED` until the owner downloads the result and playtests it locally.
+8. Subjective peel feel, Foley pleasantness, visual naturalness and overall tactile satisfaction remain experiential `UNVERIFIED` until the owner downloads the result and playtests it locally.
+
+For visual work, a concrete target image/mockup must precede Godot implementation when a visual solution is known, and the newest runtime capture must be compared against that target. Functional green alone is not visual acceptance.
 
 ## Security boundary
 
