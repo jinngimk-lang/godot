@@ -1,8 +1,12 @@
 extends SceneTree
 
 const MAX_IDLE_PEEL_EDGE_GAP := 0.10
-const MIN_CINEMATIC_FOREARM_SPAN := 0.55
-const MAX_CINEMATIC_FOREARM_SPAN := 1.35
+# The reference composition shows first-person forearms entering from the lower
+# corners and occupying a substantial part of the frame. The old 1.35 m upper
+# bound encoded the rejected thin/tube silhouette; the new viewport-authority
+# arm is intentionally longer and broader while still bounded.
+const MIN_CINEMATIC_FOREARM_SPAN := 1.45
+const MAX_CINEMATIC_FOREARM_SPAN := 2.05
 const MIN_REALTIME_DETAIL_BUDGET := 20000
 
 func _init() -> void:
@@ -62,11 +66,11 @@ func _run() -> void:
 			return
 		var cinematic_forearm := hand.get_node_or_null("CinematicForearm") as MeshInstance3D
 		if cinematic_forearm == null or not cinematic_forearm.visible:
-			_fail("%s must use the short cinematic forearm" % hand_name,scene)
+			_fail("%s must use the first-person cinematic forearm" % hand_name,scene)
 			return
 		var span := float(cinematic.call("get_cinematic_forearm_span",hand_name))
 		if span < MIN_CINEMATIC_FOREARM_SPAN or span > MAX_CINEMATIC_FOREARM_SPAN:
-			_fail("%s cinematic forearm span %.3f outside reference bounds" % [hand_name,span],scene)
+			_fail("%s cinematic forearm span %.3f outside first-person reference bounds" % [hand_name,span],scene)
 			return
 		var legacy_forearm := hand.get_node_or_null("ForearmNatural") as MeshInstance3D
 		if legacy_forearm == null or legacy_forearm.visible:
@@ -125,7 +129,7 @@ func _run() -> void:
 			_fail("market %s cinematic forearm must stay natural skin" % hand_name,scene)
 			return
 
-	print("PASS: smooth realtime hands own the viewport, hidden XR assets keep pose authority, short forearms and contact anchors stay coherent")
+	print("PASS: smooth realtime hands own the viewport, hidden XR assets keep pose authority, first-person forearms and contact anchors stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
