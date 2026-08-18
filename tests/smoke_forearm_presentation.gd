@@ -10,8 +10,8 @@ const MAX_IDLE_PEEL_EDGE_GAP := 0.10
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
 const MIN_VISIBLE_AUTHORED_MESHES := 2
 const MIN_POLISHED_AUTHORED_MESHES := 2
-const MIN_CINEMATIC_FOREARM_SPAN := 3.20
-const MAX_CINEMATIC_FOREARM_SPAN := 5.20
+const MIN_CINEMATIC_FOREARM_SPAN := 1.80
+const MAX_CINEMATIC_FOREARM_SPAN := 2.90
 
 func _init() -> void:
 	call_deferred("_run")
@@ -77,7 +77,6 @@ func _run() -> void:
 			_fail("%s legacy cuff must stay hidden from the viewport" % hand_name,scene)
 			return
 
-		# Preserve compatibility geometry/invariants even though it is not visible.
 		if not (old_forearm.mesh is ArrayMesh):
 			_fail("%s compatibility forearm mesh missing" % hand_name,scene)
 			return
@@ -121,8 +120,6 @@ func _run() -> void:
 		_fail("compatibility forearm no longer overlaps authored wrist",scene)
 		return
 
-	# Glass scenes use skin forearms; café uses dark cloth. The cinematic hand
-	# material itself remains stable across venues.
 	scene.call("debug_select_variant",1)
 	await process_frame
 	await process_frame
@@ -170,7 +167,7 @@ func _run() -> void:
 			_fail("market %s cinematic forearm must stay natural skin" % hand_name,scene)
 			return
 
-	print("PASS: authored continuous hands stay visible and polished, primitive shell stays retired, cinematic forearms and interaction anchors remain coherent")
+	print("PASS: authored continuous hands stay visible and polished, primitive shell stays retired, short cinematic forearms and interaction anchors remain coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
