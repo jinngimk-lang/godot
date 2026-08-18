@@ -191,15 +191,15 @@ func _build_authored_wrist_cover() -> void:
 func _build_realtime_hand_shell() -> void:
 	_skin = StandardMaterial3D.new()
 	_skin.resource_name = "RealtimeHandSkin"
-	_skin.albedo_color = Color(0.72,0.50,0.38,1.0)
-	_skin.roughness = 0.52
+	_skin.albedo_color = Color(0.71,0.48,0.36,1.0)
+	_skin.roughness = 0.57
 	_skin.metallic = 0.0
-	_skin.metallic_specular = 0.34
+	_skin.metallic_specular = 0.32
 	_nail = StandardMaterial3D.new()
 	_nail.resource_name = "RealtimeHandNail"
-	_nail.albedo_color = Color(0.86,0.67,0.59,1.0)
-	_nail.roughness = 0.40
-	_nail.metallic_specular = 0.40
+	_nail.albedo_color = Color(0.84,0.64,0.57,1.0)
+	_nail.roughness = 0.42
+	_nail.metallic_specular = 0.38
 
 	_realtime_shell = Node3D.new()
 	_realtime_shell.name = "RealtimeHandShell"
@@ -207,17 +207,19 @@ func _build_realtime_hand_shell() -> void:
 	add_child(_realtime_shell)
 	_realtime_shell_vertex_budget = 0
 
-	_add_ellipsoid(_realtime_shell,Vector3(0.0,-0.090,0.0),Vector3(0.090,0.112,0.042),"Palm")
-	_add_ellipsoid(_realtime_shell,_mirror(Vector3(0.047,-0.105,-0.003)),Vector3(0.052,0.071,0.043),"Thenar")
-	_add_ellipsoid(_realtime_shell,_mirror(Vector3(-0.050,-0.108,0.004)),Vector3(0.045,0.070,0.039),"Hypothenar")
-	_add_ellipsoid(_realtime_shell,Vector3(0.0,0.042,0.004),Vector3(0.046,0.080,0.037),"Wrist")
+	# Keep the palm as a quiet anatomical bridge. The previous broad thenar and
+	# hypothenar bulbs read as a mitten once the hand was enlarged to hero scale.
+	_add_ellipsoid(_realtime_shell,Vector3(0.0,-0.092,0.002),Vector3(0.074,0.104,0.034),"Palm")
+	_add_ellipsoid(_realtime_shell,_mirror(Vector3(0.041,-0.108,-0.002)),Vector3(0.036,0.057,0.033),"Thenar")
+	_add_ellipsoid(_realtime_shell,_mirror(Vector3(-0.039,-0.110,0.004)),Vector3(0.031,0.054,0.029),"Hypothenar")
+	_add_ellipsoid(_realtime_shell,Vector3(0.0,0.040,0.005),Vector3(0.040,0.071,0.032),"Wrist")
 
 	var pose := _pinch_pose_points() if _dynamic else _support_pose_points()
 	for finger_name in ["Index","Middle","Ring","Little","Thumb"]:
 		var points: Array = pose[finger_name]
 		var base_radius := _realtime_finger_radius(finger_name)
-		_add_swept_finger(_realtime_shell,points,base_radius,base_radius*0.76,finger_name)
-		_add_ellipsoid(_realtime_shell,points[points.size()-1],Vector3.ONE*base_radius*0.80,"%sTip" % finger_name)
+		_add_swept_finger(_realtime_shell,points,base_radius,base_radius*0.72,finger_name)
+		_add_ellipsoid(_realtime_shell,points[points.size()-1],Vector3.ONE*base_radius*0.72,"%sTip" % finger_name)
 
 	_build_nail(_realtime_shell,"Index",pose["Index"][pose["Index"].size()-1],pose["Index"][pose["Index"].size()-2],_realtime_finger_radius("Index"))
 	_build_nail(_realtime_shell,"Thumb",pose["Thumb"][pose["Thumb"].size()-1],pose["Thumb"][pose["Thumb"].size()-2],_realtime_finger_radius("Thumb"))
@@ -262,11 +264,11 @@ func _add_swept_finger(parent: Node, points: Array, base_radius: float, tip_radi
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := lerpf(base_radius,tip_radius,smoothstep(0.0,1.0,t))
-		var knuckle := 1.0+0.055*sin(PI*t)*sin(3.0*PI*t)
+		var knuckle := 1.0+0.035*sin(PI*t)*sin(3.0*PI*t)
 		for side_index in range(FINGER_SIDES):
 			var u := float(side_index)/float(FINGER_SIDES)
 			var angle := TAU*u
-			var radial := ring_x*(cos(angle)*radius*knuckle)+ring_y*(sin(angle)*radius*0.90*knuckle)
+			var radial := ring_x*(cos(angle)*radius*knuckle)+ring_y*(sin(angle)*radius*0.88*knuckle)
 			vertices.append(point+radial)
 			normals.append(radial.normalized())
 			uvs.append(Vector2(u,t))
@@ -307,27 +309,33 @@ func _build_nail(parent: Node, node_name: String, tip: Vector3, previous: Vector
 	nail.mesh = mesh
 	nail.material_override = _nail
 	var direction := (tip-previous).normalized()
-	nail.position = tip+Vector3(0.0,0.0,-radius*0.60)-direction*radius*0.12
-	nail.scale = Vector3(0.72,0.92,0.16)
+	nail.position = tip+Vector3(0.0,0.0,-radius*0.58)-direction*radius*0.10
+	nail.scale = Vector3(0.70,0.90,0.15)
 	parent.add_child(nail)
 	_realtime_shell_vertex_budget += 28*14
 
 func _pinch_pose_points() -> Dictionary:
+	# Only index and thumb approach the paper. Middle/ring/little curl back under
+	# the palm so the silhouette reads as a natural precision pinch, not four
+	# parallel hoses reaching for the label.
 	return {
-		"Index":[Vector3(0.046,-0.174,0.000),Vector3(0.050,-0.230,-0.028),Vector3(0.047,-0.260,-0.076),Vector3(0.048,-0.244,-0.108)],
-		"Middle":[Vector3(0.012,-0.180,0.006),Vector3(0.014,-0.238,-0.010),Vector3(0.010,-0.266,-0.052),Vector3(0.002,-0.236,-0.090)],
-		"Ring":[Vector3(-0.022,-0.176,0.010),Vector3(-0.026,-0.232,-0.004),Vector3(-0.032,-0.252,-0.044),Vector3(-0.036,-0.222,-0.078)],
-		"Little":[Vector3(-0.055,-0.164,0.012),Vector3(-0.061,-0.212,-0.004),Vector3(-0.069,-0.230,-0.038),Vector3(-0.073,-0.206,-0.066)],
-		"Thumb":[Vector3(0.070,-0.080,-0.004),Vector3(0.111,-0.130,-0.028),Vector3(0.102,-0.181,-0.070),Vector3(0.062,-0.224,-0.108)]
+		"Index":[Vector3(0.036,-0.164,0.000),Vector3(0.043,-0.219,-0.018),Vector3(0.047,-0.267,-0.062),Vector3(0.050,-0.258,-0.101)],
+		"Middle":[Vector3(0.008,-0.166,0.008),Vector3(0.010,-0.205,0.020),Vector3(0.005,-0.220,0.060),Vector3(-0.004,-0.188,0.091)],
+		"Ring":[Vector3(-0.020,-0.162,0.010),Vector3(-0.024,-0.199,0.019),Vector3(-0.032,-0.211,0.054),Vector3(-0.038,-0.181,0.080)],
+		"Little":[Vector3(-0.047,-0.153,0.012),Vector3(-0.052,-0.184,0.018),Vector3(-0.059,-0.194,0.046),Vector3(-0.064,-0.169,0.067)],
+		"Thumb":[Vector3(0.062,-0.079,-0.003),Vector3(0.099,-0.125,-0.018),Vector3(0.092,-0.176,-0.060),Vector3(0.061,-0.226,-0.097)]
 	}
 
 func _support_pose_points() -> Dictionary:
+	# Support fingers travel around the far side of the vessel (negative Z from
+	# the camera), allowing the bottle/cup to occlude them naturally. The thumb
+	# stays on the near face as the visible stabilising digit.
 	var source := {
-		"Index":[Vector3(0.046,-0.174,0.002),Vector3(0.052,-0.234,-0.008),Vector3(0.050,-0.284,-0.034),Vector3(0.043,-0.303,-0.074)],
-		"Middle":[Vector3(0.012,-0.180,0.007),Vector3(0.014,-0.246,-0.004),Vector3(0.010,-0.298,-0.032),Vector3(0.002,-0.314,-0.073)],
-		"Ring":[Vector3(-0.022,-0.176,0.010),Vector3(-0.026,-0.238,-0.002),Vector3(-0.032,-0.288,-0.028),Vector3(-0.040,-0.302,-0.066)],
-		"Little":[Vector3(-0.055,-0.164,0.012),Vector3(-0.061,-0.218,-0.002),Vector3(-0.070,-0.259,-0.026),Vector3(-0.078,-0.270,-0.058)],
-		"Thumb":[Vector3(0.070,-0.080,-0.004),Vector3(0.116,-0.130,-0.010),Vector3(0.124,-0.176,-0.036),Vector3(0.110,-0.206,-0.070)]
+		"Index":[Vector3(0.036,-0.164,0.002),Vector3(0.042,-0.218,-0.020),Vector3(0.044,-0.260,-0.066),Vector3(0.038,-0.279,-0.104)],
+		"Middle":[Vector3(0.008,-0.168,0.006),Vector3(0.010,-0.229,-0.018),Vector3(0.007,-0.276,-0.070),Vector3(0.000,-0.289,-0.112)],
+		"Ring":[Vector3(-0.019,-0.164,0.009),Vector3(-0.023,-0.221,-0.016),Vector3(-0.030,-0.265,-0.066),Vector3(-0.037,-0.278,-0.105)],
+		"Little":[Vector3(-0.045,-0.153,0.011),Vector3(-0.051,-0.204,-0.013),Vector3(-0.059,-0.243,-0.058),Vector3(-0.066,-0.254,-0.093)],
+		"Thumb":[Vector3(0.061,-0.078,0.014),Vector3(0.098,-0.121,0.028),Vector3(0.105,-0.163,0.047),Vector3(0.088,-0.198,0.060)]
 	}
 	var mirrored := {}
 	for key in source.keys():
@@ -339,11 +347,11 @@ func _support_pose_points() -> Dictionary:
 
 func _realtime_finger_radius(finger_name: String) -> float:
 	match finger_name:
-		"Thumb": return 0.024
-		"Index": return 0.020
-		"Middle": return 0.0215
-		"Ring": return 0.0205
-		_: return 0.0175
+		"Thumb": return 0.0180
+		"Index": return 0.0140
+		"Middle": return 0.0148
+		"Ring": return 0.0140
+		_: return 0.0123
 
 func _apply_pose() -> void:
 	if _using_authored_asset:
@@ -370,11 +378,11 @@ func _refresh_pinch_anchors() -> void:
 
 func _refresh_realtime_anchors() -> void:
 	if _dynamic:
-		_index_tip.position = Vector3(0.048,-0.244,-0.108)*REALTIME_PRESENTATION_SCALE
-		_thumb_tip.position = Vector3(0.062,-0.224,-0.108)*REALTIME_PRESENTATION_SCALE
+		_index_tip.position = Vector3(0.050,-0.258,-0.101)*REALTIME_PRESENTATION_SCALE
+		_thumb_tip.position = Vector3(0.061,-0.226,-0.097)*REALTIME_PRESENTATION_SCALE
 	else:
-		_index_tip.position = Vector3(-0.043,-0.303,-0.074)*REALTIME_PRESENTATION_SCALE
-		_thumb_tip.position = Vector3(-0.110,-0.206,-0.070)*REALTIME_PRESENTATION_SCALE
+		_index_tip.position = _mirror(Vector3(0.038,-0.279,-0.104))*REALTIME_PRESENTATION_SCALE
+		_thumb_tip.position = _mirror(Vector3(0.088,-0.198,0.060))*REALTIME_PRESENTATION_SCALE
 	_pinch_point.position = (_index_tip.position+_thumb_tip.position)*0.5
 
 func _refresh_authored_anchors() -> void:
