@@ -6,33 +6,39 @@ const BASE_POSITION := Vector3(0.0,0.72,-1.43)
 const PROFILES := {
 	"cafe_window":{
 		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
-		"world_width":TARGET_WORLD_WIDTH,
-		"offset":Vector2(0.0,0.0),
-		"modulate":Color(0.94,0.92,0.89,1.0)
+		"world_width":8.40,
+		"offset":Vector2(0.0,0.00),
+		"modulate":Color(0.94,0.90,0.84,1.0)
 	},
 	"pantry_jar":{
-		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
-		"world_width":7.45,
-		"offset":Vector2(-0.38,0.14),
-		"modulate":Color(1.00,0.82,0.67,1.0)
+		# Bright warm grocery/food-prep crop. The realtime pale stone counter and
+		# sauce jar make this read as pantry/kitchen rather than another café.
+		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
+		"world_width":6.10,
+		"offset":Vector2(-0.92,0.13),
+		"modulate":Color(1.00,0.88,0.72,1.0)
 	},
 	"pantry_tin":{
-		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":7.05,
-		"offset":Vector2(0.66,-0.04),
-		"modulate":Color(0.82,0.77,0.67,1.0)
+		# Tighter neutral shelving/bar-stock crop gives the metal can a darker,
+		# industrial grocery identity distinct from the bright supermarket.
+		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
+		"world_width":6.25,
+		"offset":Vector2(0.56,0.08),
+		"modulate":Color(0.82,0.82,0.78,1.0)
 	},
 	"market_coldcase":{
 		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":TARGET_WORLD_WIDTH,
+		"world_width":8.40,
 		"offset":Vector2(0.0,0.02),
-		"modulate":Color(0.98,0.985,0.99,1.0)
+		"modulate":Color(0.98,0.99,1.00,1.0)
 	},
 	"market_can":{
-		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
-		"world_width":6.45,
-		"offset":Vector2(-0.72,0.18),
-		"modulate":Color(0.72,0.90,0.96,1.0)
+		# Window-heavy cool crop reads as a brighter beverage/patio counter and no
+		# longer shares the dark bar plate used by the tin/pantry scene.
+		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
+		"world_width":5.75,
+		"offset":Vector2(-1.18,0.16),
+		"modulate":Color(0.72,0.90,0.88,1.0)
 	}
 }
 
