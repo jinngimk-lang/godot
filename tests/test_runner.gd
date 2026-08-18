@@ -23,23 +23,17 @@ func _init() -> void:
 		"res://tests/test_peel_flap_arc.gd",
 		"res://tests/test_label_backing_material.gd",
 		"res://tests/test_label_print_contract.gd",
-		"res://tests/test_hand_visual.gd",
-		"res://tests/test_authored_hand_asset.gd",
-		"res://tests/test_cinematic_hand_presentation.gd",
-		"res://tests/test_reference_peel_playback.gd",
+		"res://tests/test_realtime_render_authority.gd",
+		"res://tests/test_input_reference_contract.gd",
 		"res://tests/test_peel_foley_router.gd",
 		"res://tests/test_peel_audio_mix.gd",
 		"res://tests/test_session_model.gd",
 		"res://tests/test_post_peel_progression.gd",
-		"res://tests/test_ritual_flow.gd",
-		"res://tests/test_cup_crumple_model.gd",
-		"res://tests/test_crumple_hand_staging.gd",
 		"res://tests/test_reference_profiles.gd",
 		"res://tests/test_inspection_controller.gd",
 		"res://tests/test_venue_presentation.gd",
 		"res://tests/test_product_presentation.gd",
 		"res://tests/test_cafe_hero_product.gd",
-		"res://tests/test_cafe_sleeve_fabric.gd",
 		"res://tests/test_residue_visual.gd",
 		"res://tests/test_table_surface_material.gd",
 		"res://tests/test_hud_chrome_presentation.gd",
@@ -50,7 +44,7 @@ func _init() -> void:
 			failures.append_array(suite.run())
 
 	if failures.is_empty():
-		print("PASS: all deterministic tests")
+		print("PASS: all deterministic object-only tests")
 		quit(0)
 		return
 	for failure in failures:

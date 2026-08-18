@@ -120,15 +120,24 @@ func run() -> Array[String]:
 		failures.append("RED: label needs a thin but visible substrate sidewall; got %.4f" % thickness)
 
 	if not visual.has_method("get_torn_front_fringe"):
-		failures.append("RED: partially peeled label needs a deterministic torn-front fiber fringe")
+		failures.append("RED: fibrous bar peel needs a deterministic torn-front fiber fringe")
 	else:
+		# Café thermal stock and Market coated stock should peel as broad clean
+		# panels. Only the Bar's uncoated-fiber substrate gets obvious torn fringe.
+		visual.apply_profile(profiles[0])
+		if not visual.get_torn_front_fringe(progress).is_empty():
+			failures.append("RED: café thermal paper should not sprout torn fringe during a clean peel")
+		visual.apply_profile(profiles[2])
+		if not visual.get_torn_front_fringe(progress).is_empty():
+			failures.append("RED: coated market label should not sprout fibrous fringe")
+		visual.apply_profile(profiles[1])
 		var attached_fringe: PackedVector2Array = visual.get_torn_front_fringe(0.0)
 		var torn_fringe: PackedVector2Array = visual.get_torn_front_fringe(progress)
 		var repeated_fringe: PackedVector2Array = visual.get_torn_front_fringe(progress)
 		if not attached_fringe.is_empty():
-			failures.append("RED: fully attached label must not expose torn-front fibers")
+			failures.append("RED: fully attached fibrous label must not expose torn-front fibers")
 		if torn_fringe.size() < 5 or torn_fringe.size() > 11:
-			failures.append("RED: torn front should use a small readable cluster of fibers; got %d" % torn_fringe.size())
+			failures.append("RED: torn bar front should use a small readable cluster of fibers; got %d" % torn_fringe.size())
 		elif torn_fringe != repeated_fringe:
 			failures.append("RED: torn-front fringe must be deterministic across identical frames")
 		else:
@@ -138,7 +147,7 @@ func run() -> Array[String]:
 				longest = maxf(longest, fiber.y)
 				shortest = minf(shortest, fiber.y)
 			if longest < 0.010:
-				failures.append("RED: torn-front fibers must protrude enough to break the rectangular silhouette")
+				failures.append("RED: torn-front fibers must protrude enough to break the bar silhouette")
 			if longest - shortest < 0.004:
 				failures.append("RED: torn-front fibers need varied lengths instead of a uniform comb")
 	visual.free()

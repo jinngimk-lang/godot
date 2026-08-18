@@ -1,29 +1,21 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
-[ext_resource type="Script" path="res://scripts/presentation/cafe_presentation.gd" id="2_presentation"]
-[ext_resource type="Script" path="res://scripts/presentation/forearm_presentation.gd" id="3_forearm"]
-[ext_resource type="Script" path="res://scripts/presentation/cup_crumple_presentation.gd" id="4_crumple"]
-[ext_resource type="Script" path="res://scripts/presentation/crumple_hand_staging.gd" id="5_crumple_hand"]
 [ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
 [ext_resource type="Script" path="res://scripts/presentation/reference_backdrop.gd" id="7_backdrop"]
 [ext_resource type="Script" path="res://scripts/presentation/table_surface_presentation.gd" id="8_table"]
 [ext_resource type="Script" path="res://scripts/presentation/hud_chrome_presentation.gd" id="9_hud"]
-[ext_resource type="Script" path="res://scripts/presentation/cup_contents_presentation.gd" id="10_contents"]
 [ext_resource type="Script" path="res://scripts/presentation/reference_composition.gd" id="11_composition"]
 [ext_resource type="Script" path="res://scripts/presentation/reference_lighting.gd" id="12_lighting"]
-[ext_resource type="Script" path="res://scripts/presentation/hand_choreography_presentation.gd" id="13_hand_choreo"]
 [ext_resource type="Script" path="res://scripts/presentation/guided_journey_presentation.gd" id="14_journey"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_receipt_readability_presentation.gd" id="15_receipt_readability"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_lid_molded_presentation.gd" id="16_lid_molding"]
-[ext_resource type="Script" path="res://scripts/presentation/cinematic_hand_presentation.gd" id="17_cinematic_hands"]
-[ext_resource type="Script" path="res://scripts/presentation/reference_peel_playback.gd" id="18_reference_playback"]
+[ext_resource type="Script" path="res://scripts/presentation/cursor_presentation.gd" id="17_cursor"]
+[ext_resource type="Script" path="res://scripts/presentation/corner_peel_presentation.gd" id="18_corner"]
+[ext_resource type="Script" path="res://scripts/presentation/hero_product_detail_presentation.gd" id="19_hero_detail"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
-
-[node name="CafePresentation" type="Node3D" parent="."]
-script = ExtResource("2_presentation")
 
 [node name="ReferenceBackdrop" type="Sprite3D" parent="."]
 script = ExtResource("7_backdrop")
@@ -52,23 +44,11 @@ script = ExtResource("15_receipt_readability")
 [node name="CafeLidMoldedPresentation" type="Node" parent="."]
 script = ExtResource("16_lid_molding")
 
-[node name="ForearmPresentation" type="Node3D" parent="."]
-script = ExtResource("3_forearm")
+[node name="HeroProductDetailPresentation" type="Node3D" parent="."]
+script = ExtResource("19_hero_detail")
 
-[node name="CupCrumplePresentation" type="Node3D" parent="."]
-script = ExtResource("4_crumple")
+[node name="CornerPeelPresentation" type="Node3D" parent="."]
+script = ExtResource("18_corner")
 
-[node name="CrumpleHandStaging" type="Node3D" parent="."]
-script = ExtResource("5_crumple_hand")
-
-[node name="CupContentsPresentation" type="Node3D" parent="."]
-script = ExtResource("10_contents")
-
-[node name="HandChoreographyPresentation" type="Node" parent="."]
-script = ExtResource("13_hand_choreo")
-
-[node name="CinematicHandPresentation" type="Node3D" parent="."]
-script = ExtResource("17_cinematic_hands")
-
-[node name="ReferencePeelPlayback" type="CanvasLayer" parent="."]
-script = ExtResource("18_reference_playback")
+[node name="CursorPresentation" type="Node" parent="."]
+script = ExtResource("17_cursor")

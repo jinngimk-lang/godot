@@ -4,60 +4,41 @@ func run() -> Array[String]:
 	var failures: Array[String] = []
 	var model = SessionModel.new()
 	if not model.has_method("select_variant"):
-		failures.append("RED: showcase needs deterministic direct variant navigation")
+		return ["PROFILE_RED: showcase needs deterministic direct variant navigation"]
+	if model.VARIANTS.size() != 5:
+		failures.append("PROFILE_RED: object-only north star requires exactly five variants")
 		return failures
-	if model.VARIANTS.size() < 3:
-		failures.append("reference vertical slice requires three variants")
-		return failures
-	var expected_scenes := ["cafe_window","night_bar","market_coldcase"]
-	var expected_kinds := ["paper_cup","amber_bottle","clear_bottle"]
-	var expected_post := ["crumple","inspect","inspect"]
+
+	var expected_scenes := ["cafe_window","pantry_jar","pantry_tin","market_coldcase","market_can"]
+	var expected_kinds := ["paper_cup","sauce_jar","tin_can","clear_bottle","soda_can"]
+	var expected_names := ["Coffee Shop","Jar","Tin Can","Supermarket","Can"]
 	var composition_path := "res://scripts/presentation/reference_composition.gd"
 	var composition = load(composition_path) if ResourceLoader.exists(composition_path) else null
 	if composition == null:
-		failures.append("BOTTLE_FRAMING_RED: live ReferenceComposition is required")
-	for i in range(3):
+		failures.append("PROFILE_RED: live ReferenceComposition is required")
+
+	for i in range(5):
 		var variant: Dictionary = model.VARIANTS[i]
-		for key in ["scene_profile","container_profile","post_peel_action"]:
-			if not variant.has(key): failures.append("RED: variant %d missing %s" % [i,key])
-		if not failures.is_empty(): continue
-		if String(variant.scene_profile.get("id","")) != expected_scenes[i]: failures.append("variant %d wrong scene" % i)
-		if String(variant.container_profile.get("kind","")) != expected_kinds[i]: failures.append("variant %d wrong container kind" % i)
-		if String(variant.post_peel_action) != expected_post[i]: failures.append("variant %d wrong post-peel action" % i)
-
-		# ReferenceComposition promises a hand-and-object closeup where the hero
-		# vessel occupies roughly one-half to two-thirds of frame height. Test the
-		# live composition owner directly so a dead profile value cannot make CI
-		# green while captured product pixels remain unchanged.
+		for key in ["scene_profile","container_profile","post_peel_action","label_width","label_height"]:
+			if not variant.has(key):
+				failures.append("PROFILE_RED: variant %d missing %s" % [i,key])
+		if String(variant.get("name","")) != expected_names[i]:
+			failures.append("PROFILE_RED: variant %d must be named %s" % [i,expected_names[i]])
+		if String((variant.get("scene_profile",{}) as Dictionary).get("id","")) != expected_scenes[i]:
+			failures.append("PROFILE_RED: variant %d has wrong scene id" % i)
+		if String((variant.get("container_profile",{}) as Dictionary).get("kind","")) != expected_kinds[i]:
+			failures.append("PROFILE_RED: variant %d has wrong product kind" % i)
+		if String(variant.get("post_peel_action","")) != "inspect":
+			failures.append("PROFILE_RED: object-only variant %d must finish in inspect, not crumple" % i)
+		if float(variant.get("label_width",0.0)) < 0.68 or float(variant.get("label_height",0.0)) < 0.50:
+			failures.append("PROFILE_RED: variant %d label must remain a large tactile hero patch" % i)
 		if composition != null:
-			var camera_fov := float(composition.target_fov_for_kind(expected_kinds[i]))
-			if expected_kinds[i] == "paper_cup":
-				if absf(camera_fov-39.0) > 0.1:
-					failures.append("BOTTLE_FRAMING_RED: café closeup lens must remain 39 degrees, got %.2f" % camera_fov)
-			else:
-				if camera_fov < 47.0:
-					failures.append("BOTTLE_FRAMING_RED: %s needs a wider bottle lens so the full slender vessel stays in frame, got %.2f" % [expected_scenes[i],camera_fov])
-				if camera_fov > 50.0:
-					failures.append("BOTTLE_FRAMING_RED: %s lens became too wide for the reference closeup, got %.2f" % [expected_scenes[i],camera_fov])
+			var fov := float(composition.target_fov_for_kind(expected_kinds[i]))
+			if fov < 34.0 or fov > 42.0:
+				failures.append("PROFILE_RED: %s hero framing must stay within close 34-42 degree reference range, got %.2f" % [expected_kinds[i],fov])
 
-	var cafe: Dictionary = model.VARIANTS[0]
-	var cafe_width := float(cafe.get("label_width",0.0))
-	var cafe_height := float(cafe.get("label_height",0.0))
-	if cafe_width <= 0.0 or cafe_height <= 0.0:
-		failures.append("RED: café label dimensions must be positive")
-	else:
-		var aspect := cafe_width/cafe_height
-		if cafe_width > 0.72:
-			failures.append("RED: approved café receipt needs a narrower silhouette, got %.3f m" % cafe_width)
-		if cafe_height < 0.54:
-			failures.append("RED: approved café receipt needs stronger vertical presence, got %.3f m" % cafe_height)
-		if aspect > 1.35:
-			failures.append("RED: café receipt should read near-square rather than landscape, aspect %.2f" % aspect)
-
-	model.select_variant(2)
-	if String(model.current_variant().container_profile.get("kind","")) != "clear_bottle":
-		failures.append("direct navigation should select market bottle even before progression unlock")
-	model.select_variant(1)
-	if String(model.current_variant().scene_profile.get("id","")) != "night_bar":
-		failures.append("direct navigation should select bar profile")
+	for i in range(5):
+		model.select_variant(i)
+		if String(model.current_variant().container_profile.get("kind","")) != expected_kinds[i]:
+			failures.append("PROFILE_RED: direct navigation must select %s at index %d" % [expected_kinds[i],i])
 	return failures

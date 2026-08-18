@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-# Visual iteration produces several commits quickly. Only the newest head for a
-# branch is useful; stale full Godot/capture runs waste minutes and delay the
-# feedback loop. Push and PR events for the same head branch intentionally share
-# one concurrency key.
 concurrency:
   group: godot-check-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
@@ -97,87 +93,45 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_scene.gd
           ./godot --headless --path . --script res://tests/smoke_scene.gd
 
       - name: Reference scene smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_reference_scene.gd
           ./godot --headless --path . --script res://tests/smoke_reference_scene.gd
 
       - name: Label cup-surface smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_label_cup_surface.gd
           ./godot --headless --path . --script res://tests/smoke_label_cup_surface.gd
 
       - name: Cafe presentation smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_cafe_presentation.gd
           ./godot --headless --path . --script res://tests/smoke_cafe_presentation.gd
-
-      - name: Cup crumple presentation smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f tests/smoke_cup_crumple_presentation.gd
-          ./godot --headless --path . --script res://tests/smoke_cup_crumple_presentation.gd
-
-      - name: Crumple shell hand-contact smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f tests/smoke_crumple_shell_contact.gd
-          ./godot --headless --path . --script res://tests/smoke_crumple_shell_contact.gd
-
-      - name: Cup contents presentation smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f tests/smoke_cup_contents_presentation.gd
-          ./godot --headless --path . --script res://tests/smoke_cup_contents_presentation.gd
-
-      - name: Forearm presentation smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f tests/smoke_forearm_presentation.gd
-          ./godot --headless --path . --script res://tests/smoke_forearm_presentation.gd
-
-      - name: Ritual loop smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f tests/smoke_ritual_loop.gd
-          ./godot --headless --path . --script res://tests/smoke_ritual_loop.gd
 
       - name: Repeated-session reset smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_reset_loop.gd
           ./godot --headless --path . --script res://tests/smoke_reset_loop.gd
 
       - name: Pause input isolation smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_pause_input_isolation.gd
           ./godot --headless --path . --script res://tests/smoke_pause_input_isolation.gd
 
       - name: Reset input isolation smoke
         shell: bash
         run: |
           set -euo pipefail
-          test -f tests/smoke_reset_input_isolation.gd
           ./godot --headless --path . --script res://tests/smoke_reset_input_isolation.gd
 
-      - name: Capture cafe bar and market frames
+      - name: Capture five object-only scene pairs
         shell: bash
         run: |
           set -euo pipefail
@@ -187,17 +141,17 @@ jobs:
           fi
           mkdir -p artifacts/reference_frames
           xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
-          for name in cafe bar market; do
+          for name in coffee coffee_peel38 jar jar_peel49 tin tin_peel41 market market_peel45 can can_peel33; do
             test -s "artifacts/reference_frames/${name}.png"
           done
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-capture.log; then
-            echo "Godot emitted errors while capturing reference frames."
+            echo "Godot emitted errors while capturing object-only reference frames."
             exit 1
           fi
 
       - name: Upload reference frames
         uses: actions/upload-artifact@v4
         with:
-          name: peel-calm-reference-frames
+          name: peel-calm-object-only-reference-frames
           path: artifacts/reference_frames/*.png
           if-no-files-found: error

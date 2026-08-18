@@ -1,5 +1,8 @@
 extends Node3D
 
+const CURSOR_PATH := "res://assets/ui/peel_cursor.svg"
+const SCENE_NAMES := ["Coffee Shop","Jar","Tin Can","Supermarket","Can"]
+
 var _camera: Camera3D
 var _cup: MeshInstance3D
 var _lid: MeshInstance3D
@@ -8,8 +11,6 @@ var _label_print: LabelPrint
 var _lifecycle: LabelLifecycle
 var _controller: PeelController
 var _pointer: PointerAdapter
-var _right_hand: HandVisual
-var _left_hand: HandVisual
 var _audio: PeelAudio
 var _hud: Label
 var _reward: Label
@@ -17,27 +18,39 @@ var _continue_button: Button
 var _edge_marker: MeshInstance3D
 var _session: SessionModel
 var _ritual: RitualFlow
-var _crumple: CupCrumpleModel
-var _crumple_presentation: CupCrumplePresentation
-var _contents_presentation: CupContentsPresentation
 var _venue: VenuePresentation
 var _product: ProductPresentation
 var _residue: ResidueVisual
 var _inspection: InspectionController
 var _release_count := 0
-var _reset_timer := -1.0
 var _completed_this_frame := false
-var _pending_score := 0
-var _advance_after_reset := false
 var _detach_reward_recorded := false
 var _paused := false
+var _rmb_rotating := false
+var _zoom_fov_offset := 0.0
+
+func get_control_contract() -> Dictionary:
+	return {
+		"peel":"LMB",
+		"rotate":"RMB",
+		"zoom":"Wheel",
+		"reset":"R",
+		"scenes":"1/2/3/4/5",
+		"pause":"Esc"
+	}
+
+func get_visual_interaction_contract() -> Dictionary:
+	return {
+		"visible_hands":false,
+		"pointer_grip":"mouse_direct",
+		"cursor":"hand"
+	}
 
 func _ready() -> void:
 	_build_world()
-	_crumple_presentation = get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
-	_contents_presentation = get_node_or_null("CupContentsPresentation") as CupContentsPresentation
 	_venue = get_node_or_null("VenuePresentation") as VenuePresentation
 	_disable_legacy_cafe_stage()
+	_install_cursor()
 	_session = SessionModel.new()
 	_ritual = RitualFlow.new()
 	_lifecycle = LabelLifecycle.new(0.16)
@@ -54,14 +67,6 @@ func _process(delta: float) -> void:
 
 	_update_inspection(delta)
 	_ritual.update(delta)
-	var ritual_phase := _ritual.get_phase_name()
-	if _uses_crumple() and ritual_phase in ["CRUMPLE_READY","CRUMPLING","RITUAL_COMPLETE"]:
-		var crumple_state: PointerState = _pointer.consume_frame()
-		_process_crumple_pointer(crumple_state)
-		_audio.quiet()
-		_update_hud("",_lifecycle.get_phase_name(),_controller.get_progress())
-		_pointer.clear_transients()
-		return
 
 	var progress := _controller.get_progress()
 	var front_local := _label.get_front_position(progress)
@@ -86,21 +91,16 @@ func _process(delta: float) -> void:
 	_label.set_detach_alpha(_lifecycle.get_detach_alpha())
 	var detached_now := _lifecycle.consume_detach_event()
 
-	var hand_screen: Vector2 = result["hand_position"] as Vector2
-	var desired_world := _screen_to_plane(hand_screen,front_world.z+0.28)
+	# Object-only interaction authority: the controller's live pointer position is
+	# projected directly onto the real label interaction plane. There is no hidden
+	# hand/pinch proxy between the mouse and LabelVisual.
+	var pointer_screen: Vector2 = result["hand_position"] as Vector2
+	var desired_world := _screen_to_plane(pointer_screen,front_world.z+0.20)
 	var desired_local := _label.to_local(desired_world)
 	var effective_local := _label.get_effective_grip(progress,desired_local)
-	var effective_world := _label.to_global(effective_local)
-	var state_name := String(result["state"])
-	var pinching := state_name in ["EDGE_LIFT","PINCHED","PEELING","COMPLETE"] or phase_name in ["DETACHING","HELD"]
-	_right_hand.set_pinch_amount(1.0 if pinching else 0.18)
-	_right_hand.set_grip_target(effective_world)
-	_right_hand.tick(delta)
-	var pinch_world := _right_hand.get_pinch_world_position()
-	_label.set_peel(progress,_label.to_local(pinch_world))
+	_label.set_peel(progress,effective_local)
 
-	# Legacy gold point is kept only as a hidden discoverability node. The label
-	# surface owns peel input, so interaction never depends on this marker.
+	var state_name := String(result["state"])
 	_edge_marker.global_position = front_world
 	_edge_marker.visible = false
 
@@ -108,7 +108,7 @@ func _process(delta: float) -> void:
 	var residue := float(result.get("residue",0.0))
 	_residue.set_residue(progress,residue,integrity)
 
-	var tension := hand_screen.distance_to(edge_screen)*0.65
+	var tension := pointer_screen.distance_to(edge_screen)*0.65
 	var speed := state.velocity.length()/100.0
 	var active_peel := state_name == "PEELING" and phase_name == "PEELING"
 	_audio.set_feedback(active_peel,speed,tension,released_amount,detached_now,delta)
@@ -116,34 +116,6 @@ func _process(delta: float) -> void:
 		_handle_detached_label()
 	_update_hud(state_name,phase_name,progress)
 	_pointer.clear_transients()
-
-func _process_crumple_pointer(state: PointerState) -> void:
-	if _ritual == null or _crumple == null or not _uses_crumple():
-		return
-	var phase := _ritual.get_phase_name()
-	if phase == "CRUMPLE_READY" and state.pressed:
-		var cup_screen := _camera.unproject_position(_cup.global_position)
-		if _ritual.begin_crumple():
-			_crumple.begin_gesture(state.position.x,cup_screen.x)
-			phase = _ritual.get_phase_name()
-	elif phase == "CRUMPLING" and state.pressed and _crumple.get_gesture_side() == 0:
-		var cup_screen := _camera.unproject_position(_cup.global_position)
-		_crumple.begin_gesture(state.position.x,cup_screen.x)
-	if phase != "CRUMPLING":
-		return
-	if state.released_this_frame or not state.pressed:
-		_crumple.end_gesture()
-		return
-	var change: Dictionary = _crumple.apply_drag(state.relative.x)
-	var pulse := float(change.get("event_strength",0.0))
-	if _crumple_presentation != null:
-		_crumple_presentation.set_crumple(_crumple.get_progress(),_crumple.get_gesture_side(),pulse)
-	if _contents_presentation != null:
-		_contents_presentation.set_crumple(_crumple.get_progress(),_crumple.get_gesture_side(),pulse)
-	if pulse > 0.0:
-		_audio.trigger_crumple(pulse)
-	if _crumple.is_complete() and _ritual.mark_crumple_complete() and _ritual.consume_reward_event():
-		_reward.text = "%s\nStay a moment • Continue when ready" % _crumple_feedback_text()
 
 func _build_world() -> void:
 	_camera = Camera3D.new()
@@ -236,21 +208,6 @@ func _build_world() -> void:
 	_edge_marker.material_override = _material(Color(0.98,0.72,0.20),0.42)
 	add_child(_edge_marker)
 
-	_left_hand = HandVisual.new()
-	_left_hand.name = "LeftHand"
-	add_child(_left_hand)
-	_left_hand.setup(false)
-	_left_hand.snap_to(Vector3(0.60,0.22,0.40))
-	_left_hand.rotation_degrees = Vector3(14,42,45)
-	_left_hand.set_pinch_amount(0.36)
-
-	_right_hand = HandVisual.new()
-	_right_hand.name = "RightHand"
-	add_child(_right_hand)
-	_right_hand.setup(true)
-	_right_hand.snap_to(Vector3(-0.72,0.28,0.88))
-	_right_hand.rotation_degrees = Vector3(18,-22,-8)
-
 	_pointer = PointerAdapter.new()
 	_pointer.name = "PointerAdapter"
 	add_child(_pointer)
@@ -297,27 +254,21 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 		_continue_button.disabled = _paused
 	var variant := _session.current_variant()
 	var scene_id := String((variant.get("scene_profile",{}) as Dictionary).get("id","cafe_window"))
-	var venue_name := {"cafe_window":"WINDOW CAFÉ","night_bar":"AMBER BAR","market_coldcase":"MARKET COOLER"}.get(scene_id,"WINDOW CAFÉ")
+	var venue_name := String(variant.get("name",scene_id)).to_upper()
 	var integrity := _controller.get_integrity() if _controller != null else 1.0
 	var residue := _controller.get_residue() if _controller != null else 0.0
 	var grade := _quality_grade(integrity,residue)
 	var percent := int(round(progress*100.0))
-	var post_action := String(variant.get("post_peel_action","crumple"))
 	var hint := String(variant.get("hint","slow pull feels cleaner"))
 	if _paused:
-		_hud.text = "%s  •  PAUSED\nEsc Resume  •  R Reset  •  Q/E Scene  •  1/2/3" % venue_name
+		_hud.text = "%s  •  PAUSED\nEsc Resume  •  R Reset  •  1/2/3/4/5 Scene" % venue_name
 		return
 	if phase_name == "DETACHING": hint = "last adhesive fibers releasing…"
-	elif phase_name == "HELD": hint = "label released • inspect or Continue"
+	elif phase_name == "HELD": hint = "label released • rotate/zoom to inspect or Continue"
 	elif state_name == "PEELING": hint = "steady pull • ease off if the paper starts to tear"
 	elif state_name == "RELEASED": hint = "re-grab anywhere on the visible label"
-	if _uses_crumple() and _ritual != null and _ritual.get_phase_name() in ["CRUMPLE_READY","CRUMPLING","RITUAL_COMPLETE"]:
-		var crumple_percent := int(round((_crumple.get_progress() if _crumple != null else 0.0)*100.0))
-		hint = "optional squeeze %d%% • Continue when ready" % crumple_percent
-	elif post_action == "inspect" and phase_name == "HELD":
-		hint = "RMB drag to inspect residue • Continue when ready"
-	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Peel anywhere  •  RMB Inspect  •  Q/E Scene  •  1/2/3  •  Esc Pause  •  R Reset" % [
-		venue_name,String(variant.get("name","Peel Calm")),percent,grade,int(round(residue*100.0)),hint
+	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Peel  •  RMB Rotate  •  Wheel Zoom  •  R Reset  •  1/2/3/4/5 Scene  •  Esc Pause" % [
+		venue_name,String(variant.get("drink","Peel Calm")),percent,grade,int(round(residue*100.0)),hint
 	]
 
 func _quality_grade(integrity: float, residue: float) -> String:
@@ -329,8 +280,6 @@ func _quality_grade(integrity: float, residue: float) -> String:
 
 func _on_completed() -> void:
 	_completed_this_frame = true
-	var continuity := 1.0 if _release_count == 0 else maxf(0.55,1.0-float(_release_count)*0.1)
-	_pending_score = ScoreModel.score(100.0,1.0,continuity)
 
 func _handle_detached_label() -> void:
 	if _detach_reward_recorded:
@@ -341,28 +290,16 @@ func _handle_detached_label() -> void:
 	var reward_text := "CLEAN RELEASE" if grade in ["A","B"] else "TEXTURED RELEASE"
 	if bool(progress_result.get("unlocked_new",false)):
 		reward_text += "\nnext scene unlocked"
-	if _uses_crumple():
-		reward_text += "\noptional squeeze • Continue when ready"
-	else:
-		reward_text += "\nRMB inspect • Continue when ready"
+	reward_text += "\nRMB rotate • Wheel zoom • Continue when ready"
 	_reward.text = reward_text
-	_reset_timer = -1.0
-	_advance_after_reset = false
-	if _uses_crumple():
-		_ritual.on_label_detached()
 	_show_continue_button()
 	_pointer.quarantine_current_press()
 
 func _show_continue_button() -> void:
 	if _continue_button == null or _session == null:
 		return
-	match _session.get_variant_index():
-		0:
-			_continue_button.text = "Continue to Bar"
-		1:
-			_continue_button.text = "Continue to Market"
-		_:
-			_continue_button.text = "Continue to Café"
+	var next_index := posmod(_session.get_variant_index()+1,SCENE_NAMES.size())
+	_continue_button.text = "Continue to %s" % SCENE_NAMES[next_index]
 	_continue_button.disabled = _paused
 	_continue_button.visible = true
 
@@ -371,22 +308,24 @@ func _on_continue_pressed() -> void:
 		return
 	if _inspection != null:
 		_inspection.end()
-	if _uses_crumple():
-		if _crumple != null:
-			_crumple.end_gesture()
-		if _ritual != null and _ritual.request_next():
-			_consume_next_request()
-		return
+	_rmb_rotating = false
 	_advance_to_next_item()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _inspection == null:
 		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
-		if event.pressed and not _paused:
-			_inspection.begin()
-		else:
-			_inspection.end()
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed and not _paused:
+				_rmb_rotating = true
+				_inspection.begin()
+			elif _rmb_rotating:
+				_rmb_rotating = false
+				_inspection.end()
+		elif event.pressed and not _paused and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_apply_zoom_step(-1.0)
+		elif event.pressed and not _paused and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_apply_zoom_step(1.0)
 	elif event is InputEventMouseMotion and _inspection.is_active() and not _paused:
 		_inspection.drag(event.relative.x,0.0)
 
@@ -400,28 +339,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		else:
 			_pointer.suspend_gameplay_input()
 			_paused = true
+			_rmb_rotating = false
 			if _inspection != null: _inspection.end()
 		_audio.reset_feedback()
 		_update_hud("",_lifecycle.get_phase_name(),_controller.get_progress())
 		return
-	if event.keycode == KEY_Q:
-		_select_showcase_relative(-1)
-		return
-	if event.keycode == KEY_E:
-		_select_showcase_relative(1)
-		return
-	if event.keycode in [KEY_1,KEY_2,KEY_3]:
+	if event.keycode in [KEY_1,KEY_2,KEY_3,KEY_4,KEY_5]:
 		_select_showcase(int(event.keycode-KEY_1))
 		return
 	if event.keycode == KEY_R:
 		_paused = false
-		if event.shift_pressed:
-			_session.restart_run()
-			_apply_current_variant()
-			_reset_session()
-			return
-		if _crumple != null:
-			_crumple.end_gesture()
+		_rmb_rotating = false
 		_reset_session()
 
 func _select_showcase_relative(direction: int) -> void:
@@ -430,6 +358,8 @@ func _select_showcase_relative(direction: int) -> void:
 
 func _select_showcase(index: int) -> void:
 	_paused = false
+	_rmb_rotating = false
+	_zoom_fov_offset = 0.0
 	if _inspection != null: _inspection.reset()
 	_session.select_variant(index)
 	_apply_current_variant()
@@ -438,12 +368,10 @@ func _select_showcase(index: int) -> void:
 func debug_select_variant(index: int) -> void:
 	_select_showcase(index)
 
-func _consume_next_request() -> void:
-	if _ritual != null and _ritual.consume_next_request():
-		_advance_to_next_item()
-
 func _advance_to_next_item() -> void:
-	_session.advance_item()
+	var next_index := posmod(_session.get_variant_index()+1,_session.VARIANTS.size())
+	_session.select_variant(next_index)
+	_zoom_fov_offset = 0.0
 	_apply_current_variant()
 	_reset_session()
 
@@ -482,64 +410,35 @@ func _apply_current_variant() -> void:
 	_product.apply_to_base(_cup,_lid,container_profile)
 	if _venue != null:
 		_venue.apply_profile(variant.get("scene_profile",{}) as Dictionary)
-	var crumple_profile: Dictionary = variant.get("crumple_profile",{})
-	if _crumple == null:
-		_crumple = CupCrumpleModel.new(crumple_profile)
-	else:
-		_crumple.configure(crumple_profile)
-		_crumple.reset()
-	if _crumple_presentation != null:
-		_crumple_presentation.visible = _uses_crumple()
-		_crumple_presentation.set_profile(variant)
-		_crumple_presentation.reset_visual()
-	if _contents_presentation != null:
-		_contents_presentation.set_profile(variant)
-		_contents_presentation.reset_visual()
 	_apply_inspection_yaw(0.0)
 
 func _reset_session() -> void:
+	_rmb_rotating = false
 	if _pointer != null:
 		_pointer.resume_gameplay_input()
 		_pointer.quarantine_current_press()
 	if _controller != null: _controller.reset()
 	if _lifecycle != null: _lifecycle.reset()
 	if _ritual != null: _ritual.reset()
-	if _crumple != null: _crumple.reset()
-	if _crumple_presentation != null: _crumple_presentation.reset_visual()
-	if _contents_presentation != null: _contents_presentation.reset_visual()
 	if _inspection != null: _inspection.reset()
 	_apply_inspection_yaw(0.0)
 	_release_count = 0
-	_pending_score = 0
 	_completed_this_frame = false
-	_reset_timer = -1.0
-	_advance_after_reset = false
 	_detach_reward_recorded = false
 	if _reward != null: _reward.text = ""
 	if _continue_button != null:
 		_continue_button.visible = false
 		_continue_button.disabled = false
 	if _residue != null: _residue.set_residue(0.0,0.0,1.0)
-	var fresh_grip_world := Vector3.ZERO
-	var has_fresh_grip := false
 	if _label != null:
 		_label.set_phase("ATTACHED")
 		_label.set_detach_alpha(0.0)
 		var front := _label.get_front_position(0.0)
 		_label.set_peel(0.0,front)
-		fresh_grip_world = _label.to_global(front)
-		has_fresh_grip = true
 	if _label_print != null and _session != null:
 		var variant := _session.current_variant()
 		var order_code := "P%02d" % (_session.get_clean_peels()+1)
 		_label_print.set_order(order_code,String(variant.get("drink","COCOA CLOUD")))
-	if _right_hand != null:
-		_right_hand.set_pinch_amount(0.18)
-		_right_hand.tick(0.0)
-		if has_fresh_grip:
-			var current_pinch := _right_hand.get_pinch_world_position()
-			_right_hand.position += fresh_grip_world-current_pinch
-			_right_hand.set_grip_target(fresh_grip_world)
 	if _audio != null: _audio.reset_feedback()
 	_update_hud("","ATTACHED",0.0)
 
@@ -548,9 +447,6 @@ func _update_inspection(delta: float) -> void:
 		return
 	var yaw := _inspection.tick(delta)
 	_apply_inspection_yaw(yaw)
-	var support := Vector3(0.58+sin(yaw)*0.10,0.24,0.37+cos(yaw)*0.035)
-	_left_hand.set_grip_target(support)
-	_left_hand.tick(delta)
 
 func _apply_inspection_yaw(yaw: float) -> void:
 	if _cup != null: _cup.rotation.y = yaw
@@ -558,7 +454,11 @@ func _apply_inspection_yaw(yaw: float) -> void:
 	if _label != null: _label.rotation.y = yaw
 	if _product != null: _product.set_inspection_yaw(yaw)
 	if _residue != null: _residue.set_inspection_yaw(yaw)
-	if _contents_presentation != null: _contents_presentation.rotation.y = yaw
+
+func _apply_zoom_step(direction: float) -> void:
+	_zoom_fov_offset = clampf(_zoom_fov_offset+direction*1.5,-5.0,5.0)
+	if _camera != null:
+		_camera.fov = clampf(_camera.fov+direction*1.5,32.0,48.0)
 
 func _project_label_region() -> Rect2:
 	if _camera == null or _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
@@ -573,34 +473,35 @@ func _project_label_region() -> Rect2:
 	var min_p := points[0]
 	var max_p := points[0]
 	for p in points:
-		min_p.x = minf(min_p.x,p.x)
-		min_p.y = minf(min_p.y,p.y)
-		max_p.x = maxf(max_p.x,p.x)
-		max_p.y = maxf(max_p.y,p.y)
-	return Rect2(min_p,max_p-min_p).grow(8.0)
+		min_p.x = minf(min_p.x,p.x); min_p.y = minf(min_p.y,p.y)
+		max_p.x = maxf(max_p.x,p.x); max_p.y = maxf(max_p.y,p.y)
+	return Rect2(min_p,max_p-min_p).grow(18.0)
 
-func _uses_crumple() -> bool:
-	if _session == null: return true
-	return String(_session.current_variant().get("post_peel_action","crumple")) == "crumple"
+func _screen_to_plane(screen_pos: Vector2, plane_z: float) -> Vector3:
+	var origin := _camera.project_ray_origin(screen_pos)
+	var direction := _camera.project_ray_normal(screen_pos)
+	if absf(direction.z)<0.0001: return origin
+	var t := (plane_z-origin.z)/direction.z
+	return origin+direction*t
+
+func _install_cursor() -> void:
+	if not ResourceLoader.exists(CURSOR_PATH):
+		return
+	var cursor := load(CURSOR_PATH) as Texture2D
+	if cursor == null:
+		return
+	Input.set_custom_mouse_cursor(cursor,Input.CURSOR_POINTING_HAND,Vector2(12,3))
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
 
 func _disable_legacy_cafe_stage() -> void:
 	var legacy := get_node_or_null("CafePresentation") as Node3D
-	if legacy == null: return
+	if legacy == null:
+		return
 	legacy.visible = false
+	legacy.set_process(false)
 	var old_world := legacy.get_node_or_null("WorldEnvironment") as WorldEnvironment
-	if old_world != null: old_world.environment = null
-
-func _crumple_feedback_text() -> String:
-	return "GENTLE CRUMPLE"
-
-func _screen_to_plane(screen_position: Vector2, z_depth: float) -> Vector3:
-	var origin := _camera.project_ray_origin(screen_position)
-	var direction := _camera.project_ray_normal(screen_position)
-	var plane := Plane(Vector3(0,0,1),z_depth)
-	var hit = plane.intersects_ray(origin,direction)
-	if hit == null:
-		return _label.to_global(_label.get_front_position(_controller.get_progress())+Vector3(0,0,0.28))
-	return hit
+	if old_world != null:
+		old_world.environment = null
 
 func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()

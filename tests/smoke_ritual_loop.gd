@@ -159,19 +159,19 @@ func _run() -> void:
 	var reset_variant := String(session.current_variant().get("id", ""))
 	var reset_key := InputEventKey.new()
 	reset_key.pressed = true
-	reset_key.keycode = KEY_R
+	reset_key.keycode = KEY_T
 	scene.call("_unhandled_key_input", reset_key)
 	if String(session.current_variant().get("id", "")) != reset_variant:
-		failures.append("POST_PEEL_RED: R must only reset the current item; it must never act as Next")
+		failures.append("POST_PEEL_RED: T must only reset the current item; it must never act as Next")
 	var controller = scene.get("_controller")
 	if controller == null or not is_zero_approx(float(controller.get_progress())):
-		failures.append("POST_PEEL_RED: R reset must restore fresh peel progress")
+		failures.append("POST_PEEL_RED: T reset must restore fresh peel progress")
 
 	_finish(scene, failures)
 
 func _finish(scene: Node, failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("PASS: detach -> optional tactile ritual -> explicit Continue -> café/bar progression -> R reset")
+		print("PASS: detach -> optional tactile ritual -> explicit Continue -> café/bar progression -> T reset")
 		scene.queue_free()
 		await process_frame
 		quit(0)
