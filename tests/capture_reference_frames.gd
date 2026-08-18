@@ -41,12 +41,25 @@ func _run() -> void:
 		if not await _capture(String(capture_case["done"])): return
 		_resume_scene(scene)
 		await _settle_frames(2)
+
+	# Release viewport-owned cursor resources before tearing down the scene.
 	Input.set_custom_mouse_cursor(null,Input.CURSOR_POINTING_HAND)
+	Input.set_custom_mouse_cursor(null,Input.CURSOR_ARROW)
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	scene.queue_free()
-	await process_frame
+
+	# Capture used to queue_free() and quit almost immediately. On GL/Xvfb the
+	# renderer could still hold the last ArrayMesh/texture for one more frame,
+	# producing intermittent ObjectDB/resource-leak ERROR lines after all 15
+	# captures had actually passed. Tear down synchronously, release the packed
+	# scene reference, then let several process/render frames drain before quit.
+	root.remove_child(scene)
+	scene.free()
+	scene = null
+	packed = null
+	await _settle_frames(8)
 	await RenderingServer.frame_post_draw
+	await _settle_frames(3)
 	print("PASS: captured five paper-release triplets")
 	quit(0)
 
@@ -105,9 +118,6 @@ func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	var grip_local := label.get_effective_grip(1.0,desired_grip_local)
 	label.set_peel(1.0,grip_local)
 	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
-	# Stage the actual post-peel lifecycle rather than freezing the old HELD state.
-	# LabelLifecycle intentionally clamps any single delta to 0.5 s, so advance the
-	# 0.72 s settle window in two bounded updates to prove true RESOLVED state.
 	lifecycle.reset()
 	lifecycle.update(1.0,true,0.016)
 	lifecycle.update(1.0,false,0.18)
@@ -197,6 +207,7 @@ func _capture(name: String) -> bool:
 	var error := image.save_png(path)
 	if error != OK:
 		push_error("CAPTURE_RED: failed to save %s (%d)" % [path,error]); quit(1); return false
+	image = null
 	print("CAPTURE: %s" % path)
 	return true
 
