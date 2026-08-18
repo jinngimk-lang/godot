@@ -22,5 +22,11 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_HERO_RED: direct Yuzu target requires silver crimp cap")
 		if float(contract.get("glass_highlight_alpha",0.0)) < 0.10:
 			failures.append("BOTTLE_HERO_RED: glass needs readable edge/highlight breakup")
+		if float(contract.get("outer_glass_alpha",1.0)) > 0.055:
+			failures.append("BOTTLE_HERO_RED: target glass center must stay optically clear, not milky")
+		if float(contract.get("liquid_alpha",0.0)) < 0.42:
+			failures.append("BOTTLE_HERO_RED: pale Yuzu liquid must read separately through clear glass")
+		if float(contract.get("target_focus_y",0.0)) < 0.24:
+			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
 	polish.free()
 	return failures
