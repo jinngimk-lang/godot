@@ -32,8 +32,6 @@ func is_skin_physically_lit() -> bool:
 func get_ready_hand_count() -> int:
 	return _hands.size()
 
-# Retained for older diagnostics: authored XR geometry is now deliberately
-# hidden. It remains pose/anchor authority, not viewport authority.
 func get_visible_authored_hand_mesh_count() -> int:
 	var count := 0
 	for hand_name in _hands.keys():
@@ -120,7 +118,7 @@ func _bind_hand(parent: Node3D, hand_name: String) -> void:
 	var legacy_forearm := hand.get_node_or_null("ForearmNatural") as MeshInstance3D
 	if legacy_forearm == null:
 		return
-	var shell := hand.get_node_or_null("RealtimeHandShell") as CSGCombiner3D
+	var shell := hand.get_node_or_null("RealtimeHandShell") as Node3D
 	if shell == null:
 		return
 	_hide_render_meshes(authored)
@@ -159,8 +157,8 @@ func _hide_render_meshes(node: Node) -> void:
 		_hide_render_meshes(child)
 
 func _apply_realtime_shell_materials(hand: HandVisual, shell: Node) -> void:
-	if shell is CSGPrimitive3D:
-		(shell as CSGPrimitive3D).material = _skin_material
+	if shell is MeshInstance3D:
+		(shell as MeshInstance3D).material_override = _skin_material
 	for child in shell.get_children():
 		_apply_realtime_shell_materials(hand,child)
 	for nail_name in ["IndexNail","ThumbNail"]:
@@ -181,16 +179,12 @@ func _build_cinematic_forearm(hand_name: String) -> void:
 	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x) < 0.04:
 		outward_sign = -1.0 if hand_name == "RightHand" else 1.0
-
-	# The arm now leaves the nearest lower corner instead of crossing the whole
-	# frame. This is the biggest composition mismatch in the previous captures.
-	var control_a_world := start_world + Vector3(outward_sign*0.16,-0.17,0.045)
-	var control_b_world := start_world + Vector3(outward_sign*0.42,-0.36,0.090)
-	var end_world := start_world + Vector3(outward_sign*0.76,-0.59,0.135)
+	var control_a_world := start_world+Vector3(outward_sign*0.16,-0.17,0.045)
+	var control_b_world := start_world+Vector3(outward_sign*0.42,-0.36,0.090)
+	var end_world := start_world+Vector3(outward_sign*0.76,-0.59,0.135)
 	var control_a := hand.to_local(control_a_world)
 	var control_b := hand.to_local(control_b_world)
 	var end := hand.to_local(end_world)
-
 	var forearm := MeshInstance3D.new()
 	forearm.name = "CinematicForearm"
 	forearm.mesh = _build_curve_mesh(start,control_a,control_b,end,0.058,0.088)
@@ -198,7 +192,6 @@ func _build_cinematic_forearm(hand_name: String) -> void:
 	forearm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	hand.add_child(forearm)
 	data["forearm"] = forearm
-
 	var cuff := MeshInstance3D.new()
 	cuff.name = "CinematicCuff"
 	var cuff_mesh := CylinderMesh.new()
@@ -305,10 +298,10 @@ func _count_visible_meshes(node: Node) -> int:
 		count += _count_visible_meshes(child)
 	return count
 
-func _cubic_point(a: Vector3, b: Vector3, c: Vector3, d: Vector3, t: float) -> Vector3:
+func _cubic_point(a: Vector3,b: Vector3,c: Vector3,d: Vector3,t: float) -> Vector3:
 	var inv := 1.0-t
 	return a*inv*inv*inv+b*3.0*inv*inv*t+c*3.0*inv*t*t+d*t*t*t
 
-func _cubic_tangent(a: Vector3, b: Vector3, c: Vector3, d: Vector3, t: float) -> Vector3:
+func _cubic_tangent(a: Vector3,b: Vector3,c: Vector3,d: Vector3,t: float) -> Vector3:
 	var inv := 1.0-t
 	return (b-a)*3.0*inv*inv+(c-b)*6.0*inv*t+(d-c)*3.0*t*t
