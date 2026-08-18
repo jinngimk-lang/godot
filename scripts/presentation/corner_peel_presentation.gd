@@ -6,8 +6,8 @@ const V_SEGMENTS := 28
 const SURFACE_OFFSET := 0.025
 const VISUAL_AREA_SCALE := 0.62
 const COMPLETE_RAMP_START := 0.84
-const BEND_BAND_RATIO := 0.14
-const PAPER_BACKING_THICKNESS := 0.0036
+const DEFAULT_BEND_BAND_RATIO := 0.14
+const DEFAULT_BACKING_THICKNESS := 0.0036
 const PAPER_BACKING_ROUGHNESS := 0.96
 
 var _label: LabelVisual
@@ -21,6 +21,8 @@ var _last_progress := -1.0
 var _last_drag := Vector3(INF,INF,INF)
 var _last_size := Vector2.ZERO
 var _visual_grip_local := Vector3.ZERO
+var _bend_band_ratio := DEFAULT_BEND_BAND_RATIO
+var _backing_thickness := DEFAULT_BACKING_THICKNESS
 
 func _ready() -> void:
 	call_deferred("_bind")
@@ -45,6 +47,12 @@ func _process(_delta: float) -> void:
 	_last_size = size
 	_rebuild(progress,drag)
 
+func set_paper_profile(profile: Dictionary) -> void:
+	_bend_band_ratio = clampf(float(profile.get("bend_band_ratio",DEFAULT_BEND_BAND_RATIO)),0.06,0.22)
+	_backing_thickness = clampf(float(profile.get("backing_thickness",DEFAULT_BACKING_THICKNESS)),0.0015,0.010)
+	_last_progress = -1.0
+	_last_drag = Vector3(INF,INF,INF)
+
 func get_visual_grip_world_position() -> Vector3:
 	return to_global(_visual_grip_local)
 
@@ -68,10 +76,10 @@ func visual_progress_for_gameplay(progress: float) -> float:
 	return lerpf(start_visible,1.0,eased)
 
 func paper_bend_band_ratio() -> float:
-	return BEND_BAND_RATIO
+	return _bend_band_ratio
 
 func paper_backing_thickness() -> float:
-	return PAPER_BACKING_THICKNESS
+	return _backing_thickness
 
 func paper_backing_roughness() -> float:
 	return PAPER_BACKING_ROUGHNESS
@@ -164,7 +172,7 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var edge_variation := 0.018*sin(v*17.0+u*5.0)+0.009*sin(v*41.0)
 			var d := (1.0-u)+(1.0-v)+edge_variation
 			var depth := clampf((threshold-d)/maxf(threshold,0.001),0.0,1.0)
-			var band_t := clampf(depth/BEND_BAND_RATIO,0.0,1.0)
+			var band_t := clampf(depth/_bend_band_ratio,0.0,1.0)
 			var rigid_weight := band_t*band_t*(3.0-2.0*band_t)
 			if full_release:
 				rigid_weight = 1.0
@@ -175,7 +183,7 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var flap_normal := outward.lerp(free_normal,rigid_weight).normalized()
 			base_positions.append(attached)
 			flap_positions.append(moved)
-			back_positions.append(moved-flap_normal*PAPER_BACKING_THICKNESS)
+			back_positions.append(moved-flap_normal*_backing_thickness)
 			adhesive_positions.append(attached+outward*0.0015)
 			base_normals.append(outward)
 			flap_normals.append(flap_normal)
@@ -219,8 +227,7 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 func _reversed_indices(source: PackedInt32Array) -> PackedInt32Array:
 	var reversed := PackedInt32Array()
 	for i in range(0,source.size(),3):
-		if i+2 >= source.size():
-			break
+		if i+2 >= source.size(): break
 		reversed.append(source[i])
 		reversed.append(source[i+2])
 		reversed.append(source[i+1])
@@ -237,6 +244,5 @@ func _arrays(vertices: PackedVector3Array, normals: PackedVector3Array, tex_uv: 
 
 func _area_threshold(progress: float) -> float:
 	var p := clampf(progress,0.0,1.0)
-	if p<=0.5:
-		return sqrt(2.0*p)
+	if p<=0.5: return sqrt(2.0*p)
 	return 2.0-sqrt(2.0*(1.0-p))
