@@ -21,25 +21,25 @@ func run() -> Array[String]:
 		pointer.set_frame(true,Vector2(144,60),Vector2(2,-1),Vector2(160,-80),false)
 		controller.process_pointer(pointer,0.016)
 	for i in range(12):
-		var p := Vector2(148+i*3,58-i)
+		var p: Vector2 = Vector2(148+i*3,58-i)
 		pointer.set_frame(true,p,Vector2(3,-1),Vector2(420,-120),false)
 		controller.process_pointer(pointer,0.016)
-	var moving_progress := controller.get_progress()
+	var moving_progress: float = float(controller.get_progress())
 	if moving_progress <= 0.0:
 		failures.append("precondition: deliberate moving pull must begin peel")
 	for _i in range(45):
 		pointer.set_frame(true,pointer.position,Vector2.ZERO,Vector2.ZERO,false)
 		controller.process_pointer(pointer,0.016)
-	var held_progress := controller.get_progress()
+	var held_progress: float = float(controller.get_progress())
 	if held_progress-moving_progress > 0.006:
 		failures.append("PAPER_RESISTANCE_RED: holding still must stall peel progress; advanced %.4f" % (held_progress-moving_progress))
 
 	# Continued outward displacement must resume release.
 	for i in range(16):
-		var p2 := pointer.position+Vector2(3.0+float(i)*1.2,-1.0)
+		var p2: Vector2 = pointer.position+Vector2(3.0+float(i)*1.2,-1.0)
 		pointer.set_frame(true,p2,Vector2(3,-1),Vector2(460,-130),false)
 		controller.process_pointer(pointer,0.016)
-	if controller.get_progress() <= held_progress+0.004:
+	if float(controller.get_progress()) <= held_progress+0.004:
 		failures.append("paper peel must resume when the cursor does additional outward work")
 
 	# RED: the visible corner implementation may compress mid-progress for a
@@ -53,8 +53,8 @@ func run() -> Array[String]:
 		if not corner.has_method("visual_progress_for_gameplay"):
 			failures.append("PAPER_COMPLETION_RED: corner peel needs visual_progress_for_gameplay completion mapping")
 		else:
-			var mid := float(corner.call("visual_progress_for_gameplay",0.38))
-			var full := float(corner.call("visual_progress_for_gameplay",1.0))
+			var mid: float = float(corner.call("visual_progress_for_gameplay",0.38))
+			var full: float = float(corner.call("visual_progress_for_gameplay",1.0))
 			if mid >= 0.38:
 				failures.append("mid peel should remain visually compressed enough to keep print readable")
 			if full < 0.999:
@@ -62,7 +62,7 @@ func run() -> Array[String]:
 		if not corner.has_method("paper_bend_band_ratio"):
 			failures.append("PAPER_STIFFNESS_RED: corner peel needs a bounded bend-front band")
 		else:
-			var band := float(corner.call("paper_bend_band_ratio"))
+			var band: float = float(corner.call("paper_bend_band_ratio"))
 			if band <= 0.02 or band > 0.22:
 				failures.append("paper bend must be localized near peel front, got %.3f" % band)
 		corner.free()
@@ -78,9 +78,9 @@ func run() -> Array[String]:
 		if not backdrop.has_method("profile_visual_signature"):
 			failures.append("SCENE_SEPARATION_RED: backdrop needs per-scene visual signatures")
 		else:
-			var signatures := {}
+			var signatures: Dictionary = {}
 			for id in ["cafe_window","pantry_jar","pantry_tin","market_coldcase","market_can"]:
-				var signature := String(backdrop.call("profile_visual_signature",id))
+				var signature: String = String(backdrop.call("profile_visual_signature",id))
 				if signature.is_empty():
 					failures.append("scene %s has empty backdrop signature" % id)
 				signatures[signature] = true
