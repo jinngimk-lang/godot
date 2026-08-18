@@ -34,11 +34,12 @@ func reset() -> void:
 	_integrity = 1.0
 	_residue = 0.0
 
-func step(tension: float, pull_speed: float, peel_angle: float, delta: float) -> Dictionary:
+func step(tension: float, pull_speed: float, peel_angle: float, delta: float, release_motion: float = 1.0) -> Dictionary:
 	var safe_tension := minf(absf(_finite_or(tension, 0.0)), 1000000.0)
 	var safe_speed := minf(absf(_finite_or(pull_speed, 0.0)), 100.0)
 	var safe_angle := clampf(absf(_finite_or(peel_angle, 0.0)), 0.0, PI)
 	var safe_delta := clampf(absf(_finite_or(delta, 0.0)), 0.0, 1.0 / 15.0)
+	var motion_gate := clampf(_finite_or(release_motion, 0.0), 0.0, 1.0)
 	var previous := _progress
 
 	if safe_delta > 0.0:
@@ -50,20 +51,23 @@ func step(tension: float, pull_speed: float, peel_angle: float, delta: float) ->
 		var weight := 1.0 - exp(-rate * safe_delta)
 		_bond_load = clampf(lerpf(_bond_load, target_load, weight), 0.0, 12.0)
 
-		if not _completion_emitted and _progress < 1.0 and _bond_load > 0.92:
-			# Crossing the loaded-bond zone begins a small release; the full release
-			# rate still requires sustained load above 1.0. This preserves tactile
-			# latency while avoiding a visibly frozen first pull.
+		if not _completion_emitted and _progress < 1.0 and _bond_load > 0.92 and motion_gate > 0.0:
+			# Adhesive can store load while the cursor is stationary, but release only
+			# happens when the player performs additional outward peel work. This is
+			# the key difference between a resistant paper label and a soft tape that
+			# keeps crawling off under a fixed mouse position.
 			var drive := clampf((_bond_load - 0.92) / 1.65, 0.0, 1.0)
 			var frame_scale := clampf(safe_delta * 60.0, 0.0, 4.0)
-			var release := _release_increment * lerpf(0.12, 1.0, drive) * frame_scale
+			var peak_factor := lerpf(1.18, 0.86, clampf(_progress / 0.24, 0.0, 1.0))
+			var micro_resistance := 0.90 + 0.10 * sin(_progress * 43.0 + 0.7)
+			var release := _release_increment * lerpf(0.10, 1.0, drive) * frame_scale * motion_gate * peak_factor * micro_resistance
 			_progress = clampf(_progress + release, 0.0, 1.0)
 
 			var speed_abuse := clampf((safe_speed - _safe_pull_speed) / (_tear_pull_speed - _safe_pull_speed), 0.0, 1.0)
 			var force_abuse := clampf((target_load - 2.0) / 4.0, 0.0, 1.0)
 			var abuse := maxf(speed_abuse, force_abuse)
 			if abuse > 0.0:
-				var damage := abuse * _residue_gain * safe_delta
+				var damage := abuse * _residue_gain * safe_delta * motion_gate
 				_integrity = clampf(_integrity - damage, 0.0, 1.0)
 				_residue = clampf(_residue + damage * 1.35, 0.0, 1.0)
 

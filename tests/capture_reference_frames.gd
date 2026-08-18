@@ -2,11 +2,11 @@ extends SceneTree
 
 const OUTPUT_DIR := "res://artifacts/reference_frames"
 const CASES := [
-	{"index":0,"base":"coffee","peel":"coffee_peel38","progress":0.38,"residue":0.08,"integrity":0.94},
-	{"index":1,"base":"jar","peel":"jar_peel49","progress":0.49,"residue":0.14,"integrity":0.88},
-	{"index":2,"base":"tin","peel":"tin_peel41","progress":0.41,"residue":0.18,"integrity":0.82},
-	{"index":3,"base":"market","peel":"market_peel45","progress":0.45,"residue":0.05,"integrity":0.98},
-	{"index":4,"base":"can","peel":"can_peel33","progress":0.33,"residue":0.07,"integrity":0.96}
+	{"index":0,"base":"coffee","peel":"coffee_peel38","done":"coffee_done","progress":0.38,"residue":0.08,"integrity":0.94},
+	{"index":1,"base":"jar","peel":"jar_peel49","done":"jar_done","progress":0.49,"residue":0.14,"integrity":0.88},
+	{"index":2,"base":"tin","peel":"tin_peel41","done":"tin_done","progress":0.41,"residue":0.18,"integrity":0.82},
+	{"index":3,"base":"market","peel":"market_peel45","done":"market_done","progress":0.45,"residue":0.05,"integrity":0.98},
+	{"index":4,"base":"can","peel":"can_peel33","done":"can_done","progress":0.33,"residue":0.07,"integrity":0.96}
 ]
 const FORBIDDEN_NODES := ["LeftHand","RightHand","ForearmPresentation","CrumpleHandStaging","HandChoreographyPresentation","CinematicHandPresentation","HandSurfaceSmoothing","ReferencePeelPlayback"]
 
@@ -35,6 +35,12 @@ func _run() -> void:
 		await _settle_frames(1)
 		if not _assert_direct_peel(scene,capture_case): return
 		if not await _capture(String(capture_case["peel"])): return
+		if not _stage_full_release(scene,capture_case): return
+		await _settle_frames(4)
+		_align_cursor_to_corner(scene,true)
+		await _settle_frames(1)
+		if not _assert_full_release(scene,capture_case): return
+		if not await _capture(String(capture_case["done"])): return
 		_resume_scene(scene)
 		await _settle_frames(2)
 	Input.set_custom_mouse_cursor(null,Input.CURSOR_POINTING_HAND)
@@ -43,7 +49,7 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 	await RenderingServer.frame_post_draw
-	print("PASS: captured five localized corner-peel evidence pairs")
+	print("PASS: captured five paper-release triplets")
 	quit(0)
 
 func _assert_object_only_scene(scene: Node) -> bool:
@@ -75,8 +81,6 @@ func _stage_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 		quit(1); return false
 	var progress := float(capture_case["progress"])
 	var front := label.get_front_position(progress)
-	# Hidden LabelVisual retains scalar simulation state. Positive X/outward drag is
-	# consumed by CornerPeelPresentation to lift the top-right printed-paper corner.
 	var desired_grip_local := front+Vector3(0.36,0.04,0.22)
 	var grip_local := label.get_effective_grip(progress,desired_grip_local)
 	label.set_phase("PEELING")
@@ -88,6 +92,27 @@ func _stage_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 		guide.set_process(false)
 		guide.set_state(int(capture_case["index"]),"PEELING","inspect",progress,false)
 	scene.call("_update_hud","PEELING","PEELING",progress)
+	return true
+
+func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
+	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
+	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
+	if label == null or residue == null:
+		push_error("CAPTURE_RED: full release staging is missing label/residue")
+		quit(1); return false
+	var front := label.get_front_position(1.0)
+	label.set_phase("HELD")
+	label.set_detach_alpha(1.0)
+	var desired_grip_local := front+Vector3(0.50,0.10,0.34)
+	var grip_local := label.get_effective_grip(1.0,desired_grip_local)
+	label.set_peel(1.0,grip_local)
+	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
+	scene.set_process(false)
+	if guide != null:
+		guide.set_process(false)
+		guide.set_state(int(capture_case["index"]),"COMPLETE","inspect",1.0,true)
+	scene.call("_update_hud","COMPLETE","HELD",1.0)
 	return true
 
 func _align_cursor_to_corner(scene: Node, peeled: bool) -> void:
@@ -119,6 +144,25 @@ func _assert_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 		push_error("CAPTURE_RED: %s HUD does not match staged progress" % String(capture_case["peel"])); quit(1); return false
 	if guide != null and not guide.get_action_text().contains("%d%%" % expected_percent):
 		push_error("CAPTURE_RED: %s rail guidance does not match staged progress" % String(capture_case["peel"])); quit(1); return false
+	return true
+
+func _assert_full_release(scene: Node, capture_case: Dictionary) -> bool:
+	var corner := scene.get_node_or_null("CornerPeelPresentation") as CornerPeelPresentation
+	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
+	if corner == null or label == null:
+		push_error("CAPTURE_RED: full release lost label presentation")
+		quit(1); return false
+	if float(corner.visual_progress_for_gameplay(1.0)) < 0.999:
+		push_error("CAPTURE_RED: %s leaves visually attached paper at 100%%" % String(capture_case["done"]))
+		quit(1); return false
+	var visual := corner.get_node_or_null("CornerPeelLabel") as MeshInstance3D
+	if visual == null or visual.mesh == null or visual.mesh.get_surface_count() < 1:
+		push_error("CAPTURE_RED: %s has no released paper sheet" % String(capture_case["done"]))
+		quit(1); return false
+	var hud := scene.get_node_or_null("HUD/Instructions") as Label
+	if hud == null or not hud.text.contains("Peel 100%"):
+		push_error("CAPTURE_RED: %s does not expose 100%% completion in HUD" % String(capture_case["done"]))
+		quit(1); return false
 	return true
 
 func _resume_scene(scene: Node) -> void:

@@ -131,7 +131,7 @@ jobs:
           set -euo pipefail
           ./godot --headless --path . --script res://tests/smoke_reset_input_isolation.gd
 
-      - name: Capture five object-only scene pairs
+      - name: Capture five object-only scene triplets
         shell: bash
         run: |
           set -euo pipefail
@@ -141,7 +141,7 @@ jobs:
           fi
           mkdir -p artifacts/reference_frames
           xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
-          for name in coffee coffee_peel38 jar jar_peel49 tin tin_peel41 market market_peel45 can can_peel33; do
+          for name in coffee coffee_peel38 coffee_done jar jar_peel49 jar_done tin tin_peel41 tin_done market market_peel45 market_done can can_peel33 can_done; do
             test -s "artifacts/reference_frames/${name}.png"
           done
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-capture.log; then

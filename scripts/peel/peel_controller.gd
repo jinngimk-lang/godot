@@ -142,7 +142,15 @@ func _advance_peel(pointer: PointerState, delta: float) -> void:
 	var tension := pull_vec.length() * _tension_per_pixel
 	var speed := pointer.velocity.length() / 100.0
 	var peel_angle := absf(atan2(pull_vec.y, pull_vec.x))
-	var result: Dictionary = _model.step(tension, speed, peel_angle, delta)
+
+	# A paper/adhesive joint can remain loaded without magically consuming more
+	# bond. Only additional mouse displacement in the current pull direction
+	# contributes release work. Sideways/inward motion can change load and angle
+	# but does not advance the peel front.
+	var pull_direction := pull_vec.normalized() if pull_vec.length_squared() > 0.000001 else Vector2.ZERO
+	var outward_pixels := maxf(pointer.relative.dot(pull_direction), 0.0)
+	var motion_gate := clampf(outward_pixels / 2.4, 0.0, 1.0)
+	var result: Dictionary = _model.step(tension, speed, peel_angle, delta, motion_gate)
 	if bool(result["completed_now"]):
 		_set_state(State.COMPLETE)
 		completed.emit()
