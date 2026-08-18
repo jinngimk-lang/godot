@@ -16,7 +16,7 @@ func profile_parameters(profile_id: String) -> Dictionary:
 			"grain_scale": 18.0 if profile_id == "market_coldcase" else 55.0,
 			"stone_mode": 1.0 if profile_id == "market_coldcase" else 0.0,
 			"grain_bump_strength": 0.022 if profile_id == "market_coldcase" else 0.030,
-			"surface_alpha": 0.42
+			"surface_alpha": 0.22
 		}
 	if profile_id in ["pantry_jar","pantry_tin"]:
 		return {
@@ -26,7 +26,7 @@ func profile_parameters(profile_id: String) -> Dictionary:
 			"grain_scale": 64.0,
 			"stone_mode": 0.0,
 			"grain_bump_strength": 0.038,
-			"surface_alpha": 0.46
+			"surface_alpha": 0.24
 		}
 	return {
 		"base_color": Vector3(0.34,0.15,0.050),
@@ -35,7 +35,7 @@ func profile_parameters(profile_id: String) -> Dictionary:
 		"grain_scale": 70.0,
 		"stone_mode": 0.0,
 		"grain_bump_strength": 0.040,
-		"surface_alpha": 0.46
+		"surface_alpha": 0.24
 	}
 
 func _process(_delta: float) -> void:
@@ -44,10 +44,15 @@ func _process(_delta: float) -> void:
 		return
 	var venue := root.get_node_or_null("VenuePresentation")
 	var table := root.get_node_or_null("Table") as MeshInstance3D
-	if venue == null or table == null or _shader == null or not venue.has_method("get_active_profile_id"):
+	if venue == null or table == null or not venue.has_method("get_active_profile_id"):
 		return
+	# The approved mockup is a photographic environment with a continuous real
+	# counter. A giant procedural BoxMesh in front of the backdrop created the most
+	# obvious prototype seam. Keep the interaction/contact plane in the scene for
+	# math and shadows, but let the backdrop own its visible counter pixels.
+	table.visible = false
 	var next_id := String(venue.call("get_active_profile_id"))
-	if next_id == _active_id:
+	if next_id == _active_id or _shader == null:
 		return
 	_active_id = next_id
 	var mat := ShaderMaterial.new()
