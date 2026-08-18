@@ -59,7 +59,7 @@ func run() -> Array[String]:
 		failures.append("newly detached label should remain briefly visible")
 
 	lifecycle.update(1.0, false, 0.36)
-	var mid_settle := lifecycle.get_release_settle_alpha()
+	var mid_settle: float = lifecycle.get_release_settle_alpha()
 	if mid_settle < 0.40 or mid_settle > 0.60:
 		failures.append("half settle duration should be about half resolved")
 	if not lifecycle.should_render_label():
