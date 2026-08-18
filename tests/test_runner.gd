@@ -36,6 +36,7 @@ func _init() -> void:
 		"res://tests/test_inspection_controller.gd",
 		"res://tests/test_venue_presentation.gd",
 		"res://tests/test_product_presentation.gd",
+		"res://tests/test_bottle_hero_polish.gd",
 		"res://tests/test_cafe_hero_product.gd",
 		"res://tests/test_residue_visual.gd",
 		"res://tests/test_table_surface_material.gd",
