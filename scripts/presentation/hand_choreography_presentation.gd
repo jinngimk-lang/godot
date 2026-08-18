@@ -30,6 +30,7 @@ func _process(delta: float) -> void:
 	var venue_id := _venue_id()
 	_stage_support_hand(venue_id,safe_delta)
 	_stage_peel_hand_rest(venue_id,safe_delta)
+	_stage_peel_hand_follow(venue_id,safe_delta)
 
 func _bind() -> void:
 	_parent = get_parent() as Node3D
@@ -102,6 +103,53 @@ func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
 	_right_hand.rotation.x = lerp_angle(_right_hand.rotation.x,desired.x,rotation_weight)
 	_right_hand.rotation.y = lerp_angle(_right_hand.rotation.y,desired.y,rotation_weight)
 	_right_hand.rotation.z = lerp_angle(_right_hand.rotation.z,desired.z,rotation_weight)
+
+func _stage_peel_hand_follow(venue_id: String, delta: float) -> void:
+	if _right_hand == null or _controller == null or _label == null:
+		return
+	if _cafe_crumple_owns_peel_hand(venue_id):
+		return
+	var state := _controller.get_state_name()
+	var progress := _controller.get_progress()
+	if progress <= 0.025 or progress >= 0.98 or state not in ["EDGE_LIFT","PINCHED","PEELING"]:
+		return
+	if not _label.is_inside_tree() or not _right_hand.is_inside_tree():
+		return
+	# Gameplay remains the sole owner of the active peel-hand position. This
+	# presentation layer owns only root orientation, deriving it from the actual
+	# free-paper centerline instead of freezing the whole hand at its idle pose.
+	var grip_local := _label.to_local(_right_hand.get_pinch_world_position())
+	var follow_yaw := _peel_follow_yaw_delta(progress,grip_local)
+	var profile := _peel_rest_profile(venue_id)
+	var base_rotation: Vector3 = profile["rotation"]
+	var desired := Vector3(base_rotation.x,base_rotation.y+follow_yaw,base_rotation.z)
+	var weight := 1.0-exp(-ROTATION_FOLLOW_RATE*delta)
+	_right_hand.rotation.x = lerp_angle(_right_hand.rotation.x,desired.x,weight)
+	_right_hand.rotation.y = lerp_angle(_right_hand.rotation.y,desired.y,weight)
+	_right_hand.rotation.z = lerp_angle(_right_hand.rotation.z,desired.z,weight)
+
+func _peel_follow_yaw_delta(progress: float, grip_local: Vector3) -> float:
+	if _label == null:
+		return 0.0
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	if p <= 0.025 or p >= 0.98:
+		return 0.0
+	var points := _label.get_sample_points(p,grip_local)
+	if points.size() < 2:
+		return 0.0
+	# The first centerline segment is the real visible free-tip tangent. Compare
+	# it with the substrate tangent at the current attachment boundary. The signed
+	# XZ angle is therefore a direct geometry delta, not a tuned pose angle.
+	var free_tangent := points[1]-points[0]
+	var attached_next := minf(p+0.04,1.0)
+	var substrate_tangent := _label.get_front_position(attached_next)-_label.get_front_position(p)
+	var free_xz := Vector2(free_tangent.x,free_tangent.z)
+	var substrate_xz := Vector2(substrate_tangent.x,substrate_tangent.z)
+	if free_xz.length_squared() <= 0.000001 or substrate_xz.length_squared() <= 0.000001:
+		return 0.0
+	var free_angle := atan2(free_xz.x,free_xz.y)
+	var substrate_angle := atan2(substrate_xz.x,substrate_xz.y)
+	return wrapf(free_angle-substrate_angle,-PI,PI)
 
 func _cafe_crumple_owns_peel_hand(venue_id: String) -> bool:
 	if venue_id != "cafe_window" or _parent == null:
