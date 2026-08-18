@@ -17,6 +17,18 @@ Then inspect current `main`, current production code/tests, the active handoff/c
 
 If a verified owner-level direction, major architecture decision, acceptance rule, merged milestone, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
 
+## Owner-locked completion order
+
+Do not lose or reorder these five product priorities without new owner feedback or strong runtime evidence:
+
+1. **Optimize scenes** — five showcase selections must become genuinely different, polished places with coherent composition, lighting, depth and foreground surfaces.
+2. **Optimize models** — cup, glass jar/bottle, tin can and aluminum can must read as believable hero products rather than primitive geometry.
+3. **Optimize label material** — paper front/back/edge, fibers, adhesive boundary, residue and local bending must read as paper rather than tape.
+4. **Optimize post-peel label handling** — after 100% release the label must enter an intentional completion lifecycle; it must not remain indefinitely floating over the product as if still being peeled.
+5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, receive calm completion feedback, and continue to the next product/scene without dead ends.
+
+The project is not complete merely because any one item is green. Treat these five as a whole-game completion stack.
+
 ## Product identity
 
 Peel Calm is a relaxing tactile/ASMR desktop game about peeling real-time labels from everyday containers. The pleasure comes from catching an edge, loading the paper and adhesive, overcoming breakaway resistance, hearing/seeing local release, and finishing with a completely detached label.
@@ -81,6 +93,14 @@ Current substrate feel ordering, from most resistant/stiff to most compliant, is
 `Jar > Tin / Coffee > Yuzu > Soda Can`
 
 Do not collapse all products to one generic feel profile without new evidence.
+
+## Post-peel lifecycle north star
+
+A fully removed label must not remain forever as an unexplained floating object. Completion should have an authored calm resolution, for example:
+
+`ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> DISPOSED_OR_COLLECTED -> NEXT_READY`
+
+The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. Preferred behavior is a brief 0.4–1.2 second completion hold/settle so the user sees success, followed by one of: settle onto a tray/table area, slide/fall to an unobtrusive discard area, or collapse into a small collected-label UI stack. It should then stop blocking the hero object. The next action must be obvious.
 
 ## Five-scene identity rule
 
@@ -163,4 +183,4 @@ After this file, read:
 4. `docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
 5. current `main` production code/tests/workflows and newest runtime captures.
 
-As of the checkpoint that created this document, the project is already on the no-hands/object-only architecture with displacement-gated paper peel, complete 100% release, per-substrate feel profiles, fibrous paper rendering, and pre-release tactile-loading audio. Highest-value remaining work is product material realism, paper-edge realism, stronger five-environment separation, and further owner-judged resistance/ASMR tuning.
+As of the checkpoint that created this document, the project is already on the no-hands/object-only architecture with displacement-gated paper peel, complete 100% release, per-substrate feel profiles, fibrous paper rendering, and pre-release tactile-loading audio. Highest-value remaining work follows the owner-locked order above: scene quality, model quality, label material, post-peel label lifecycle, then complete interaction-flow polish.
