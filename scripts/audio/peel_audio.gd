@@ -26,14 +26,15 @@ func _ready() -> void:
 	_final = _make_player("FinalRelease", FINAL_PATH, -10.0)
 	_router.reset()
 
+func is_tactile_loading_state(state_name: String) -> bool:
+	return state_name in ["EDGE_LIFT","PINCHED"]
+
 func get_continuous_mix_targets(active: bool, speed: float, tension: float) -> Vector2:
 	if not active:
 		return Vector2(-80.0, -80.0)
 	var safe_speed := clampf(speed if is_finite(speed) else 0.0, 0.0, 30.0)
 	var safe_tension := clampf(tension if is_finite(tension) else 0.0, 0.0, 80.0)
 	var speed_mix := clampf(safe_speed / 9.0, 0.0, 1.0)
-	# Continuous adhesive friction is background texture; tactile release one-shots
-	# remain the foreground. Tension can lift the bed only slightly.
 	var tension_lift := clampf(safe_tension / 80.0, 0.0, 1.0) * 2.0
 	var slow_db := lerpf(-24.0 + tension_lift, -39.0, speed_mix)
 	var fast_db := lerpf(-39.0, -23.0 + tension_lift, speed_mix)
@@ -49,25 +50,33 @@ func set_feedback(
 ) -> void:
 	var safe_speed := clampf(speed if is_finite(speed) else 0.0, 0.0, 30.0)
 	var safe_tension := clampf(tension if is_finite(tension) else 0.0, 0.0, 80.0)
-	var targets := get_continuous_mix_targets(active, safe_speed, safe_tension)
+	var effective_active := active
+	var loading_only := false
+	if not effective_active:
+		var root := get_parent()
+		var controller_value = root.get("_controller") if root != null else null
+		if controller_value != null and controller_value.has_method("get_state_name"):
+			loading_only = is_tactile_loading_state(String(controller_value.call("get_state_name")))
+			effective_active = loading_only
+
+	var targets := get_continuous_mix_targets(effective_active, safe_speed, safe_tension)
+	if loading_only:
+		# Before adhesive release the player should hear a restrained paper/adhesive
+		# preload, not the full running peel bed. The louder tactile cue remains the
+		# paper_flex one-shot emitted by the same real router under motion+tension.
+		targets += Vector2(-7.0,-9.0)
 	_slow_target_db = targets.x
 	_fast_target_db = targets.y
 
-	for event_name in _router.update(active, safe_speed, safe_tension, released, detached_now, delta):
+	for event_name in _router.update(effective_active, safe_speed, safe_tension, released, detached_now, delta):
 		match event_name:
-			"paper_flex":
-				_play_one_shot(_paper, 0.94, 1.06, -3.0, 2.0)
-			"micro_release":
-				_play_one_shot(_micro, 0.92, 1.10, -2.0, 2.0)
-			"final_release":
-				_play_one_shot(_final, 0.97, 1.04, -1.0, 1.0)
+			"paper_flex": _play_one_shot(_paper, 0.94, 1.06, -3.0, 2.0)
+			"micro_release": _play_one_shot(_micro, 0.92, 1.10, -2.0, 2.0)
+			"final_release": _play_one_shot(_final, 0.97, 1.04, -1.0, 1.0)
 
 func trigger_crumple(strength: float) -> void:
 	var safe_strength := clampf(strength if is_finite(strength) else 0.0, 0.0, 1.0)
-	if safe_strength <= 0.0 or _paper == null or _paper.stream == null:
-		return
-	# Reuse the already-audited paper Foley but shift it lower/softer so a cup
-	# fold is distinct from the lighter paper-flex ticks during peeling.
+	if safe_strength <= 0.0 or _paper == null or _paper.stream == null: return
 	_paper.pitch_scale = randf_range(0.78, 0.92) + safe_strength * 0.06
 	_paper.volume_db = lerpf(-28.0, -20.0, safe_strength) + randf_range(-1.2, 1.2)
 	_paper.play()
@@ -77,33 +86,23 @@ func reset_feedback() -> void:
 	_router.reset()
 	_slow_target_db = -80.0
 	_fast_target_db = -80.0
-	_stop_if_valid(_slow)
-	_stop_if_valid(_fast)
-	_stop_if_valid(_paper)
-	_stop_if_valid(_micro)
-	_stop_if_valid(_final)
+	_stop_if_valid(_slow); _stop_if_valid(_fast); _stop_if_valid(_paper); _stop_if_valid(_micro); _stop_if_valid(_final)
 
-# Compatibility entry points retained while the scene integration moves to set_feedback().
 func set_peel_feedback(speed: float, tension: float, released: float) -> void:
 	set_feedback(true, speed, tension, released, false, get_process_delta_time())
 
 func quiet() -> void:
-	# Fade/stop adhesive loops without killing a crumple one-shot that may have
-	# started earlier in the same frame.
 	_slow_target_db = -80.0
 	_fast_target_db = -80.0
 
 func trigger_release_tick() -> void:
-	if _micro != null:
-		_play_one_shot(_micro, 0.92, 1.10, -2.0, 2.0)
+	if _micro != null: _play_one_shot(_micro, 0.92, 1.10, -2.0, 2.0)
 
 func trigger_completion() -> void:
-	if _final != null:
-		_play_one_shot(_final, 0.97, 1.04, -1.0, 1.0)
+	if _final != null: _play_one_shot(_final, 0.97, 1.04, -1.0, 1.0)
 
 func _process(delta: float) -> void:
-	if _slow == null or _fast == null:
-		return
+	if _slow == null or _fast == null: return
 	var safe_delta := clampf(delta, 0.0, 0.1)
 	_slow.volume_db = move_toward(_slow.volume_db, _slow_target_db, safe_delta * 70.0)
 	_fast.volume_db = move_toward(_fast.volume_db, _fast_target_db, safe_delta * 70.0)
@@ -120,31 +119,19 @@ func _make_player(node_name: String, resource_path: String, initial_db: float) -
 
 func _update_loop_player(player: AudioStreamPlayer, target_db: float) -> void:
 	if target_db > -55.0:
-		if not player.playing:
-			player.play()
+		if not player.playing: player.play()
 	elif player.playing and player.volume_db <= -55.0:
 		player.stop()
 
-func _play_one_shot(
-	player: AudioStreamPlayer,
-	pitch_min: float,
-	pitch_max: float,
-	volume_jitter_min: float,
-	volume_jitter_max: float
-) -> void:
-	if player == null or player.stream == null:
-		return
+func _play_one_shot(player: AudioStreamPlayer, pitch_min: float, pitch_max: float, volume_jitter_min: float, volume_jitter_max: float) -> void:
+	if player == null or player.stream == null: return
 	player.pitch_scale = randf_range(pitch_min, pitch_max)
 	var base_db := -18.0
-	if player == _paper:
-		base_db = -23.0
-	elif player == _micro:
-		base_db = -17.0
-	elif player == _final:
-		base_db = -10.0
+	if player == _paper: base_db = -23.0
+	elif player == _micro: base_db = -17.0
+	elif player == _final: base_db = -10.0
 	player.volume_db = base_db + randf_range(volume_jitter_min, volume_jitter_max)
 	player.play()
 
 func _stop_if_valid(player: AudioStreamPlayer) -> void:
-	if player != null and player.playing:
-		player.stop()
+	if player != null and player.playing: player.stop()
