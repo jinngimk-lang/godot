@@ -1,21 +1,46 @@
 extends Sprite3D
 class_name ReferenceBackdrop
 
-const TEXTURES := {
-	"cafe_window":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"pantry_jar":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"pantry_tin":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg",
-	"market_can":"res://art/reference_backdrops/market_backdrop.jpg"
+const BASE_POSITION := Vector3(0.0,0.72,-1.43)
+const PROFILES := {
+	"cafe_window":{
+		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
+		"world_width":8.40,
+		"offset":Vector2(0.0,0.0),
+		"modulate":Color(0.94,0.92,0.89,1.0)
+	},
+	"pantry_jar":{
+		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
+		"world_width":7.45,
+		"offset":Vector2(-0.38,0.14),
+		"modulate":Color(1.00,0.82,0.67,1.0)
+	},
+	"pantry_tin":{
+		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
+		"world_width":6.25,
+		"offset":Vector2(0.72,-0.08),
+		"modulate":Color(0.82,0.78,0.72,1.0)
+	},
+	"market_coldcase":{
+		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
+		"world_width":8.40,
+		"offset":Vector2(0.0,0.02),
+		"modulate":Color(0.98,0.985,0.99,1.0)
+	},
+	"market_can":{
+		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
+		"world_width":6.55,
+		"offset":Vector2(-0.82,0.16),
+		"modulate":Color(0.78,0.91,0.96,1.0)
+	}
 }
-const TARGET_WORLD_WIDTH := 8.40
 
 var _active_id := ""
 
 func _ready() -> void:
 	name = "ReferenceBackdrop"
 	centered = true
-	position = Vector3(0.0,0.72,-1.43)
+	position = BASE_POSITION
 	shaded = false
 	double_sided = true
 	alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -34,20 +59,31 @@ func _process(_delta: float) -> void:
 func get_active_profile_id() -> String:
 	return _active_id
 
+func profile_visual_signature(profile_id: String) -> String:
+	var id := profile_id if profile_id in PROFILES else "cafe_window"
+	var profile: Dictionary = PROFILES[id]
+	var offset: Vector2 = profile.get("offset",Vector2.ZERO)
+	var tint: Color = profile.get("modulate",Color.WHITE)
+	return "%s|%.2f|%.2f,%.2f|%.2f,%.2f,%.2f" % [
+		String(profile.get("texture","")),
+		float(profile.get("world_width",8.4)),
+		offset.x,offset.y,
+		tint.r,tint.g,tint.b
+	]
+
 func _apply(profile_id: String) -> void:
-	if profile_id not in TEXTURES:
+	if profile_id not in PROFILES:
 		profile_id = "cafe_window"
 	_active_id = profile_id
-	var loaded := load(String(TEXTURES[profile_id])) as Texture2D
+	var profile: Dictionary = PROFILES[profile_id]
+	var loaded := load(String(profile.get("texture",""))) as Texture2D
 	if loaded != null:
 		texture = loaded
-		pixel_size = TARGET_WORLD_WIDTH/maxf(float(loaded.get_width()),1.0)
-	if profile_id in ["market_coldcase","market_can"]:
-		modulate = Color(0.98,0.985,0.99,1.0)
-	elif profile_id in ["pantry_jar","pantry_tin"]:
-		modulate = Color(0.95,0.90,0.83,1.0)
-	else:
-		modulate = Color(0.94,0.92,0.89,1.0)
+		pixel_size = float(profile.get("world_width",8.40))/maxf(float(loaded.get_width()),1.0)
+	var offset: Vector2 = profile.get("offset",Vector2.ZERO)
+	position = BASE_POSITION+Vector3(offset.x,offset.y,0.0)
+	var tint_value = profile.get("modulate",Color.WHITE)
+	modulate = tint_value if tint_value is Color else Color.WHITE
 
 func _mask_blockout_geometry() -> void:
 	var venue := get_parent().get_node_or_null("VenuePresentation")
