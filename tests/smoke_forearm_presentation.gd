@@ -7,6 +7,7 @@ const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 const MIN_WRIST_OVERLAP_AUTHORED := 0.009
 const MAX_IDLE_PEEL_EDGE_GAP := 0.10
+const MIN_ACTIVE_PEEL_YAW_DELTA_DEGREES := 8.0
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
 
 func _init() -> void:
@@ -95,10 +96,6 @@ func _run() -> void:
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
 
-	# HandChoreographyPresentation already owns the untouched peel-hand rest.
-	# That rest must be grounded on the real attached label edge rather than a
-	# venue-specific floating XYZ target. Measure the visible pinch anchor after
-	# deterministic settle so screenshots cannot show an OK-sign pinching air.
 	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as Node
 	if choreography == null:
 		_fail("missing HandChoreographyPresentation support owner",scene)
@@ -113,10 +110,19 @@ func _run() -> void:
 		_fail("idle peel pinch must rest at real label edge, gap %.3f > %.3f" % [idle_gap,MAX_IDLE_PEEL_EDGE_GAP],scene)
 		return
 
-	# Support-root choreography has one owner. ForearmPresentation owns geometry
-	# and venue material only; HandChoreographyPresentation owns glass grip root
-	# placement and inspection-follow. Two writers caused small reset drift and
-	# would become visible jitter once higher-fidelity arms are introduced.
+	# Once paper is actually lifted, the whole hand must turn with the visible
+	# flap geometry instead of freezing forever at the idle venue rotation. This
+	# contract is geometry-derived: no angle grid and no endpoint optimizer.
+	if not choreography.has_method("_peel_follow_yaw_delta"):
+		_fail("active peel choreography must derive whole-hand orientation from real flap geometry",scene)
+		return
+	var lifted_progress := 0.45
+	var lifted_grip_local := label.get_front_position(lifted_progress)+Vector3(-0.38,0.16,0.34)
+	var follow_delta := absf(rad_to_deg(float(choreography.call("_peel_follow_yaw_delta",lifted_progress,lifted_grip_local))))
+	if follow_delta < MIN_ACTIVE_PEEL_YAW_DELTA_DEGREES:
+		_fail("lifted flap must produce a meaningful whole-hand yaw response, %.2f° < %.2f°" % [follow_delta,MIN_ACTIVE_PEEL_YAW_DELTA_DEGREES],scene)
+		return
+
 	if presentation.has_method("_update_support_hand"):
 		_fail("ForearmPresentation must not retain glass support-root ownership",scene)
 		return
@@ -137,7 +143,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, seamless curved forearms, edge-grounded peel rest and single-owner grip choreography stay coherent")
+	print("PASS: reference-scale hands, seamless curved forearms, edge-grounded peel rest, flap-follow orientation and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
