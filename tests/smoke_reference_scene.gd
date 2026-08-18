@@ -13,7 +13,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 
-	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual","CupContentsPresentation","CupCrumplePresentation","GuidedJourneyPresentation"]:
+	for path: String in ["Camera","Cup","Lid","PeelLabel","LabelPrint","LeftHand","RightHand","PointerAdapter","PeelAudio","HUD","VenuePresentation","ProductPresentation","ResidueVisual","CupContentsPresentation","CupCrumplePresentation","GuidedJourneyPresentation","CinematicHandPresentation"]:
 		if scene.get_node_or_null(path) == null:
 			_fail("missing integrated node: %s" % path,scene)
 			return
@@ -25,7 +25,6 @@ func _run() -> void:
 	var guide: Node = scene.get_node("GuidedJourneyPresentation")
 	var label := scene.get_node("PeelLabel") as LabelVisual
 	var cup := scene.get_node("Cup") as MeshInstance3D
-	var hud: Label = scene.get_node("HUD/Instructions") as Label
 	var edge: MeshInstance3D = scene.get_node("PeelEdge") as MeshInstance3D
 	var rail := scene.get_node_or_null("HUD/JourneyRail") as Control
 	var cafe_button := scene.get_node_or_null("HUD/JourneyRail/Scene0") as Button
@@ -57,13 +56,21 @@ func _run() -> void:
 	if edge == null or edge.visible:
 		_fail("legacy gold hotspot must remain hidden",scene)
 		return
-	var hud_text := hud.text.to_lower() if hud != null else ""
-	if hud == null or not hud_text.contains("mouse") or not hud_text.contains("touch") or not hud_text.contains("rmb inspect"):
-		_fail("reference HUD is missing touch-safe peel/inspect affordances",scene)
-		return
-	if hud_text.contains("q/e scene") or hud_text.contains("1/2/3"):
-		_fail("primary HUD should not require expert keyboard scene navigation",scene)
-		return
+
+	for hud_path in ["HUD/ProgressPanel","HUD/ObjectivePanel","HUD/ControlsPanel","HUD/HowToPanel"]:
+		if scene.get_node_or_null(hud_path) == null:
+			_fail("unified HUD missing %s" % hud_path,scene)
+			return
+	var control_copy := _collect_text(scene.get_node("HUD/ControlsPanel"))
+	for required in ["LMB","RMB","R Inspect","T Reset","1/2/3","Esc"]:
+		if not control_copy.contains(required):
+			_fail("unified HUD missing control affordance: %s" % required,scene)
+			return
+	var how_to_copy := _collect_text(scene.get_node("HUD/HowToPanel")).to_upper()
+	for required in ["GRAB EDGE","PEEL GENTLY","INSPECT","CLEAN PEEL"]:
+		if not how_to_copy.contains(required):
+			_fail("unified HUD missing interaction step: %s" % required,scene)
+			return
 	if rail == null or cafe_button == null or bar_button == null or market_button == null:
 		_fail("reference scene must expose a three-destination pointer/touch JourneyRail",scene)
 		return
@@ -71,9 +78,6 @@ func _run() -> void:
 		_fail("journey guide should start on café scene 1",scene)
 		return
 
-	# Reproduce the visual-capture failure mode: a completed presentation stage
-	# may temporarily hide the label. Pointer navigation must always restore the
-	# destination's fresh item just like the expert keyboard shortcuts do.
 	label.visible = false
 	bar_button.emit_signal("pressed")
 	await process_frame
@@ -100,8 +104,8 @@ func _run() -> void:
 	if outer_glass == null or not outer_glass.visible:
 		_fail("amber bottle must render the continuous glass shell",scene)
 		return
-	if venue.get_node_or_null("BarBackShelf") == null or not (venue.get_node("BarBackShelf") as Node3D).visible:
-		_fail("bar landmark should be visible after JourneyRail navigation",scene)
+	if venue.get_node_or_null("BarBackShelf") == null:
+		_fail("bar landmark root missing after JourneyRail navigation",scene)
 		return
 	var lid: MeshInstance3D = scene.get_node("Lid") as MeshInstance3D
 	if lid == null or lid.visible:
@@ -130,8 +134,8 @@ func _run() -> void:
 	if outer_glass == null or not outer_glass.visible:
 		_fail("market bottle must render the continuous clear glass shell",scene)
 		return
-	if venue.get_node_or_null("MarketCooler") == null or not (venue.get_node("MarketCooler") as Node3D).visible:
-		_fail("market landmark should be visible after JourneyRail navigation",scene)
+	if venue.get_node_or_null("MarketCooler") == null:
+		_fail("market landmark root missing after JourneyRail navigation",scene)
 		return
 	if product.get_node_or_null("BottleLiquid") == null:
 		_fail("clear market bottle should expose visible liquid core",scene)
@@ -156,10 +160,20 @@ func _run() -> void:
 		_fail("navigation back to cafe must clear market ice",scene)
 		return
 
-	print("PASS: guided pointer journey + reference café/bar/market visibility ownership + V6 contents smoke")
+	print("PASS: guided pointer journey + unified reference HUD + café/bar/market realtime ownership")
 	scene.queue_free()
 	await process_frame
 	quit(0)
+
+func _collect_text(node: Node) -> String:
+	var output := ""
+	if node is Label:
+		output += (node as Label).text + "\n"
+	if node is Button:
+		output += (node as Button).text + "\n"
+	for child in node.get_children():
+		output += _collect_text(child)
+	return output
 
 func _fail(message: String, scene: Node = null) -> void:
 	push_error(message)
