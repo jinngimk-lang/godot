@@ -1,10 +1,10 @@
 extends Node3D
 class_name BottleHeroPolish
 
-const HIGHLIGHT_ALPHA := 0.14
-const OUTER_GLASS_ALPHA := 0.038
-const LIQUID_ALPHA := 0.52
-const TARGET_FOCUS_Y := 0.30
+const HIGHLIGHT_ALPHA := 0.125
+const OUTER_GLASS_ALPHA := 0.014
+const LIQUID_ALPHA := 0.62
+const TARGET_FOCUS_Y := 0.42
 
 var _active_kind := ""
 var _product: ProductPresentation
@@ -46,8 +46,8 @@ func build_preview_for_kind(kind: String) -> void:
 		return
 	_build_metal_cap()
 	_build_neck_ring()
-	_build_highlight("BottleHighlightLeft",-0.215,0.25,0.90,HIGHLIGHT_ALPHA)
-	_build_highlight("BottleHighlightRight",0.226,0.18,0.72,HIGHLIGHT_ALPHA*0.60)
+	_build_highlight("BottleHighlightLeft",-0.222,0.27,0.92,HIGHLIGHT_ALPHA)
+	_build_highlight("BottleHighlightRight",0.235,0.20,0.70,HIGHLIGHT_ALPHA*0.52)
 	_tune_base_bottle()
 
 func _bind() -> void:
@@ -64,25 +64,29 @@ func _tune_base_bottle() -> void:
 	var outer := _product.get_node_or_null("BottleOuterGlass") as MeshInstance3D
 	if outer != null and outer.material_override is StandardMaterial3D:
 		var material := outer.material_override as StandardMaterial3D
-		material.albedo_color = Color(0.94,0.985,0.985,OUTER_GLASS_ALPHA)
-		material.roughness = 0.020
-		material.metallic_specular = 0.96
-		material.rim = 0.94
-		material.rim_tint = 0.62
+		material.albedo_color = Color(0.985,0.995,0.990,OUTER_GLASS_ALPHA)
+		material.roughness = 0.014
+		material.metallic_specular = 0.98
+		material.rim = 0.98
+		material.rim_tint = 0.76
 	var inner := _product.get_node_or_null("BottleInnerGlass") as MeshInstance3D
 	if inner != null and inner.material_override is StandardMaterial3D:
 		var inner_material := inner.material_override as StandardMaterial3D
-		inner_material.albedo_color = Color(0.97,1.0,1.0,0.012)
+		inner_material.albedo_color = Color(1.0,1.0,1.0,0.004)
 		inner_material.roughness = 0.014
 	var liquid := _product.get_node_or_null("BottleLiquid") as MeshInstance3D
 	if liquid != null and liquid.material_override is StandardMaterial3D:
 		var liquid_material := liquid.material_override as StandardMaterial3D
-		liquid_material.albedo_color = Color(0.92,0.91,0.68,LIQUID_ALPHA)
-		liquid_material.roughness = 0.085
-		liquid_material.metallic_specular = 0.36
+		liquid_material.albedo_color = Color(0.935,0.925,0.705,LIQUID_ALPHA)
+		liquid_material.roughness = 0.10
+		liquid_material.metallic_specular = 0.28
 	var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
-	if edge != null:
-		edge.scale = Vector3.ONE*1.003
+	if edge != null and edge.material_override is ShaderMaterial:
+		edge.scale = Vector3.ONE*1.002
+		var edge_material := edge.material_override as ShaderMaterial
+		edge_material.set_shader_parameter("edge_color",Color(0.94,0.99,1.0,1.0))
+		edge_material.set_shader_parameter("edge_alpha",0.32)
+		edge_material.set_shader_parameter("fresnel_power",2.55)
 
 func _build_metal_cap() -> void:
 	var cap := MeshInstance3D.new()
@@ -122,10 +126,10 @@ func _build_neck_ring() -> void:
 	ring.mesh = mesh
 	ring.position.y = 1.337
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.98,1.0,1.0,0.18)
+	material.albedo_color = Color(0.99,1.0,1.0,0.13)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.030
-	material.metallic_specular = 0.95
+	material.roughness = 0.024
+	material.metallic_specular = 0.96
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	ring.material_override = material
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -135,14 +139,14 @@ func _build_highlight(node_name: String, x: float, y: float, height: float, alph
 	var highlight := MeshInstance3D.new()
 	highlight.name = node_name
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.024,height)
+	quad.size = Vector2(0.016,height)
 	highlight.mesh = quad
-	highlight.position = Vector3(x,y,0.335)
+	highlight.position = Vector3(x,y,0.336)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0,1.0,0.985,alpha)
+	material.albedo_color = Color(1.0,1.0,0.99,alpha)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.035
-	material.metallic_specular = 0.96
+	material.roughness = 0.025
+	material.metallic_specular = 0.98
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.render_priority = 3
 	highlight.material_override = material
