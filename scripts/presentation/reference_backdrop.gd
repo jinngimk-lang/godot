@@ -3,13 +3,11 @@ class_name ReferenceBackdrop
 
 const TEXTURES := {
 	"cafe_window":"res://art/reference_backdrops/cafe_backdrop.jpg",
-	"night_bar":"res://art/reference_backdrops/bar_backdrop.jpg",
-	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg"
+	"pantry_jar":"res://art/reference_backdrops/cafe_backdrop.jpg",
+	"pantry_tin":"res://art/reference_backdrops/cafe_backdrop.jpg",
+	"market_coldcase":"res://art/reference_backdrops/market_backdrop.jpg",
+	"market_can":"res://art/reference_backdrops/market_backdrop.jpg"
 }
-# Cover the widest live reference framing (48-degree bottle camera at 16:9)
-# with a small raster overscan margin.  The previous 7.45-world-unit plate was
-# sized for the tighter cafe framing and exposed world-clear black wedges in
-# Bar/Market after bottle framing widened.
 const TARGET_WORLD_WIDTH := 8.40
 
 var _active_id := ""
@@ -43,14 +41,11 @@ func _apply(profile_id: String) -> void:
 	var loaded := load(String(TEXTURES[profile_id])) as Texture2D
 	if loaded != null:
 		texture = loaded
-		# The source plates have different pixel dimensions. Scale by their actual
-		# width so every dedicated plate covers the same physical viewport and the
-		# widest bottle reference camera never exposes world-clear side wedges.
-		pixel_size = TARGET_WORLD_WIDTH / maxf(float(loaded.get_width()),1.0)
-	if profile_id == "market_coldcase":
-		modulate = Color(0.97,0.97,0.97,1.0)
-	elif profile_id == "night_bar":
-		modulate = Color(0.96,0.90,0.84,1.0)
+		pixel_size = TARGET_WORLD_WIDTH/maxf(float(loaded.get_width()),1.0)
+	if profile_id in ["market_coldcase","market_can"]:
+		modulate = Color(0.98,0.985,0.99,1.0)
+	elif profile_id in ["pantry_jar","pantry_tin"]:
+		modulate = Color(0.95,0.90,0.83,1.0)
 	else:
 		modulate = Color(0.94,0.92,0.89,1.0)
 
