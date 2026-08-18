@@ -1,10 +1,16 @@
 extends Node
 class_name ReferenceComposition
 
-const CAFE_FOV := 39.0
-const BOTTLE_FOV := 43.0
+const FOV_BY_KIND := {
+	"paper_cup":39.0,
+	"sauce_jar":40.0,
+	"tin_can":39.0,
+	"clear_bottle":43.0,
+	"soda_can":40.0
+}
 
 var _last_kind := ""
+var _last_target := -1.0
 
 func _ready() -> void:
 	call_deferred("_apply")
@@ -20,7 +26,7 @@ func _apply() -> void:
 	if camera == null:
 		return
 	camera.position = Vector3(0.0,0.80,3.55)
-	camera.fov = CAFE_FOV
+	camera.fov = target_fov_for_kind("paper_cup")
 	camera.look_at(Vector3(0.0,0.15,0.0),Vector3.UP)
 	_sync_variant_framing()
 
@@ -33,11 +39,14 @@ func _sync_variant_framing() -> void:
 	if camera == null or product == null:
 		return
 	var kind := product.get_active_kind()
-	var target_fov := target_fov_for_kind(kind)
-	if kind == _last_kind and absf(camera.fov-target_fov) <= 0.001:
+	var offset_value = root.get("_zoom_fov_offset")
+	var offset := float(offset_value) if offset_value != null else 0.0
+	var target := clampf(target_fov_for_kind(kind)+offset,32.0,48.0)
+	if kind == _last_kind and absf(target-_last_target) <= 0.001 and absf(camera.fov-target) <= 0.001:
 		return
-	camera.fov = target_fov
+	camera.fov = target
 	_last_kind = kind
+	_last_target = target
 
 static func target_fov_for_kind(kind: String) -> float:
-	return CAFE_FOV if kind == "paper_cup" else BOTTLE_FOV
+	return float(FOV_BY_KIND.get(kind,40.0))
