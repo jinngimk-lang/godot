@@ -89,24 +89,25 @@ func _cafe_crumple_owns_peel_hand(venue_id: String) -> bool:
 	return crumple != null and crumple.get_progress()>0.001
 
 func _support_profile(venue_id: String) -> Dictionary:
-	# Realtime hand fingers extend along local -Y. Negative Z rotation turns the
-	# support fingers inward from the lower-right so they visually wrap the hero
-	# vessel instead of pointing toward the edge of frame.
+	# Place the stabilising palm on the product's right flank and roll it farther
+	# inward. The fingers are authored behind the vessel, so this staging lets the
+	# bottle/cup provide natural occlusion instead of displaying a fan of tubes
+	# across the front label.
 	match venue_id:
 		"night_bar":
 			return {
-				"position":Vector3(0.53,0.13,0.30),
-				"rotation":Vector3(deg_to_rad(8.0),deg_to_rad(36.0),deg_to_rad(-60.0))
+				"position":Vector3(0.71,0.10,0.12),
+				"rotation":Vector3(deg_to_rad(5.0),deg_to_rad(18.0),deg_to_rad(-78.0))
 			}
 		"market_coldcase":
 			return {
-				"position":Vector3(0.52,0.12,0.31),
-				"rotation":Vector3(deg_to_rad(7.0),deg_to_rad(34.0),deg_to_rad(-58.0))
+				"position":Vector3(0.70,0.09,0.13),
+				"rotation":Vector3(deg_to_rad(5.0),deg_to_rad(17.0),deg_to_rad(-76.0))
 			}
 		_:
 			return {
-				"position":Vector3(0.61,0.18,0.34),
-				"rotation":Vector3(deg_to_rad(10.0),deg_to_rad(36.0),deg_to_rad(-58.0))
+				"position":Vector3(0.69,0.14,0.16),
+				"rotation":Vector3(deg_to_rad(7.0),deg_to_rad(20.0),deg_to_rad(-76.0))
 			}
 
 func _peel_rest_profile(venue_id: String) -> Dictionary:
