@@ -38,6 +38,18 @@ void fragment() {
 	CLEARCOAT_ROUGHNESS = 0.05;
 }
 """
+const GLASS_HIGHLIGHT_SHADER := """shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
+uniform vec4 highlight_color : source_color = vec4(1.0, 0.72, 0.32, 0.32);
+void fragment() {
+	vec2 p = UV * 2.0 - 1.0;
+	float lateral = 1.0 - smoothstep(0.08, 1.0, abs(p.x));
+	float vertical = 1.0 - smoothstep(0.52, 1.0, abs(p.y));
+	float core = pow(max(lateral, 0.0), 2.4) * vertical;
+	ALBEDO = highlight_color.rgb;
+	ALPHA = highlight_color.a * core;
+}
+"""
 const CONTACT_SHADOW_SHADER := """shader_type spatial;
 render_mode unshaded, blend_mix, cull_disabled, depth_draw_never;
 uniform vec4 shadow_color : source_color = vec4(0.035, 0.020, 0.012, 0.24);
@@ -185,15 +197,15 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	outer.name = "BottleOuterGlass"
 	outer.mesh = outer_mesh
 	var outer_color := body_color.lightened(0.10) if amber else body_color
-	outer.material_override = _glass_mat(outer_color,source_alpha*(0.30 if amber else 0.62),roughness)
+	outer.material_override = _glass_mat(outer_color,source_alpha*(0.22 if amber else 0.44),roughness)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(outer)
 
 	var edge := MeshInstance3D.new()
 	edge.name = "BottleEdgeFresnel"
 	edge.mesh = outer_mesh
-	edge.scale = Vector3.ONE * 1.006
-	edge.material_override = _glass_edge_material(body_color, source_alpha, amber)
+	edge.scale = Vector3.ONE*1.006
+	edge.material_override = _glass_edge_material(body_color,source_alpha,amber)
 	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(edge)
 
@@ -203,7 +215,7 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	var inner := MeshInstance3D.new()
 	inner.name = "BottleInnerGlass"
 	inner.mesh = _build_lathe_mesh(inner_profile,false,false)
-	inner.material_override = _glass_mat(body_color.lightened(0.26 if amber else 0.16),source_alpha*0.10,0.023)
+	inner.material_override = _glass_mat(body_color.lightened(0.30 if amber else 0.18),source_alpha*0.06,0.020)
 	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(inner)
 
@@ -211,21 +223,57 @@ func _build_bottle(profile: Dictionary, amber: bool) -> void:
 	liquid.name = "BottleLiquid"
 	liquid.mesh = _build_lathe_mesh(_liquid_profile(amber),true,true)
 	var liquid_mat := StandardMaterial3D.new()
-	liquid_mat.albedo_color = Color(0.60,0.22,0.035,0.14) if amber else Color(profile.get("liquid_color",Color(0.91,0.93,0.70,0.40)))
-	liquid_mat.albedo_color.a = 0.14 if amber else 0.40
+	liquid_mat.albedo_color = Color(0.78,0.285,0.035,0.18) if amber else Color(profile.get("liquid_color",Color(0.91,0.93,0.70,0.28)))
+	liquid_mat.albedo_color.a = 0.18 if amber else 0.28
 	liquid_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	liquid_mat.roughness = 0.08
-	liquid_mat.metallic_specular = 0.56
+	liquid_mat.roughness = 0.055
+	liquid_mat.metallic_specular = 0.60
+	liquid_mat.rim_enabled = true
+	liquid_mat.rim = 0.34
+	liquid_mat.rim_tint = 0.28
 	liquid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	liquid.material_override = liquid_mat
 	add_child(liquid)
 
-	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.334 if amber else 0.322,0.020,body_color.lightened(0.08),0.050,minf(source_alpha*0.58+0.10,0.45))
+	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.334 if amber else 0.322,0.020,body_color.lightened(0.12),0.040,minf(source_alpha*0.44+0.06,0.28))
 	_add_bottle_mouth_rim(body_color,neck_radius,source_alpha,roughness)
+	_add_bottle_highlights(amber)
 
 	if not amber:
 		_add_market_green_cap(neck_radius)
 		_add_condensation()
+
+func _add_bottle_highlights(amber: bool) -> void:
+	var shader := Shader.new()
+	shader.code = GLASS_HIGHLIGHT_SHADER
+	var main := MeshInstance3D.new()
+	main.name = "BottleKeyHighlight"
+	var main_quad := QuadMesh.new()
+	main_quad.size = Vector2(0.055,1.48)
+	main.mesh = main_quad
+	main.position = Vector3(-0.145,0.22,0.323)
+	var main_mat := ShaderMaterial.new()
+	main_mat.shader = shader
+	main_mat.set_shader_parameter("highlight_color",Color(1.0,0.55,0.15,0.52) if amber else Color(0.92,0.98,1.0,0.44))
+	main_mat.render_priority = 3
+	main.material_override = main_mat
+	main.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(main)
+
+	var secondary := MeshInstance3D.new()
+	secondary.name = "BottleSecondaryHighlight"
+	var secondary_quad := QuadMesh.new()
+	secondary_quad.size = Vector2(0.028,0.92)
+	secondary.mesh = secondary_quad
+	secondary.position = Vector3(0.205,0.42,0.260)
+	secondary.rotation_degrees = Vector3(0.0,-18.0,0.0)
+	var secondary_mat := ShaderMaterial.new()
+	secondary_mat.shader = shader
+	secondary_mat.set_shader_parameter("highlight_color",Color(1.0,0.76,0.34,0.28) if amber else Color(0.76,0.92,1.0,0.24))
+	secondary_mat.render_priority = 3
+	secondary.material_override = secondary_mat
+	secondary.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(secondary)
 
 func _bottle_profile(neck_radius: float, amber: bool) -> Array[Vector2]:
 	var body := 0.342 if amber else 0.330
@@ -240,16 +288,16 @@ func _bottle_profile(neck_radius: float, amber: bool) -> Array[Vector2]:
 		Vector2(0.84,body*0.76),
 		Vector2(0.91,body*0.60),
 		Vector2(0.98,neck_radius*1.16),
-		Vector2(1.05,neck_radius),
-		Vector2(1.38,neck_radius),
-		Vector2(1.43,neck_radius*1.06),
-		Vector2(1.47,neck_radius*1.13),
-		Vector2(1.50,neck_radius*1.08)
+		Vector2(1.04,neck_radius),
+		Vector2(1.25,neck_radius),
+		Vector2(1.30,neck_radius*1.06),
+		Vector2(1.34,neck_radius*1.13),
+		Vector2(1.37,neck_radius*1.08)
 	]
 
 func _liquid_profile(amber: bool) -> Array[Vector2]:
 	var radius := 0.291 if amber else 0.281
-	var top_y := 0.19 if amber else 0.46
+	var top_y := 0.52 if amber else 0.58
 	return [
 		Vector2(-0.60,radius*0.90),
 		Vector2(-0.57,radius*0.98),
@@ -263,7 +311,7 @@ func _build_lathe_mesh(profile: Array[Vector2], cap_bottom: bool, cap_top: bool)
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
-	if profile.size() < 2:
+	if profile.size()<2:
 		return ArrayMesh.new()
 	for ring_index in range(profile.size()):
 		var sample := profile[ring_index]
@@ -325,15 +373,15 @@ func _add_bottle_mouth_rim(body_color: Color, neck_radius: float, source_alpha: 
 	var rim := MeshInstance3D.new()
 	rim.name = "BottleMouthRim"
 	var rim_mesh := CylinderMesh.new()
-	rim_mesh.top_radius = neck_radius + 0.020
-	rim_mesh.bottom_radius = neck_radius + 0.012
-	rim_mesh.height = 0.055
+	rim_mesh.top_radius = neck_radius+0.020
+	rim_mesh.bottom_radius = neck_radius+0.012
+	rim_mesh.height = 0.050
 	rim_mesh.radial_segments = 72
 	rim_mesh.cap_top = false
 	rim_mesh.cap_bottom = false
 	rim.mesh = rim_mesh
-	rim.position = Vector3(0,1.475,0)
-	rim.material_override = _glass_mat(body_color.lightened(0.12),minf(source_alpha*0.52+0.055,0.34),maxf(roughness*0.82,0.024))
+	rim.position = Vector3(0,1.345,0)
+	rim.material_override = _glass_mat(body_color.lightened(0.18),minf(source_alpha*0.36+0.035,0.22),maxf(roughness*0.75,0.020))
 	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(rim)
 
@@ -341,20 +389,17 @@ func _add_market_green_cap(neck_radius: float) -> void:
 	var cap := MeshInstance3D.new()
 	cap.name = "MarketGreenCap"
 	var cap_mesh := CylinderMesh.new()
-	cap_mesh.top_radius = neck_radius + 0.036
-	cap_mesh.bottom_radius = neck_radius + 0.032
-	cap_mesh.height = 0.120
+	cap_mesh.top_radius = neck_radius+0.036
+	cap_mesh.bottom_radius = neck_radius+0.032
+	cap_mesh.height = 0.105
 	cap_mesh.radial_segments = 72
 	cap.mesh = cap_mesh
-	# The locked market reference uses a capped clear bottle. Keep the cap just
-	# over the authored glass mouth so it reads as product identity at thumbnail
-	# scale without altering bottle framing or the glass body silhouette.
-	cap.position = Vector3(0.0,1.540,0.0)
+	cap.position = Vector3(0.0,1.425,0.0)
 	var cap_mat := StandardMaterial3D.new()
-	cap_mat.albedo_color = Color(0.16,0.46,0.18,1.0)
-	cap_mat.roughness = 0.52
+	cap_mat.albedo_color = Color(0.12,0.38,0.15,1.0)
+	cap_mat.roughness = 0.46
 	cap_mat.metallic = 0.0
-	cap_mat.metallic_specular = 0.30
+	cap_mat.metallic_specular = 0.34
 	cap.material_override = cap_mat
 	add_child(cap)
 
@@ -371,7 +416,7 @@ func _add_condensation() -> void:
 		sm.rings = 5
 		bead.mesh = sm
 		bead.position = Vector3(sin(angle)*0.334,y,cos(angle)*0.334)
-		bead.material_override = _glass_mat(Color(0.96,1.0,1.0),0.20,0.020)
+		bead.material_override = _glass_mat(Color(0.96,1.0,1.0),0.16,0.018)
 		add_child(bead)
 
 func _add_ring(root: Node3D, node_name: String, at: Vector3, radius: float, height: float, color: Color, roughness: float, alpha := 1.0) -> void:
@@ -385,9 +430,9 @@ func _add_ring(root: Node3D, node_name: String, at: Vector3, radius: float, heig
 	ring.mesh = mesh
 	ring.position = at
 	var mat := _mat(color,roughness)
-	if alpha < 0.999:
+	if alpha<0.999:
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color.a = clampf(alpha,0.08,0.96)
+		mat.albedo_color.a = clampf(alpha,0.05,0.96)
 		mat.rim_enabled = true
 		mat.rim = 0.55
 		mat.rim_tint = 0.38
@@ -403,17 +448,17 @@ func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 func _glass_mat(color: Color, alpha: float, roughness: float) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
-	mat.albedo_color.a = clampf(alpha,0.04,0.60)
+	mat.albedo_color.a = clampf(alpha,0.02,0.48)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = clampf(roughness,0.018,0.22)
+	mat.roughness = clampf(roughness,0.014,0.18)
 	mat.metallic = 0.0
-	mat.metallic_specular = 0.86
+	mat.metallic_specular = 0.92
 	mat.rim_enabled = true
-	mat.rim = 0.80
-	mat.rim_tint = 0.46
+	mat.rim = 0.88
+	mat.rim_tint = 0.54
 	mat.clearcoat_enabled = true
-	mat.clearcoat = 0.82
-	mat.clearcoat_roughness = 0.055
+	mat.clearcoat = 0.94
+	mat.clearcoat_roughness = 0.035
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
@@ -422,11 +467,11 @@ func _glass_edge_material(body_color: Color, source_alpha: float, amber: bool) -
 	shader.code = GLASS_EDGE_SHADER
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	var edge_color := body_color.lightened(0.48 if amber else 0.03)
+	var edge_color := body_color.lightened(0.58 if amber else 0.04)
 	if not amber:
-		edge_color = Color(0.74,0.86,0.90,1.0)
-	material.set_shader_parameter("edge_color", edge_color)
-	material.set_shader_parameter("edge_alpha", clampf(source_alpha * (0.82 if amber else 1.46), 0.13, 0.34))
-	material.set_shader_parameter("fresnel_power", 3.15 if amber else 3.25)
+		edge_color = Color(0.82,0.93,0.96,1.0)
+	material.set_shader_parameter("edge_color",edge_color)
+	material.set_shader_parameter("edge_alpha",clampf(source_alpha*(0.68 if amber else 1.18),0.10,0.24))
+	material.set_shader_parameter("fresnel_power",3.0 if amber else 3.1)
 	material.render_priority = 1
 	return material
