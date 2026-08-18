@@ -304,7 +304,14 @@ func _sleeve_cross_section(t: float, angle: float) -> Vector2:
 	var vertical_ratio := lerpf(0.58,0.66,p)
 	var fold := 1.0+0.030*sin(angle*3.0+p*1.7)+0.018*cos(angle*5.0-p*1.15)
 	var vertical_fold := 1.0+0.015*sin(angle*2.0-p*2.2)
-	return Vector2(cos(angle)*radius*fold,sin(angle)*radius*vertical_ratio*fold*vertical_fold)
+	# A human forearm does not have a mirror-symmetric pipe cross-section. Keep
+	# the wrist and off-screen end fixed, but bias the muscle belly toward the
+	# radial side while relaxing the ulnar side by the same amount. The paired
+	# bias preserves the overall width instead of restarting the already-closed
+	# radius/path search, while adding a stable anatomical silhouette landmark.
+	var anatomy_weight := sin(p*PI)
+	var side_bias := 1.0+0.090*anatomy_weight*cos(angle)
+	return Vector2(cos(angle)*radius*fold*side_bias,sin(angle)*radius*vertical_ratio*fold*vertical_fold)
 
 func _radius_profile(t: float) -> float:
 	var p := clampf(t,0.0,1.0)
