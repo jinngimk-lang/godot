@@ -17,10 +17,10 @@ const PROFILES := {
 		"modulate":Color(1.00,0.82,0.67,1.0)
 	},
 	"pantry_tin":{
-		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
-		"world_width":6.25,
-		"offset":Vector2(0.72,-0.08),
-		"modulate":Color(0.82,0.78,0.72,1.0)
+		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
+		"world_width":7.05,
+		"offset":Vector2(0.66,-0.04),
+		"modulate":Color(0.82,0.77,0.67,1.0)
 	},
 	"market_coldcase":{
 		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
@@ -29,10 +29,10 @@ const PROFILES := {
 		"modulate":Color(0.98,0.985,0.99,1.0)
 	},
 	"market_can":{
-		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":6.55,
-		"offset":Vector2(-0.82,0.16),
-		"modulate":Color(0.78,0.91,0.96,1.0)
+		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
+		"world_width":6.45,
+		"offset":Vector2(-0.72,0.18),
+		"modulate":Color(0.72,0.90,0.96,1.0)
 	}
 }
 
