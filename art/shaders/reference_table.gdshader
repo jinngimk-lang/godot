@@ -1,12 +1,13 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_burley, specular_schlick_ggx, blend_mix, depth_draw_opaque;
 
-uniform vec3 base_color : source_color = vec3(0.20, 0.095, 0.04);
-uniform float roughness_value : hint_range(0.05, 1.0) = 0.45;
-uniform float grain_strength : hint_range(0.0, 0.35) = 0.12;
+uniform vec3 base_color : source_color = vec3(0.30, 0.14, 0.055);
+uniform float roughness_value : hint_range(0.05, 1.0) = 0.34;
+uniform float grain_strength : hint_range(0.0, 0.35) = 0.18;
 uniform float grain_scale : hint_range(5.0, 180.0) = 72.0;
 uniform float stone_mode : hint_range(0.0, 1.0) = 0.0;
 uniform float grain_bump_strength : hint_range(0.0, 0.12) = 0.04;
+uniform float surface_alpha : hint_range(0.15, 1.0) = 0.48;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -46,7 +47,7 @@ void fragment() {
 	float wood = wood_signal(UV);
 	float stone_noise = stone_signal(UV);
 	float stone = mix(0.965, 1.035, stone_noise);
-	float variation = mix(0.88 + wood * grain_strength, stone, stone_mode);
+	float variation = mix(0.82 + wood * grain_strength * 1.7, stone, stone_mode);
 	ALBEDO = base_color * variation;
 
 	float micro = surface_signal(UV);
@@ -61,5 +62,6 @@ void fragment() {
 	float stone_roughness = (micro - 0.5) * 0.040;
 	ROUGHNESS = clamp(roughness_value + mix(wood_roughness, stone_roughness, stone_mode), 0.04, 1.0);
 	METALLIC = 0.0;
-	SPECULAR = mix(0.52, 0.38, stone_mode);
+	SPECULAR = mix(0.60, 0.40, stone_mode);
+	ALPHA = surface_alpha;
 }
