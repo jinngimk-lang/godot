@@ -19,8 +19,14 @@ func run() -> Array[String]:
 		"get_visible_authored_hand_mesh_count",
 		"get_polished_authored_mesh_count",
 		"get_visible_primitive_shell_mesh_count",
-		"get_cinematic_forearm_span"
+		"get_cinematic_forearm_span",
+		"is_skin_physically_lit"
 	]:
 		if not methods.has(required_method):
 			failures.append("RED: cinematic hand presentation missing authored-mesh polish contract %s" % required_method)
+	if methods.has("is_skin_physically_lit"):
+		var player = script.new()
+		if not bool(player.call("is_skin_physically_lit")):
+			failures.append("RED: final hand skin must use normal scene lighting rather than an unshaded flat-color pass")
+		player.free()
 	return failures
