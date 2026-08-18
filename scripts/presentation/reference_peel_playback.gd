@@ -1,11 +1,23 @@
 extends CanvasLayer
 class_name ReferencePeelPlayback
 
-const FRAME_SIZE := Vector2i(552,300)
-const FRAME_PATHS := [
-	"res://art/reference_motion/cafe_reference_frame_00.gd",
-	"res://art/reference_motion/cafe_reference_frame_05.gd",
-	"res://art/reference_motion/cafe_reference_frame_12.gd",
+const FRAME_SIZE := Vector2i(368,200)
+const FRAME_CHUNKS := [
+	[
+		"res://art/reference_motion/chunks/frame_00_0.gd",
+		"res://art/reference_motion/chunks/frame_00_1.gd",
+		"res://art/reference_motion/chunks/frame_00_2.gd",
+	],
+	[
+		"res://art/reference_motion/chunks/frame_05_0.gd",
+		"res://art/reference_motion/chunks/frame_05_1.gd",
+		"res://art/reference_motion/chunks/frame_05_2.gd",
+	],
+	[
+		"res://art/reference_motion/chunks/frame_12_0.gd",
+		"res://art/reference_motion/chunks/frame_12_1.gd",
+		"res://art/reference_motion/chunks/frame_12_2.gd",
+	],
 ]
 
 var _texture_rect: TextureRect
@@ -30,7 +42,7 @@ func _process(_delta: float) -> void:
 	_texture_rect.size = get_viewport().get_visible_rect().size
 	var cafe := _venue == null or _venue.get_active_profile_id() == "cafe_window"
 	var label_visible := _label != null and _label.visible
-	var ready := _textures.size() == FRAME_PATHS.size() and _decode_failures.is_empty()
+	var ready := _textures.size() == FRAME_CHUNKS.size() and _decode_failures.is_empty()
 	_texture_rect.visible = cafe and label_visible and ready
 	if not _texture_rect.visible:
 		return
@@ -39,13 +51,14 @@ func _process(_delta: float) -> void:
 
 func frame_index_for_progress(progress: float) -> int:
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
-	return clampi(int(round(p * float(FRAME_PATHS.size()-1))),0,FRAME_PATHS.size()-1)
+	return clampi(int(round(p * float(FRAME_CHUNKS.size()-1))),0,FRAME_CHUNKS.size()-1)
 
 func frame_path_for_progress(progress: float) -> String:
-	return String(FRAME_PATHS[frame_index_for_progress(progress)])
+	var frame_index := frame_index_for_progress(progress)
+	return String(FRAME_CHUNKS[frame_index][0])
 
 func get_reference_frame_count() -> int:
-	return FRAME_PATHS.size()
+	return FRAME_CHUNKS.size()
 
 func get_reference_frame_size() -> Vector2i:
 	return FRAME_SIZE
@@ -84,25 +97,33 @@ func _build_overlay() -> void:
 func _load_reference_textures() -> void:
 	_textures.clear()
 	_decode_failures.clear()
-	for path_value in FRAME_PATHS:
-		var path := String(path_value)
-		var source := load(path) as Script
-		if source == null:
-			_decode_failures.append("missing %s" % path)
-			continue
-		var constants := source.get_script_constant_map()
-		var encoded := String(constants.get("DATA",""))
+	for chunk_paths_value in FRAME_CHUNKS:
+		var chunk_paths: Array = chunk_paths_value
+		var encoded := ""
+		for path_value in chunk_paths:
+			var path := String(path_value)
+			var source := load(path) as Script
+			if source == null:
+				_decode_failures.append("missing %s" % path)
+				encoded = ""
+				break
+			var constants := source.get_script_constant_map()
+			var chunk := String(constants.get("DATA",""))
+			if chunk.is_empty():
+				_decode_failures.append("empty DATA in %s" % path)
+				encoded = ""
+				break
+			encoded += chunk
 		if encoded.is_empty():
-			_decode_failures.append("empty DATA in %s" % path)
 			continue
 		var raw := Marshalls.base64_to_raw(encoded)
 		var image := Image.new()
-		var error := image.load_jpg_from_buffer(raw)
+		var error := image.load_webp_from_buffer(raw)
 		if error != OK or image.is_empty():
-			_decode_failures.append("jpeg decode failed for %s (%d)" % [path,error])
+			_decode_failures.append("webp decode failed for %s (%d)" % [String(chunk_paths[0]),error])
 			continue
 		if image.get_size() != FRAME_SIZE:
-			_decode_failures.append("unexpected frame size %s for %s" % [str(image.get_size()),path])
+			_decode_failures.append("unexpected frame size %s for %s" % [str(image.get_size()),String(chunk_paths[0])])
 			continue
 		_textures.append(ImageTexture.create_from_image(image))
 
