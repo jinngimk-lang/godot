@@ -1,14 +1,16 @@
 extends Node3D
 class_name CrumpleHandStaging
 
-const CAFE_SUPPORT_HOME_INSET := 0.10
 const SUPPORT_MAX_INWARD_OFFSET := 0.075
 const PEEL_MAX_INWARD_OFFSET := 0.135
 const MAX_DOWN_OFFSET := 0.018
+const SUPPORT_CONTACT_HEIGHT := 0.04
+const SUPPORT_CONTACT_DEPTH := 0.08
 
 var _support_hand: Node3D
 var _peel_hand: Node3D
 var _source: CupCrumplePresentation
+var _cup: MeshInstance3D
 var _support_home := Vector3.ZERO
 var _peel_home := Vector3.ZERO
 var _has_support_home := false
@@ -24,13 +26,15 @@ func _bind() -> void:
 	_support_hand = parent.get_node_or_null("LeftHand") as Node3D
 	_peel_hand = parent.get_node_or_null("RightHand") as Node3D
 	_source = parent.get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
+	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
 	if _support_hand == null or _source == null:
 		return
-	# The new smooth support hand has a smaller palm than the retired XR render
-	# mesh. Start it closer to the paper cup so later squeeze contact is achieved
-	# by a restrained press instead of a large corrective teleport.
-	_support_home = _support_hand.position + Vector3(-CAFE_SUPPORT_HOME_INSET,0.0,0.0)
-	_support_hand.position = _support_home
+	# The visible hand was scaled up to first-person hero proportions. Derive its
+	# resting root from the *visible pinch anchor* and the actual cup radius instead
+	# of retaining the legacy fixed root offset. That makes subsequent crumple
+	# grounding a small correction rather than a large teleport.
+	_place_support_home_on_cup()
+	_support_home = _support_hand.position
 	_has_support_home = true
 	if _peel_hand != null:
 		_peel_home = _peel_hand.position
@@ -38,6 +42,17 @@ func _bind() -> void:
 	if not _source.crumple_changed.is_connected(_on_crumple_changed):
 		_source.crumple_changed.connect(_on_crumple_changed)
 	_on_crumple_changed(_source.get_progress())
+
+func _place_support_home_on_cup() -> void:
+	if not (_support_hand is HandVisual) or _cup == null or not (_cup.mesh is CylinderMesh):
+		return
+	var mesh := _cup.mesh as CylinderMesh
+	var contact_radius := maxf(mesh.top_radius,mesh.bottom_radius)*0.96
+	var desired_local := Vector3(contact_radius,SUPPORT_CONTACT_HEIGHT,SUPPORT_CONTACT_DEPTH)
+	var desired_world := _cup.to_global(desired_local)
+	var visual := _support_hand as HandVisual
+	var current_pinch_world := visual.get_pinch_world_position()
+	visual.global_position += desired_world-current_pinch_world
 
 func _on_crumple_changed(progress: float) -> void:
 	if not _has_support_home or _support_hand == null:
