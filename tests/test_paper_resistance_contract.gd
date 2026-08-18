@@ -8,9 +8,6 @@ func run() -> Array[String]:
 		failures.append("paper resistance dependencies did not load")
 		return failures
 
-	# RED: A loaded label must not keep peeling while the mouse is held still.
-	# Progress must come from additional peel displacement/work, not elapsed time
-	# under an already-large pull vector.
 	var controller = controller_script.new({"base_adhesion":10.0,"release_increment":0.014,"bond_response":10.0})
 	controller.set_edge_position(Vector2(100,100))
 	controller.set_grab_region(Rect2(Vector2(70,70),Vector2(60,60)))
@@ -34,7 +31,6 @@ func run() -> Array[String]:
 	if held_progress-moving_progress > 0.006:
 		failures.append("PAPER_RESISTANCE_RED: holding still must stall peel progress; advanced %.4f" % (held_progress-moving_progress))
 
-	# Continued outward displacement must resume release.
 	for i in range(16):
 		var p2: Vector2 = pointer.position+Vector2(3.0+float(i)*1.2,-1.0)
 		pointer.set_frame(true,p2,Vector2(3,-1),Vector2(460,-130),false)
@@ -42,9 +38,6 @@ func run() -> Array[String]:
 	if float(controller.get_progress()) <= held_progress+0.004:
 		failures.append("paper peel must resume when the cursor does additional outward work")
 
-	# RED: the visible corner implementation may compress mid-progress for a
-	# readable hero label, but 100% gameplay progress must visually detach 100%
-	# of the label instead of leaving a permanent attached patch.
 	var corner_script = load("res://scripts/presentation/corner_peel_presentation.gd")
 	if corner_script == null:
 		failures.append("corner peel presentation did not load")
@@ -65,11 +58,17 @@ func run() -> Array[String]:
 			var band: float = float(corner.call("paper_bend_band_ratio"))
 			if band <= 0.02 or band > 0.22:
 				failures.append("paper bend must be localized near peel front, got %.3f" % band)
+		if not corner.has_method("paper_backing_thickness") or not corner.has_method("paper_backing_roughness"):
+			failures.append("PAPER_MATERIAL_RED: released paper needs an opaque fibrous backing, not two-sided printed tape")
+		else:
+			var thickness: float = float(corner.call("paper_backing_thickness"))
+			var roughness: float = float(corner.call("paper_backing_roughness"))
+			if thickness < 0.0015 or thickness > 0.010:
+				failures.append("paper backing thickness should remain visible but thin, got %.4f" % thickness)
+			if roughness < 0.90:
+				failures.append("paper backing should be matte/fibrous, got roughness %.3f" % roughness)
 		corner.free()
 
-	# RED: five scenes need five distinct visual signatures. A signature may use
-	# the same source photo only if crop/modulate/placement make the final plate
-	# deterministically different.
 	var backdrop_script = load("res://scripts/presentation/reference_backdrop.gd")
 	if backdrop_script == null:
 		failures.append("reference backdrop did not load")
