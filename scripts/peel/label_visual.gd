@@ -159,7 +159,10 @@ func get_peel_roll_angle(u: float, progress: float) -> float:
 	var free_weight := 1.0-x/maxf(p,0.0001)
 	var smooth_weight := free_weight*free_weight*(3.0-2.0*free_weight)
 	var progress_weight := clampf(p/0.18,0.0,1.0)
-	return deg_to_rad(150.0)*smooth_weight*progress_weight
+	# Keep the supplied-photo silhouette: one broad lifted sheet with a modest
+	# free-edge curl. The old 150° roll turned front/back/edge surfaces into
+	# separate diagonal ribbons in the actual runtime capture.
+	return deg_to_rad(42.0)*smooth_weight*progress_weight
 
 func configure_cup_frustum(bottom_radius: float, top_radius: float, cup_height: float, cup_center_y: float) -> void:
 	_cup_bottom_radius = maxf(bottom_radius,0.001)
@@ -234,7 +237,9 @@ func get_paper_thickness() -> float:
 func get_torn_front_fringe(progress: float) -> PackedVector2Array:
 	var fringe := PackedVector2Array()
 	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
-	if p <= 0.025:
+	# The target café and Yuzu examples are clean broad-sheet peels. Reserve
+	# obvious dry fiber tufts for the intentionally damaged Bar substrate.
+	if p <= 0.025 or _substrate != "uncoated_fiber":
 		return fringe
 	var fiber_count := 7
 	for i in range(fiber_count):
@@ -345,7 +350,12 @@ func _draw_peeled_backing(top_vertices: PackedVector3Array, bottom_vertices: Pac
 		_mesh.surface_add_vertex(bottom_back)
 	_mesh.surface_end()
 	_has_backing_surface = true
-	_draw_backing_glue(top_vertices,bottom_vertices,top_normals,bottom_normals,last_index,thickness)
+	# The separate wet glue streak is a damaged fibrous-bar cue. On the clean
+	# café/market examples it read as an extra detached ribbon, so keep their
+	# underside as a single paper surface and let ResidueVisual own the glue left
+	# on the vessel.
+	if _substrate == "uncoated_fiber":
+		_draw_backing_glue(top_vertices,bottom_vertices,top_normals,bottom_normals,last_index,thickness)
 
 func _draw_backing_glue(top_vertices: PackedVector3Array, bottom_vertices: PackedVector3Array, top_normals: PackedVector3Array, bottom_normals: PackedVector3Array, last_index: int, thickness: float) -> void:
 	if last_index < 2:
