@@ -7,12 +7,15 @@ const SURFACE_OFFSET := 0.025
 const VISUAL_AREA_SCALE := 0.62
 const COMPLETE_RAMP_START := 0.84
 const BEND_BAND_RATIO := 0.14
+const PAPER_BACKING_THICKNESS := 0.0036
+const PAPER_BACKING_ROUGHNESS := 0.96
 
 var _label: LabelVisual
 var _cup: MeshInstance3D
 var _print: LabelPrint
 var _visual: MeshInstance3D
 var _front_material: StandardMaterial3D
+var _back_material: StandardMaterial3D
 var _adhesive_material: StandardMaterial3D
 var _last_progress := -1.0
 var _last_drag := Vector3(INF,INF,INF)
@@ -67,6 +70,12 @@ func visual_progress_for_gameplay(progress: float) -> float:
 func paper_bend_band_ratio() -> float:
 	return BEND_BAND_RATIO
 
+func paper_backing_thickness() -> float:
+	return PAPER_BACKING_THICKNESS
+
+func paper_backing_roughness() -> float:
+	return PAPER_BACKING_ROUGHNESS
+
 func _bind() -> void:
 	var parent := get_parent()
 	if parent == null:
@@ -83,10 +92,17 @@ func _bind() -> void:
 		add_child(_visual)
 		_front_material = StandardMaterial3D.new()
 		_front_material.resource_name = "CornerPeelPrintedPaper"
-		_front_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_front_material.cull_mode = BaseMaterial3D.CULL_BACK
 		_front_material.roughness = 0.91
 		_front_material.metallic = 0.0
 		_front_material.metallic_specular = 0.12
+		_back_material = StandardMaterial3D.new()
+		_back_material.resource_name = "CornerPeelFibrousBacking"
+		_back_material.albedo_color = Color(0.86,0.82,0.72,1.0)
+		_back_material.cull_mode = BaseMaterial3D.CULL_BACK
+		_back_material.roughness = PAPER_BACKING_ROUGHNESS
+		_back_material.metallic = 0.0
+		_back_material.metallic_specular = 0.06
 		_adhesive_material = StandardMaterial3D.new()
 		_adhesive_material.resource_name = "CornerPeelAdhesiveTrace"
 		_adhesive_material.albedo_color = Color(0.80,0.72,0.58,0.30)
@@ -119,9 +135,6 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	elif full_release and safe_drag.length()<0.075:
 		safe_drag = Vector3(0.10,0.025,0.085)
 
-	# Build a tangent plane at the advertised top-right peel corner. Detached
-	# paper converges onto this plane quickly after crossing the narrow bend band,
-	# so the free arm behaves like a stiff sheet instead of a rubber membrane.
 	var corner_y := _label.label_y+_label.label_height*0.5
 	var corner_attached := CupSurface.attached_point_on_frustum(1.0,_label.label_width,corner_y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
 	var corner_normal := CupSurface.frustum_surface_normal(corner_attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
@@ -133,9 +146,11 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 
 	var base_positions := PackedVector3Array()
 	var flap_positions := PackedVector3Array()
+	var back_positions := PackedVector3Array()
 	var adhesive_positions := PackedVector3Array()
 	var base_normals := PackedVector3Array()
 	var flap_normals := PackedVector3Array()
+	var back_normals := PackedVector3Array()
 	var adhesive_normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 
@@ -157,11 +172,14 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var flat_reference := corner_attached+tangent_axis*((u-1.0)*_label.label_width)+Vector3.UP*((v-1.0)*_label.label_height)
 			var free_target := flat_reference+safe_drag+free_normal*lift_distance+Vector3.UP*(progress*0.010)
 			var moved := attached.lerp(free_target,rigid_weight)
+			var flap_normal := outward.lerp(free_normal,rigid_weight).normalized()
 			base_positions.append(attached)
 			flap_positions.append(moved)
+			back_positions.append(moved-flap_normal*PAPER_BACKING_THICKNESS)
 			adhesive_positions.append(attached+outward*0.0015)
 			base_normals.append(outward)
-			flap_normals.append(outward.lerp(free_normal,rigid_weight).normalized())
+			flap_normals.append(flap_normal)
+			back_normals.append(-flap_normal)
 			adhesive_normals.append(outward)
 			uvs.append(Vector2(u,1.0-v))
 
@@ -189,12 +207,24 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	if not flap_indices.is_empty():
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(flap_positions,flap_normals,uvs,flap_indices))
 		mesh.surface_set_material(mesh.get_surface_count()-1,_front_material)
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(back_positions,back_normals,uvs,_reversed_indices(flap_indices)))
+		mesh.surface_set_material(mesh.get_surface_count()-1,_back_material)
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(adhesive_positions,adhesive_normals,uvs,flap_indices))
 		mesh.surface_set_material(mesh.get_surface_count()-1,_adhesive_material)
 	_visual.mesh = mesh
 
 	var corner_index := V_SEGMENTS*(U_SEGMENTS+1)+U_SEGMENTS
 	_visual_grip_local = flap_positions[corner_index]
+
+func _reversed_indices(source: PackedInt32Array) -> PackedInt32Array:
+	var reversed := PackedInt32Array()
+	for i in range(0,source.size(),3):
+		if i+2 >= source.size():
+			break
+		reversed.append(source[i])
+		reversed.append(source[i+2])
+		reversed.append(source[i+1])
+	return reversed
 
 func _arrays(vertices: PackedVector3Array, normals: PackedVector3Array, tex_uv: PackedVector2Array, indices: PackedInt32Array) -> Array:
 	var arrays: Array = []
