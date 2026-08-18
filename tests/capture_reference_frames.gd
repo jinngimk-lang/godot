@@ -37,8 +37,6 @@ func _run() -> void:
 		if not await _capture(String(capture_case["peel"])): return
 		if not _stage_full_release(scene,capture_case): return
 		await _settle_frames(4)
-		_align_cursor_to_corner(scene,true)
-		await _settle_frames(1)
 		if not _assert_full_release(scene,capture_case): return
 		if not await _capture(String(capture_case["done"])): return
 		_resume_scene(scene)
@@ -98,21 +96,29 @@ func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
 	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
 	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
-	if label == null or residue == null:
-		push_error("CAPTURE_RED: full release staging is missing label/residue")
+	var lifecycle = scene.get("_lifecycle")
+	if label == null or residue == null or lifecycle == null:
+		push_error("CAPTURE_RED: full release staging is missing label/residue/lifecycle")
 		quit(1); return false
 	var front := label.get_front_position(1.0)
-	label.set_phase("HELD")
-	label.set_detach_alpha(1.0)
 	var desired_grip_local := front+Vector3(0.50,0.10,0.34)
 	var grip_local := label.get_effective_grip(1.0,desired_grip_local)
 	label.set_peel(1.0,grip_local)
 	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
+	# Stage the actual post-peel lifecycle rather than freezing the old HELD state.
+	# The final "done" capture must prove the released sheet no longer floats in
+	# front of the hero object after its brief acknowledgement/settle window.
+	lifecycle.reset()
+	lifecycle.update(1.0,true,0.016)
+	lifecycle.update(1.0,false,0.18)
+	lifecycle.update(1.0,false,0.80)
+	label.set_phase(String(lifecycle.get_phase_name()))
+	label.set_detach_alpha(float(lifecycle.get_detach_alpha()))
 	scene.set_process(false)
 	if guide != null:
 		guide.set_process(false)
 		guide.set_state(int(capture_case["index"]),"COMPLETE","inspect",1.0,true)
-	scene.call("_update_hud","COMPLETE","HELD",1.0)
+	scene.call("_update_hud","COMPLETE",String(lifecycle.get_phase_name()),1.0)
 	return true
 
 func _align_cursor_to_corner(scene: Node, peeled: bool) -> void:
@@ -149,15 +155,26 @@ func _assert_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 func _assert_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	var corner := scene.get_node_or_null("CornerPeelPresentation") as CornerPeelPresentation
 	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
-	if corner == null or label == null:
-		push_error("CAPTURE_RED: full release lost label presentation")
+	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
+	var lifecycle = scene.get("_lifecycle")
+	if corner == null or label == null or lifecycle == null:
+		push_error("CAPTURE_RED: full release lost label presentation/lifecycle")
 		quit(1); return false
 	if float(corner.visual_progress_for_gameplay(1.0)) < 0.999:
 		push_error("CAPTURE_RED: %s leaves visually attached paper at 100%%" % String(capture_case["done"]))
 		quit(1); return false
+	if not bool(lifecycle.call("is_resolved")):
+		push_error("CAPTURE_RED: %s never resolves the released-label lifecycle" % String(capture_case["done"]))
+		quit(1); return false
 	var visual := corner.get_node_or_null("CornerPeelLabel") as MeshInstance3D
-	if visual == null or visual.mesh == null or visual.mesh.get_surface_count() < 1:
-		push_error("CAPTURE_RED: %s has no released paper sheet" % String(capture_case["done"]))
+	if visual == null or visual.mesh == null:
+		push_error("CAPTURE_RED: %s lost the paper presentation node" % String(capture_case["done"]))
+		quit(1); return false
+	if visual.visible:
+		push_error("CAPTURE_RED: %s still leaves the fully released sheet floating over the hero product" % String(capture_case["done"]))
+		quit(1); return false
+	if residue == null or not residue.has_adhesive_trace():
+		push_error("CAPTURE_RED: %s should keep residue evidence after paper disposal" % String(capture_case["done"]))
 		quit(1); return false
 	var hud := scene.get_node_or_null("HUD/Instructions") as Label
 	if hud == null or not hud.text.contains("Peel 100%"):
