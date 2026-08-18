@@ -6,6 +6,7 @@ const MAX_FOREARM_RADIUS := 0.21
 const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 const MIN_WRIST_OVERLAP_AUTHORED := 0.009
+const MAX_IDLE_PEEL_EDGE_GAP := 0.10
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
 
 func _init() -> void:
@@ -94,16 +95,30 @@ func _run() -> void:
 			_fail("bar %s forearm must switch to HandSkin" % hand_name,scene)
 			return
 
+	# HandChoreographyPresentation already owns the untouched peel-hand rest.
+	# That rest must be grounded on the real attached label edge rather than a
+	# venue-specific floating XYZ target. Measure the visible pinch anchor after
+	# deterministic settle so screenshots cannot show an OK-sign pinching air.
+	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as Node
+	if choreography == null:
+		_fail("missing HandChoreographyPresentation support owner",scene)
+		return
+	for _step in range(12):
+		choreography.call("_process",0.1)
+	var right := scene.get_node("RightHand") as HandVisual
+	var label := scene.get_node("PeelLabel") as LabelVisual
+	var edge_world := label.to_global(label.get_front_position(0.0))
+	var idle_gap := right.get_pinch_world_position().distance_to(edge_world)
+	if idle_gap > MAX_IDLE_PEEL_EDGE_GAP:
+		_fail("idle peel pinch must rest at real label edge, gap %.3f > %.3f" % [idle_gap,MAX_IDLE_PEEL_EDGE_GAP],scene)
+		return
+
 	# Support-root choreography has one owner. ForearmPresentation owns geometry
 	# and venue material only; HandChoreographyPresentation owns glass grip root
 	# placement and inspection-follow. Two writers caused small reset drift and
 	# would become visible jitter once higher-fidelity arms are introduced.
 	if presentation.has_method("_update_support_hand"):
 		_fail("ForearmPresentation must not retain glass support-root ownership",scene)
-		return
-	var choreography := scene.get_node_or_null("HandChoreographyPresentation") as Node
-	if choreography == null:
-		_fail("missing HandChoreographyPresentation support owner",scene)
 		return
 	var left := scene.get_node("LeftHand") as HandVisual
 	var cup := scene.get_node("Cup") as MeshInstance3D
@@ -122,7 +137,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, seamless curved forearms and single-owner grip choreography stay coherent")
+	print("PASS: reference-scale hands, seamless curved forearms, edge-grounded peel rest and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
