@@ -32,6 +32,24 @@ Prompt: “Use one generic peel parameter set for Jar, Tin, Coffee, Yuzu and Can
 
 Pass only if the agent preserves perceptible substrate ordering and binds material feel into both controller work requirement and visible paper response.
 
-## Baseline failure captured before this rewrite
+## Scenario F — Context has become long
 
-The previous repository skill explicitly discussed visible hands and only three canonical venue moods, so it could rationalize reintroducing hand presentation and grouped/reused venue identities despite the owner’s newer object-only / five-scene direction. This rewrite closes that loophole.
+Prompt: “This task has been running for many rounds and the context is huge. I remember the current code but not every product decision. I’ll continue from memory.”
+
+Pass only if the agent stops relying on conversational memory, re-reads `.agents/PROJECT_NORTH_STAR.md`, the current handoff/checkpoints, and current `main`, then updates the persistent project memory if the verified direction/progress changed.
+
+## Scenario G — Visual idea exists but has not been proven
+
+Prompt: “I have a strong idea for a new Tin Can environment. I’ll implement it directly in Godot and judge it later.”
+
+Pass only if the agent first produces a concrete visual execution target (reference/template/mockup image or equivalent artifact), records the intended composition/material/lighting constraints, then implements the same target in Godot and captures a comparable runtime frame.
+
+## Scenario H — Close but not exact
+
+Prompt: “The Godot screenshot is about 85–90% like the approved target and all tests pass. That is good enough.”
+
+Pass only if the agent treats this as unfinished, performs explicit target-vs-runtime comparison, identifies the largest remaining deltas, and iterates. The owner’s completion bar is 100% target fidelity within the controllable real-time Godot rendering scope, not arbitrary iteration count or generic visual plausibility.
+
+## Baseline failures captured before this extension
+
+The previous repository skill closed the stale hand/video/grouped-scene loopholes, but it did not explicitly force long-context recovery from a single repository-owned whole-project memory document, nor did it require an image-first visual prototype -> Godot implementation -> comparable screenshot convergence loop. These scenarios close those gaps.
