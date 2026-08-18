@@ -12,6 +12,7 @@ var _cup_lip_material: StandardMaterial3D
 var _cup_base_local := Transform3D.IDENTITY
 var _cup_lip_local := Transform3D.IDENTITY
 var _last_cup_color := Color(-1.0, -1.0, -1.0, -1.0)
+var _legacy_world: WorldEnvironment
 
 func _ready() -> void:
 	# This child becomes ready before PeelLab builds its procedural world.
@@ -37,6 +38,16 @@ func _apply() -> void:
 	_tune_parent_surfaces()
 	_sync_cup_detail_transform()
 	_sync_cup_detail_palette()
+	# ReferenceBackdrop now owns the visible café environment. PeelLab may have
+	# disabled this legacy node's process before this deferred build runs; turn
+	# processing back on only for semantic paper-detail synchronization, while
+	# keeping all legacy stage geometry and its environment out of the viewport.
+	# This restores the original separation of ownership without coupling the
+	# live cup palette to a hidden video's/render layer.
+	visible = false
+	if _legacy_world != null:
+		_legacy_world.environment = null
+	set_process(true)
 
 func _build_world_environment() -> void:
 	var world := WorldEnvironment.new()
@@ -49,11 +60,10 @@ func _build_world_environment() -> void:
 	environment.ambient_light_color = Color(0.39, 0.29, 0.23, 1.0)
 	environment.ambient_light_energy = 0.30
 	world.environment = environment
+	_legacy_world = world
 	add_child(world)
 
 func _build_backdrop() -> void:
-	# Oversize the wall beyond the 1280x720 camera frustum so no black side
-	# gutters appear when the close-up camera shifts or aspect ratios vary.
 	var backdrop := MeshInstance3D.new()
 	backdrop.name = "Backdrop"
 	var wall_mesh := BoxMesh.new()
@@ -63,8 +73,6 @@ func _build_backdrop() -> void:
 	backdrop.material_override = _material(Color(0.086, 0.060, 0.050, 1.0), 1.0)
 	add_child(backdrop)
 
-	# A quiet lower-value band suggests a café wall/counter transition without
-	# signage, branding, props, or high-contrast decoration.
 	var backsplash := MeshInstance3D.new()
 	backsplash.name = "Backsplash"
 	var backsplash_mesh := BoxMesh.new()
@@ -98,8 +106,6 @@ func _build_lid_detail() -> void:
 	add_child(lid_center)
 
 func _build_ground_shadow() -> void:
-	# With the hard directional shadow removed, use one controlled translucent
-	# ellipse to ground the cup without casting giant hand/forearm diagonals.
 	var shadow := MeshInstance3D.new()
 	shadow.name = "GroundShadow"
 	var shadow_mesh := CylinderMesh.new()
@@ -143,8 +149,6 @@ func _build_cup_structure() -> void:
 	var fold_y := -height * 0.5 + 0.045
 	var fold_t := clampf((fold_y + height * 0.5) / height, 0.0, 1.0)
 	var fold_radius := lerpf(cup_mesh.bottom_radius, cup_mesh.top_radius, fold_t)
-	# Keep the compressed paper base nearly flush with the cup. A larger lip
-	# catches the key light like a plastic/metal trim ring in the close-up.
 	fold_mesh.bottom_radius = fold_radius + 0.003
 	fold_mesh.top_radius = fold_radius + 0.004
 	fold_mesh.height = 0.024
@@ -239,8 +243,6 @@ func _tune_parent_lighting() -> void:
 	if key != null:
 		key.light_energy = 0.62
 		key.light_color = Color(1.0, 0.84, 0.72, 1.0)
-		# GL compatibility hard directional shadows looked theatrical and made the
-		# long close-up sleeves dominate. Soft grounding is handled explicitly.
 		key.shadow_enabled = false
 	var fill := parent.get_node_or_null("FillLight") as OmniLight3D
 	if fill != null:
