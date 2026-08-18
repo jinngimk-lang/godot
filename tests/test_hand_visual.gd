@@ -11,9 +11,9 @@ func run() -> Array[String]:
 	var method_names: Array[String] = []
 	for method in hand_script.get_script_method_list():
 		method_names.append(String(method.get("name", "")))
-	for required in ["set_grip_target", "set_pinch_amount", "get_finger_count", "snap_to", "tick"]:
+	for required in ["set_grip_target", "set_pinch_amount", "get_finger_count", "snap_to", "tick", "is_using_realtime_shell", "get_realtime_shell_vertex_count"]:
 		if not method_names.has(required):
-			failures.append("RED: HandVisual missing semi-realistic contract method %s" % required)
+			failures.append("RED: HandVisual missing realtime hand contract method %s" % required)
 	if not failures.is_empty():
 		return failures
 
@@ -28,6 +28,10 @@ func run() -> Array[String]:
 	var relaxed_pose := String(hand.get("_last_authored_pose"))
 	if relaxed_pose != "Pinch Up":
 		failures.append("RED: relaxed dynamic authored hand must use Pinch Up, got %s" % relaxed_pose)
+	if not hand.is_using_realtime_shell():
+		failures.append("RED: dynamic hand must render the dense realtime presentation shell")
+	elif hand.get_realtime_shell_vertex_count() < 20000:
+		failures.append("RED: realtime dynamic hand shell is still too low density (%d vertices)" % hand.get_realtime_shell_vertex_count())
 
 	var sleeve := hand.find_child("WristSleeve", true, false) as MeshInstance3D
 	var cuff := hand.find_child("WristCuff", true, false) as MeshInstance3D
@@ -57,5 +61,9 @@ func run() -> Array[String]:
 	var support_pose := String(support.get("_last_authored_pose"))
 	if support_pose != "Cup":
 		failures.append("RED: authored support hand must use vessel-wrapping Cup pose, got %s" % support_pose)
+	if not support.is_using_realtime_shell():
+		failures.append("RED: support hand must render the dense realtime presentation shell")
+	elif support.get_realtime_shell_vertex_count() < 20000:
+		failures.append("RED: realtime support hand shell is still too low density (%d vertices)" % support.get_realtime_shell_vertex_count())
 	support.free()
 	return failures
