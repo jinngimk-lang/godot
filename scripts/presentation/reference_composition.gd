@@ -2,7 +2,7 @@ extends Node
 class_name ReferenceComposition
 
 const CAFE_FOV := 39.0
-const BOTTLE_FOV := 48.0
+const BOTTLE_FOV := 43.0
 
 var _last_kind := ""
 
@@ -19,9 +19,6 @@ func _apply() -> void:
 	var camera := root.get_node_or_null("Camera") as Camera3D
 	if camera == null:
 		return
-	# Reference frames are hand-and-object closeups: the vessel fills roughly
-	# half to two-thirds of frame height and the hands are tactile foreground,
-	# while the venue remains contextual rather than the main subject.
 	camera.position = Vector3(0.0,0.80,3.55)
 	camera.fov = CAFE_FOV
 	camera.look_at(Vector3(0.0,0.15,0.0),Vector3.UP)
