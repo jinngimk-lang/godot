@@ -9,6 +9,7 @@ var _parent: Node3D
 var _right_hand: HandVisual
 var _left_hand: HandVisual
 var _cup: MeshInstance3D
+var _label: LabelVisual
 var _controller: PeelController
 var _venue: VenuePresentation
 
@@ -37,6 +38,7 @@ func _bind() -> void:
 	_right_hand = _parent.get_node_or_null("RightHand") as HandVisual
 	_left_hand = _parent.get_node_or_null("LeftHand") as HandVisual
 	_cup = _parent.get_node_or_null("Cup") as MeshInstance3D
+	_label = _parent.get_node_or_null("PeelLabel") as LabelVisual
 	_venue = _parent.get_node_or_null("VenuePresentation") as VenuePresentation
 	_controller = _parent.get("_controller") as PeelController
 
@@ -76,12 +78,23 @@ func _stage_peel_hand_rest(venue_id: String, delta: float) -> void:
 	var state := _controller.get_state_name()
 	var progress := _controller.get_progress()
 	# Once the player has lifted any paper, the gameplay hand target owns the
-	# position. This layer only composes the untouched idle/hover frame so the
-	# peel hand enters from the edge rather than pinching empty air over the label.
+	# position. This layer only composes the untouched idle/hover frame.
 	if progress > 0.001 or state not in ["IDLE","EDGE_HOVER","RELEASED"]:
 		return
 	var profile := _peel_rest_profile(venue_id)
 	var target: Vector3 = profile["position"]
+	if _label != null and _label.is_inside_tree() and _right_hand.is_inside_tree():
+		# Ground the visible thumb/index pinch anchor on the actual attached paper
+		# edge. This replaces the old venue-specific floating root position while
+		# preserving the authored pinch pose and venue rotation. Recomputing from
+		# the live anchor each frame naturally absorbs the small anchor shift while
+		# the rest rotation is easing toward its target.
+		var desired_pinch_world := _label.to_global(_label.get_front_position(0.0))
+		var current_pinch_world := _right_hand.get_pinch_world_position()
+		var desired_root_world := _right_hand.global_position+(desired_pinch_world-current_pinch_world)
+		var root_parent := _right_hand.get_parent() as Node3D
+		if root_parent != null:
+			target = root_parent.to_local(desired_root_world)
 	var position_weight := 1.0-exp(-REST_FOLLOW_RATE*delta)
 	_right_hand.position = _right_hand.position.lerp(target,position_weight)
 	var desired: Vector3 = profile["rotation"]
