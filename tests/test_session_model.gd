@@ -48,7 +48,7 @@ func run() -> Array[String]:
 	if model.get_variant_index() != 0:
 		failures.append("SESSION_RED: Continue after Can must wrap to Coffee Shop")
 
-	var before_clean := model.get_clean_peels()
+	var before_clean: int = int(model.get_clean_peels())
 	var result: Dictionary = model.record_ritual_complete()
 	if model.get_clean_peels() != before_clean+1:
 		failures.append("SESSION_RED: completed peel should increment completion count once")
