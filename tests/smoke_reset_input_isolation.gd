@@ -35,20 +35,20 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Ordinary R must not let the pre-reset held button grab the fresh label.
+	# Ordinary T must not let the pre-reset held button grab the fresh label.
 	var reset_key := InputEventKey.new()
 	reset_key.pressed = true
-	reset_key.keycode = KEY_R
+	reset_key.keycode = KEY_T
 	scene.call("_unhandled_key_input", reset_key)
 	if String(controller.get_state_name()) != "IDLE":
-		push_error("RESET_INPUT_RED: R fixture expected controller reset to IDLE")
+		push_error("RESET_INPUT_RED: T fixture expected controller reset to IDLE")
 		quit(1)
 		return
 	scene.call("_process", 1.0 / 60.0)
 	scene.call("_process", 1.0 / 60.0)
 	var after_reset := String(controller.get_state_name())
 	if after_reset in ["EDGE_LIFT", "PINCHED", "PEELING", "COMPLETE"]:
-		push_error("RESET_INPUT_RED: held pointer leaked across R reset and re-grabbed fresh label: %s" % after_reset)
+		push_error("RESET_INPUT_RED: held pointer leaked across T reset and re-grabbed fresh label: %s" % after_reset)
 		quit(1)
 		return
 
@@ -62,15 +62,15 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# Shift+R rebuilds the controller; the same held-pointer isolation must apply.
+	# Shift+T rebuilds the controller; the same held-pointer isolation must apply.
 	var restart := InputEventKey.new()
 	restart.pressed = true
-	restart.keycode = KEY_R
+	restart.keycode = KEY_T
 	restart.shift_pressed = true
 	scene.call("_unhandled_key_input", restart)
 	controller = scene.get("_controller")
 	if controller == null or String(controller.get_state_name()) != "IDLE":
-		push_error("RESET_INPUT_RED: Shift+R fixture expected a fresh IDLE controller")
+		push_error("RESET_INPUT_RED: Shift+T fixture expected a fresh IDLE controller")
 		quit(1)
 		return
 	edge_screen = _edge_screen(label, camera, controller)
@@ -78,7 +78,7 @@ func _run() -> void:
 	scene.call("_process", 1.0 / 60.0)
 	var after_restart := String(controller.get_state_name())
 	if after_restart in ["EDGE_LIFT", "PINCHED", "PEELING", "COMPLETE"]:
-		push_error("RESET_INPUT_RED: held pointer leaked across Shift+R restart and re-grabbed fresh label: %s" % after_restart)
+		push_error("RESET_INPUT_RED: held pointer leaked across Shift+T restart and re-grabbed fresh label: %s" % after_restart)
 		quit(1)
 		return
 
@@ -91,7 +91,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	print("PASS: reset/restart quarantine held pointer state until release and a fresh press")
+	print("PASS: T reset/restart quarantines held pointer state until release and a fresh press")
 	scene.queue_free()
 	await process_frame
 	quit(0)
