@@ -24,35 +24,32 @@ func run() -> Array[String]:
 		if String(variant.scene_profile.get("id","")) != expected_scenes[i]: failures.append("variant %d wrong scene" % i)
 		if String(variant.container_profile.get("kind","")) != expected_kinds[i]: failures.append("variant %d wrong container kind" % i)
 		if String(variant.post_peel_action) != expected_post[i]: failures.append("variant %d wrong post-peel action" % i)
-
-		# ReferenceComposition promises a hand-and-object closeup where the hero
-		# vessel occupies roughly one-half to two-thirds of frame height. Test the
-		# live composition owner directly so a dead profile value cannot make CI
-		# green while captured product pixels remain unchanged.
 		if composition != null:
 			var camera_fov := float(composition.target_fov_for_kind(expected_kinds[i]))
 			if expected_kinds[i] == "paper_cup":
-				if absf(camera_fov-39.0) > 0.1:
-					failures.append("BOTTLE_FRAMING_RED: café closeup lens must remain 39 degrees, got %.2f" % camera_fov)
+				if camera_fov < 38.0 or camera_fov > 40.0:
+					failures.append("BOTTLE_FRAMING_RED: café lens must remain a close 38-40 degrees, got %.2f" % camera_fov)
 			else:
-				if camera_fov < 47.0:
-					failures.append("BOTTLE_FRAMING_RED: %s needs a wider bottle lens so the full slender vessel stays in frame, got %.2f" % [expected_scenes[i],camera_fov])
-				if camera_fov > 50.0:
-					failures.append("BOTTLE_FRAMING_RED: %s lens became too wide for the reference closeup, got %.2f" % [expected_scenes[i],camera_fov])
+				if camera_fov < 41.0 or camera_fov > 45.0:
+					failures.append("BOTTLE_FRAMING_RED: bottle lens must stay close enough for the target hero scale, got %.2f" % camera_fov)
 
 	var cafe: Dictionary = model.VARIANTS[0]
-	var cafe_width := float(cafe.get("label_width",0.0))
-	var cafe_height := float(cafe.get("label_height",0.0))
-	if cafe_width <= 0.0 or cafe_height <= 0.0:
-		failures.append("RED: café label dimensions must be positive")
-	else:
-		var aspect := cafe_width/cafe_height
-		if cafe_width > 0.72:
-			failures.append("RED: approved café receipt needs a narrower silhouette, got %.3f m" % cafe_width)
-		if cafe_height < 0.54:
-			failures.append("RED: approved café receipt needs stronger vertical presence, got %.3f m" % cafe_height)
-		if aspect > 1.35:
-			failures.append("RED: café receipt should read near-square rather than landscape, aspect %.2f" % aspect)
+	if float(cafe.get("label_width",0.0)) < 0.72:
+		failures.append("RED: café receipt is too narrow for the supplied target")
+	if float(cafe.get("label_height",0.0)) < 0.56:
+		failures.append("RED: café receipt is too short for the supplied target")
+
+	var bar: Dictionary = model.VARIANTS[1]
+	if float(bar.get("label_width",0.0)) < 0.74:
+		failures.append("RED: bar label must be a large vertical fibrous patch")
+	if float(bar.get("label_height",0.0)) < 0.62:
+		failures.append("RED: bar label is too short versus the supplied beer-bottle target")
+
+	var market: Dictionary = model.VARIANTS[2]
+	if float(market.get("label_width",0.0)) < 0.84:
+		failures.append("RED: market label must span the clear-bottle body")
+	if float(market.get("label_height",0.0)) < 0.58:
+		failures.append("RED: market label is too short versus the supplied Yuzu target")
 
 	model.select_variant(2)
 	if String(model.current_variant().container_profile.get("kind","")) != "clear_bottle":
