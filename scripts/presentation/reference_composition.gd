@@ -12,7 +12,7 @@ const FOCUS_Y_BY_KIND := {
 	"paper_cup":0.06,
 	"sauce_jar":0.02,
 	"tin_can":0.02,
-	"clear_bottle":0.30,
+	"clear_bottle":0.42,
 	"soda_can":0.03
 }
 
