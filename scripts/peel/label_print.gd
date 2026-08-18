@@ -142,9 +142,9 @@ func _apply_market_theme() -> void:
 	_drink_label.text = "YUZU"
 	_drink_label.add_theme_font_size_override("font_size",54)
 	_drink_label.add_theme_color_override("font_color",Color(0.36,0.54,0.19,1.0))
-	_note.text = "CITRUS • 330 ml"
+	_note.text = "柚子 • CITRUS • 330 ml"
 	_note.add_theme_color_override("font_color",Color(0.27,0.40,0.16,0.82))
-	_accent.text = "●"
+	_accent.text = "✹"
 	_accent.add_theme_color_override("font_color",Color(0.93,0.77,0.16,0.94))
 	_set_bar_color(Color(0.30,0.42,0.20,0.78))
 

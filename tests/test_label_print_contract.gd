@@ -16,6 +16,17 @@ func run() -> Array[String]:
 	if not print_methods.has("set_order"):
 		failures.append("LabelPrint must expose set_order")
 
+	var print_view: SubViewport = print_script.new()
+	print_view._ready()
+	print_view.set_order("M03", "YUZU")
+	var market_note := print_view.get_node_or_null("PrintRoot/Note") as Label
+	var market_accent := print_view.get_node_or_null("PrintRoot/Accent") as Label
+	if market_note == null or not market_note.text.contains("柚子"):
+		failures.append("MARKET_ID_RED: locked yuzu reference requires a visible Japanese citrus cue on the printed label")
+	if market_accent == null or market_accent.text.strip_edges() in ["", "●"]:
+		failures.append("MARKET_ID_RED: locked market reference requires a fruit-like citrus motif, not a generic dot")
+	print_view.free()
+
 	var visual_script = load("res://scripts/peel/label_visual.gd")
 	if visual_script == null:
 		failures.append("LabelVisual script did not load")
