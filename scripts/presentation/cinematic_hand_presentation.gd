@@ -2,9 +2,9 @@ extends Node3D
 class_name CinematicHandPresentation
 
 const HAND_NAMES := ["RightHand", "LeftHand"]
-const FOREARM_RINGS := 18
-const FOREARM_SIDES := 28
-const VISIBLE_WRIST_LOCAL := Vector3(0.0,0.094,0.004)
+const FOREARM_RINGS := 22
+const FOREARM_SIDES := 32
+const VISIBLE_WRIST_LOCAL := Vector3(0.0,0.31,0.012)
 
 var _hands: Dictionary = {}
 var _cup: MeshInstance3D
@@ -75,28 +75,28 @@ func get_cinematic_forearm_span(hand_name: String = "RightHand") -> float:
 func _build_materials() -> void:
 	_skin_material = StandardMaterial3D.new()
 	_skin_material.resource_name = "CinematicHandSkin"
-	_skin_material.albedo_color = Color(0.72,0.50,0.38,1.0)
-	_skin_material.roughness = 0.53
+	_skin_material.albedo_color = Color(0.68,0.46,0.34,1.0)
+	_skin_material.roughness = 0.56
 	_skin_material.metallic = 0.0
-	_skin_material.metallic_specular = 0.34
+	_skin_material.metallic_specular = 0.36
 	_nail_material = StandardMaterial3D.new()
 	_nail_material.resource_name = "CinematicHandNail"
-	_nail_material.albedo_color = Color(0.87,0.68,0.60,1.0)
-	_nail_material.roughness = 0.40
+	_nail_material.albedo_color = Color(0.84,0.64,0.57,1.0)
+	_nail_material.roughness = 0.42
 	_nail_material.metallic = 0.0
 	_nail_material.metallic_specular = 0.42
 	_cloth_material = StandardMaterial3D.new()
 	_cloth_material.resource_name = "CinematicSleeve"
-	_cloth_material.albedo_color = Color(0.055,0.052,0.049,1.0)
-	_cloth_material.roughness = 0.92
+	_cloth_material.albedo_color = Color(0.045,0.043,0.041,1.0)
+	_cloth_material.roughness = 0.94
 	_cloth_material.metallic = 0.0
-	_cloth_material.metallic_specular = 0.08
+	_cloth_material.metallic_specular = 0.07
 	_cuff_material = StandardMaterial3D.new()
 	_cuff_material.resource_name = "CinematicSleeveCuff"
-	_cuff_material.albedo_color = Color(0.085,0.080,0.074,1.0)
-	_cuff_material.roughness = 0.95
+	_cuff_material.albedo_color = Color(0.075,0.071,0.068,1.0)
+	_cuff_material.roughness = 0.96
 	_cuff_material.metallic = 0.0
-	_cuff_material.metallic_specular = 0.07
+	_cuff_material.metallic_specular = 0.06
 
 func _bind() -> void:
 	var parent := get_parent() as Node3D
@@ -123,13 +123,7 @@ func _bind_hand(parent: Node3D, hand_name: String) -> void:
 		return
 	_hide_render_meshes(authored)
 	_apply_realtime_shell_materials(hand,shell)
-	_hands[hand_name] = {
-		"hand":hand,
-		"authored":authored,
-		"shell":shell,
-		"forearm":null,
-		"cuff":null,
-	}
+	_hands[hand_name] = {"hand":hand,"authored":authored,"shell":shell,"forearm":null,"cuff":null}
 	_build_cinematic_forearm(hand_name)
 	_enforce_render_authority(hand_name)
 
@@ -161,7 +155,7 @@ func _apply_realtime_shell_materials(hand: HandVisual, shell: Node) -> void:
 		(shell as MeshInstance3D).material_override = _skin_material
 	for child in shell.get_children():
 		_apply_realtime_shell_materials(hand,child)
-	for nail_name in ["IndexNail","ThumbNail"]:
+	for nail_name in ["RealtimeHandShell/IndexNail","RealtimeHandShell/ThumbNail"]:
 		var nail := hand.get_node_or_null(nail_name) as MeshInstance3D
 		if nail != null:
 			nail.material_override = _nail_material
@@ -179,15 +173,15 @@ func _build_cinematic_forearm(hand_name: String) -> void:
 	var outward_sign := -1.0 if start_world.x < cup_world.x else 1.0
 	if absf(start_world.x-cup_world.x) < 0.04:
 		outward_sign = -1.0 if hand_name == "RightHand" else 1.0
-	var control_a_world := start_world+Vector3(outward_sign*0.16,-0.17,0.045)
-	var control_b_world := start_world+Vector3(outward_sign*0.42,-0.36,0.090)
-	var end_world := start_world+Vector3(outward_sign*0.76,-0.59,0.135)
+	var control_a_world := start_world+Vector3(outward_sign*0.25,-0.24,0.050)
+	var control_b_world := start_world+Vector3(outward_sign*0.68,-0.62,0.115)
+	var end_world := start_world+Vector3(outward_sign*1.12,-1.02,0.180)
 	var control_a := hand.to_local(control_a_world)
 	var control_b := hand.to_local(control_b_world)
 	var end := hand.to_local(end_world)
 	var forearm := MeshInstance3D.new()
 	forearm.name = "CinematicForearm"
-	forearm.mesh = _build_curve_mesh(start,control_a,control_b,end,0.058,0.088)
+	forearm.mesh = _build_curve_mesh(start,control_a,control_b,end,0.105,0.180)
 	forearm.material_override = _cloth_material
 	forearm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	hand.add_child(forearm)
@@ -195,14 +189,14 @@ func _build_cinematic_forearm(hand_name: String) -> void:
 	var cuff := MeshInstance3D.new()
 	cuff.name = "CinematicCuff"
 	var cuff_mesh := CylinderMesh.new()
-	cuff_mesh.top_radius = 0.065
-	cuff_mesh.bottom_radius = 0.070
-	cuff_mesh.height = 0.072
-	cuff_mesh.radial_segments = 32
+	cuff_mesh.top_radius = 0.112
+	cuff_mesh.bottom_radius = 0.122
+	cuff_mesh.height = 0.085
+	cuff_mesh.radial_segments = 36
 	cuff.mesh = cuff_mesh
 	cuff.material_override = _cuff_material
 	var tangent := (control_a-start).normalized()
-	_place_cylinder(cuff,start-tangent*0.010,start+tangent*0.062)
+	_place_cylinder(cuff,start-tangent*0.012,start+tangent*0.073)
 	hand.add_child(cuff)
 	data["cuff"] = cuff
 	_hands[hand_name] = data
@@ -224,11 +218,11 @@ func _build_curve_mesh(start: Vector3, control_a: Vector3, control_b: Vector3, e
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := lerpf(start_radius,end_radius,smoothstep(0.0,1.0,t))
-		var flatten := lerpf(0.70,0.76,t)
+		var flatten := lerpf(0.74,0.82,t)
 		for side_index in range(FOREARM_SIDES):
 			var u := float(side_index)/float(FOREARM_SIDES)
 			var angle := TAU*u
-			var fold := 1.0+0.012*sin(angle*3.0+t*4.0)
+			var fold := 1.0+0.018*sin(angle*3.0+t*5.0)
 			var radial := ring_x*(cos(angle)*radius*fold)+ring_y*(sin(angle)*radius*flatten*fold)
 			vertices.append(point+radial)
 			normals.append(radial.normalized())
