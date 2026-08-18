@@ -250,7 +250,10 @@ func _build_world() -> void:
 	add_child(_left_hand)
 	_left_hand.setup(false)
 	_left_hand.snap_to(Vector3(0.60,0.22,0.40))
-	_left_hand.rotation_degrees = Vector3(14,42,45)
+	# Realtime hand geometry grows from wrist toward local -Y. Rotate the support
+	# hand so those fingers reach inward toward the cup while the wrist exits at
+	# the lower-right, matching the photographic first-person composition.
+	_left_hand.rotation_degrees = Vector3(10,36,-58)
 	_left_hand.set_pinch_amount(0.36)
 
 	_right_hand = HandVisual.new()
@@ -258,7 +261,9 @@ func _build_world() -> void:
 	add_child(_right_hand)
 	_right_hand.setup(true)
 	_right_hand.snap_to(Vector3(-0.72,0.28,0.88))
-	_right_hand.rotation_degrees = Vector3(18,-22,-8)
+	# The peel hand approaches horizontally from the lower-left: local -Y points
+	# toward the label when Z is rotated positive, rather than hanging vertically.
+	_right_hand.rotation_degrees = Vector3(14,-18,68)
 
 	_pointer = PointerAdapter.new()
 	_pointer.name = "PointerAdapter"
@@ -592,34 +597,32 @@ func _project_label_region() -> Rect2:
 	var min_p := points[0]
 	var max_p := points[0]
 	for p in points:
-		min_p.x = minf(min_p.x,p.x)
-		min_p.y = minf(min_p.y,p.y)
-		max_p.x = maxf(max_p.x,p.x)
-		max_p.y = maxf(max_p.y,p.y)
-	return Rect2(min_p,max_p-min_p).grow(8.0)
+		min_p.x = minf(min_p.x,p.x); min_p.y = minf(min_p.y,p.y)
+		max_p.x = maxf(max_p.x,p.x); max_p.y = maxf(max_p.y,p.y)
+	return Rect2(min_p,max_p-min_p).grow(18.0)
+
+func _screen_to_plane(screen_pos: Vector2, plane_z: float) -> Vector3:
+	var origin := _camera.project_ray_origin(screen_pos)
+	var direction := _camera.project_ray_normal(screen_pos)
+	if absf(direction.z)<0.0001: return origin
+	var t := (plane_z-origin.z)/direction.z
+	return origin+direction*t
 
 func _uses_crumple() -> bool:
 	if _session == null: return true
 	return String(_session.current_variant().get("post_peel_action","crumple")) == "crumple"
 
-func _disable_legacy_cafe_stage() -> void:
-	var legacy := get_node_or_null("CafePresentation") as Node3D
-	if legacy == null: return
-	legacy.visible = false
-	var old_world := legacy.get_node_or_null("WorldEnvironment") as WorldEnvironment
-	if old_world != null: old_world.environment = null
-
 func _crumple_feedback_text() -> String:
-	return "GENTLE CRUMPLE"
+	var crushed := clampf(_crumple.get_progress(),0.0,1.0)
+	if crushed > 0.92: return "FULL SQUEEZE"
+	if crushed > 0.72: return "DEEP CRUMPLE"
+	if crushed > 0.48: return "GOOD CRUMPLE"
+	return "SOFT CRUMPLE"
 
-func _screen_to_plane(screen_position: Vector2, z_depth: float) -> Vector3:
-	var origin := _camera.project_ray_origin(screen_position)
-	var direction := _camera.project_ray_normal(screen_position)
-	var plane := Plane(Vector3(0,0,1),z_depth)
-	var hit = plane.intersects_ray(origin,direction)
-	if hit == null:
-		return _label.to_global(_label.get_front_position(_controller.get_progress())+Vector3(0,0,0.28))
-	return hit
+func _disable_legacy_cafe_stage() -> void:
+	var legacy := get_node_or_null("CafePresentation")
+	if legacy != null:
+		legacy.set_process(false)
 
 func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
