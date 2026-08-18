@@ -15,9 +15,9 @@ const VARIANTS := [
 		"safe_pull_speed":5.0,
 		"tear_pull_speed":12.0,
 		"residue_gain":0.16,
-		"label_width":0.68,
-		"label_height":0.58,
-		"label_y":0.18,
+		"label_width":0.76,
+		"label_height":0.60,
+		"label_y":0.16,
 		"label_profile":{
 			"substrate":"thermal_paper",
 			"roughness":0.94,
@@ -43,7 +43,7 @@ const VARIANTS := [
 	{
 		"id":"silky_long",
 		"name":"Amber Bar Bottle",
-		"drink":"RIDGE PALE",
+		"drink":"MOUNTAIN RIDGE PALE ALE",
 		"base_adhesion":12.2,
 		"release_increment":0.013,
 		"speed_gain":0.020,
@@ -53,9 +53,9 @@ const VARIANTS := [
 		"safe_pull_speed":4.2,
 		"tear_pull_speed":9.0,
 		"residue_gain":0.24,
-		"label_width":0.90,
-		"label_height":0.35,
-		"label_y":0.00,
+		"label_width":0.80,
+		"label_height":0.66,
+		"label_y":-0.02,
 		"label_profile":{
 			"substrate":"uncoated_fiber",
 			"roughness":0.88,
@@ -70,7 +70,7 @@ const VARIANTS := [
 		"cup_color":Color(0.34,0.10,0.022),
 		"cup_shell":"amber_glass",
 		"cup_dimensions":{"top_radius":0.345,"bottom_radius":0.325,"height":1.48},
-		"container_profile":{"kind":"amber_bottle","body_color":Color(0.38,0.11,0.024),"glass_alpha":0.36,"neck_radius":0.175,"roughness":0.048},
+		"container_profile":{"kind":"amber_bottle","body_color":Color(0.38,0.11,0.024),"glass_alpha":0.42,"neck_radius":0.175,"roughness":0.055},
 		"scene_profile":{"id":"night_bar","table_color":Color(0.052,0.027,0.015),"table_roughness":0.25,"ambient_color":Color(0.055,0.028,0.018),"accent_color":Color(1.0,0.34,0.055),"light_energy":1.18},
 		"post_peel_action":"inspect",
 		"crumple_profile":{"rigidity":0.025,"dent_gain":0.0052,"max_compression":0.28},
@@ -80,7 +80,7 @@ const VARIANTS := [
 	},
 	{
 		"id":"crisp_seal",
-		"name":"Market Citrus Bottle",
+		"name":"Sparkling Yuzu",
 		"drink":"YUZU SPARKLING",
 		"base_adhesion":13.4,
 		"release_increment":0.015,
@@ -91,9 +91,9 @@ const VARIANTS := [
 		"safe_pull_speed":5.4,
 		"tear_pull_speed":11.5,
 		"residue_gain":0.19,
-		"label_width":0.88,
-		"label_height":0.38,
-		"label_y":-0.02,
+		"label_width":0.92,
+		"label_height":0.62,
+		"label_y":-0.04,
 		"label_profile":{
 			"substrate":"coated_citrus",
 			"roughness":0.66,
@@ -108,7 +108,7 @@ const VARIANTS := [
 		"cup_color":Color(0.84,0.95,0.94),
 		"cup_shell":"clear_glass",
 		"cup_dimensions":{"top_radius":0.335,"bottom_radius":0.315,"height":1.52},
-		"container_profile":{"kind":"clear_bottle","body_color":Color(0.94,0.985,0.98),"glass_alpha":0.16,"neck_radius":0.17,"liquid_color":Color(0.91,0.93,0.70),"roughness":0.040},
+		"container_profile":{"kind":"clear_bottle","body_color":Color(0.94,0.985,0.98),"glass_alpha":0.20,"neck_radius":0.17,"liquid_color":Color(0.91,0.93,0.70),"roughness":0.045},
 		"scene_profile":{"id":"market_coldcase","table_color":Color(0.76,0.77,0.75),"table_roughness":0.38,"ambient_color":Color(0.60,0.67,0.72),"accent_color":Color(0.70,0.90,1.0),"light_energy":1.02},
 		"post_peel_action":"inspect",
 		"crumple_profile":{"rigidity":0.055,"dent_gain":0.0035,"max_compression":0.18},
@@ -166,9 +166,6 @@ func restart_run() -> void:
 	_unlocked_count = 1
 
 func _unlock_count_for(clean_peels: int) -> int:
-	# The showcase is a short three-scene tactile sequence, not a grind gate.
-	# One clean completion unlocks the next scene so Continue always moves the
-	# player forward: Café -> Bar -> Market -> Café.
 	if clean_peels >= 2: return 3
 	if clean_peels >= 1: return 2
 	return 1
