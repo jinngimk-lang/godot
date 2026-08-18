@@ -1,9 +1,11 @@
 extends Node
 class_name HudChromePresentation
 
+const GOLD := Color(1.0,0.66,0.08,1.0)
+
 var _applied := false
 var _progress_copy: Label
-var _objective_copy: Label
+var _progress_bar: ProgressBar
 var _controls_copy: Label
 var _how_to_copy: Label
 
@@ -16,36 +18,42 @@ func _process(_delta: float) -> void:
 	if layer == null or legacy == null:
 		return
 	if not _applied:
-		_build_ui(layer, legacy)
-	_refresh_status(root, legacy.text)
+		_build_ui(layer,legacy)
+	_refresh_status(root,legacy.text)
 
 func _build_ui(layer: CanvasLayer, legacy: Label) -> void:
 	legacy.visible = false
 
-	var progress_panel := _panel("ProgressPanel", Vector2(16,16), Vector2(300,104))
+	var progress_panel := _panel("ProgressPanel",Vector2(24,22),Vector2(318,118))
 	layer.add_child(progress_panel)
-	_progress_copy = _label("ProgressCopy", Vector2(14,10), Vector2(272,82), 17)
+	_progress_copy = _label("ProgressCopy",Vector2(14,10),Vector2(288,54),18)
+	_progress_copy.add_theme_font_size_override("font_size",18)
 	progress_panel.add_child(_progress_copy)
+	_progress_bar = ProgressBar.new()
+	_progress_bar.name = "ProgressBar"
+	_progress_bar.position = Vector2(14,78)
+	_progress_bar.size = Vector2(288,16)
+	_progress_bar.min_value = 0.0
+	_progress_bar.max_value = 100.0
+	_progress_bar.value = 0.0
+	_progress_bar.show_percentage = false
+	_progress_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_progress_bar.add_theme_stylebox_override("background",_bar_track_style())
+	_progress_bar.add_theme_stylebox_override("fill",_bar_fill_style())
+	progress_panel.add_child(_progress_bar)
 
-	var objective_panel := _panel("ObjectivePanel", Vector2(16,134), Vector2(224,184))
-	layer.add_child(objective_panel)
-	_objective_copy = _label("ObjectiveCopy", Vector2(14,12), Vector2(196,158), 13)
-	_objective_copy.text = "OBJECTIVE\n\n○ Remove as much of the label as you can\n\n○ Minimize residue left on the product\n\n○ Keep the label in one piece"
-	objective_panel.add_child(_objective_copy)
-
-	var controls_panel := _panel("ControlsPanel", Vector2(1010,16), Vector2(254,108))
+	var controls_panel := _panel("ControlsPanel",Vector2(24,158),Vector2(268,278))
 	layer.add_child(controls_panel)
-	_controls_copy = _label("ControlsCopy", Vector2(13,10), Vector2(228,88), 12)
-	_controls_copy.text = "LMB  Grab / Peel\nRMB  Rotate product\nR Inspect / return   T Reset\n1/2/3 Scene   Esc Pause"
+	_controls_copy = _label("ControlsCopy",Vector2(16,14),Vector2(236,248),16)
+	_controls_copy.text = "LMB     Peel\n\nRMB     Rotate\n\nWheel   Zoom\n\nR       Reset\n\n1 2 3 4 5   Change Scene\n\nEsc     Pause / Menu"
 	controls_panel.add_child(_controls_copy)
 
-	var how_to_panel := _panel("HowToPanel", Vector2(1010,138), Vector2(254,350))
+	var how_to_panel := _panel("HowToPanel",Vector2(982,22),Vector2(274,520))
 	layer.add_child(how_to_panel)
-	_how_to_copy = _label("HowToCopy", Vector2(14,12), Vector2(226,326), 13)
-	_how_to_copy.text = "HOW TO PLAY\n\n1. GRAB EDGE\nClick and hold the visible label edge.\n\n2. PEEL GENTLY\nDrag slowly so the paper follows your hand.\n\n3. INSPECT\nPress R or rotate with RMB to check residue.\n\n4. CLEAN PEEL\nRemove the label with minimal residue and tearing."
+	_how_to_copy = _label("HowToCopy",Vector2(16,14),Vector2(242,490),15)
+	_how_to_copy.text = "HOW TO PLAY\n\n1   GRAB EDGE\nMove the cursor to a corner or edge of the label.\n\n2   PEEL GENTLY\nClick and drag slowly. The real label follows the cursor.\n\n3   INSPECT\nRMB drag to rotate. Use Wheel to zoom and inspect residue.\n\n4   CLEAN PEEL\nRemove the label with minimal residue and tearing."
 	_how_to_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	how_to_panel.add_child(_how_to_copy)
-
 	_applied = true
 
 func _refresh_status(root: Node, fallback_text: String) -> void:
@@ -53,30 +61,21 @@ func _refresh_status(root: Node, fallback_text: String) -> void:
 		return
 	var session = root.get("_session")
 	var controller = root.get("_controller")
-	var paused := bool(root.get("_paused")) if root.get("_paused") != null else false
+	var paused_value = root.get("_paused")
+	var paused := bool(paused_value) if paused_value != null else false
+	var progress := 0.0
+	var scene_name := "COFFEE SHOP"
 	if session != null and session.has_method("current_variant"):
 		var variant: Dictionary = session.current_variant()
-		var name := String(variant.get("name","Peel Calm"))
-		var progress := float(controller.get_progress()) if controller != null and controller.has_method("get_progress") else 0.0
-		# Capture fixtures stage the real LabelVisual/hand/residue directly while
-		# leaving PeelController untouched. Preserve that exact staged percentage
-		# from the hidden legacy status so screenshot evidence never lies about the
-		# frame being inspected. Normal gameplay writes the same value to both.
+		scene_name = String(variant.get("name","Coffee Shop")).to_upper()
+		progress = float(controller.get_progress()) if controller != null and controller.has_method("get_progress") else 0.0
 		progress = maxf(progress,_parse_legacy_progress(fallback_text))
-		var residue := float(controller.get_residue()) if controller != null and controller.has_method("get_residue") else 0.0
-		var integrity := float(controller.get_integrity()) if controller != null and controller.has_method("get_integrity") else 1.0
-		var state := "PAUSED" if paused else "Peel Progress %d%%" % int(round(progress*100.0))
-		_progress_copy.text = "%s\n%s\nResidue %d%%   Intactness %d%%" % [name,state,int(round(residue*100.0)),int(round(integrity*100.0))]
-		return
-
-	var lines := fallback_text.split("\n",false)
-	var title := "PEEL CALM"
-	var status := "Peel Progress 0%"
-	if lines.size() > 0:
-		title = String(lines[0]).get_slice("•",0).strip_edges()
-	if lines.size() > 1:
-		status = String(lines[1]).get_slice("•",0).strip_edges().replace("Peel ","Peel Progress ")
-	_progress_copy.text = "%s\n%s" % [title,status]
+	else:
+		progress = _parse_legacy_progress(fallback_text)
+	var percent := int(round(progress*100.0))
+	_progress_copy.text = "SCENE: %s\n%s" % [scene_name,"PAUSED" if paused else "Peel Progress %d%%" % percent]
+	if _progress_bar != null:
+		_progress_bar.value = float(percent)
 
 func _parse_legacy_progress(text: String) -> float:
 	var marker := "Peel "
@@ -108,21 +107,33 @@ func _label(node_name: String, at: Vector2, label_size: Vector2, font_size: int)
 	label.size = label_size
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size",font_size)
-	label.add_theme_color_override("font_color",Color(0.98,0.97,0.94,0.94))
-	label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.62))
+	label.add_theme_color_override("font_color",Color(0.985,0.975,0.95,0.97))
+	label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.70))
 	label.add_theme_constant_override("shadow_offset_x",1)
 	label.add_theme_constant_override("shadow_offset_y",1)
 	return label
 
 func _glass_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.018,0.017,0.016,0.56)
-	style.border_color = Color(1.0,1.0,1.0,0.12)
+	style.bg_color = Color(0.018,0.017,0.016,0.68)
+	style.border_color = Color(1.0,0.86,0.64,0.14)
 	style.set_border_width_all(1)
 	style.corner_radius_top_left = 10
 	style.corner_radius_top_right = 10
 	style.corner_radius_bottom_left = 10
 	style.corner_radius_bottom_right = 10
-	style.shadow_color = Color(0,0,0,0.24)
+	style.shadow_color = Color(0,0,0,0.28)
 	style.shadow_size = 6
+	return style
+
+func _bar_track_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08,0.075,0.07,0.94)
+	style.corner_radius_top_left = 8; style.corner_radius_top_right = 8; style.corner_radius_bottom_left = 8; style.corner_radius_bottom_right = 8
+	return style
+
+func _bar_fill_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = GOLD
+	style.corner_radius_top_left = 8; style.corner_radius_top_right = 8; style.corner_radius_bottom_left = 8; style.corner_radius_bottom_right = 8
 	return style
