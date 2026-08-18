@@ -44,18 +44,27 @@ func _apply_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	if _active_profile_id in ["market_coldcase","market_can"]:
-		env.background_color = Color(0.62,0.67,0.70)
-		env.ambient_light_color = Color(0.78,0.87,0.94)
-		env.ambient_light_energy = 0.68
-	elif _active_profile_id in ["pantry_jar","pantry_tin"]:
-		env.background_color = Color(0.16,0.11,0.075)
-		env.ambient_light_color = Color(0.58,0.43,0.31)
-		env.ambient_light_energy = 0.50
-	else:
-		env.background_color = Color(0.13,0.09,0.055)
-		env.ambient_light_color = Color(0.64,0.43,0.25)
-		env.ambient_light_energy = 0.54
+	match _active_profile_id:
+		"pantry_jar":
+			env.background_color = Color(0.34,0.27,0.20)
+			env.ambient_light_color = Color(0.93,0.78,0.61)
+			env.ambient_light_energy = 0.62
+		"pantry_tin":
+			env.background_color = Color(0.20,0.20,0.19)
+			env.ambient_light_color = Color(0.73,0.73,0.69)
+			env.ambient_light_energy = 0.52
+		"market_coldcase":
+			env.background_color = Color(0.63,0.69,0.72)
+			env.ambient_light_color = Color(0.83,0.91,0.98)
+			env.ambient_light_energy = 0.76
+		"market_can":
+			env.background_color = Color(0.24,0.34,0.34)
+			env.ambient_light_color = Color(0.69,0.88,0.86)
+			env.ambient_light_energy = 0.66
+		_:
+			env.background_color = Color(0.13,0.085,0.045)
+			env.ambient_light_color = Color(0.70,0.47,0.25)
+			env.ambient_light_energy = 0.58
 	_world.environment = env
 
 func _apply_parent_stage(profile: Dictionary) -> void:
@@ -69,9 +78,6 @@ func _apply_parent_stage(profile: Dictionary) -> void:
 		table_mat.roughness = clampf(float(profile.get("table_roughness",0.54)),0.05,1.0)
 		table.material_override = table_mat
 
-	# The approved Coffee Shop mockup uses warm kraft paper, not a nearly white
-	# takeaway cup. Apply this after ProductPresentation has created the live paper
-	# shader so the order sticker remains the lighter focal surface.
 	if _active_profile_id == "cafe_window":
 		var cup := parent.get_node_or_null("Cup") as MeshInstance3D
 		if cup != null and cup.material_override is ShaderMaterial:
@@ -80,10 +86,59 @@ func _apply_parent_stage(profile: Dictionary) -> void:
 	var key := parent.get_node_or_null("KeyLight") as DirectionalLight3D
 	var fill := parent.get_node_or_null("FillLight") as OmniLight3D
 	var rim := parent.get_node_or_null("RimLight") as OmniLight3D
+	var base_energy := float(profile.get("light_energy",1.0))
 	if key != null:
 		key.shadow_enabled = false
-		key.light_energy = float(profile.get("light_energy",1.0))*0.72
-	if fill != null:
-		fill.light_energy = float(profile.get("light_energy",1.0))*0.62
-	if rim != null:
-		rim.light_energy = float(profile.get("light_energy",1.0))*0.42
+	if key == null or fill == null or rim == null:
+		return
+	match _active_profile_id:
+		"pantry_jar":
+			key.rotation_degrees = Vector3(-48,-28,0)
+			key.light_color = Color(1.0,0.82,0.64)
+			key.light_energy = base_energy*0.83
+			fill.position = Vector3(-1.65,1.45,2.1)
+			fill.light_color = Color(1.0,0.91,0.78)
+			fill.light_energy = base_energy*0.72
+			rim.position = Vector3(1.40,1.25,-0.70)
+			rim.light_color = Color(0.86,0.72,0.54)
+			rim.light_energy = base_energy*0.38
+		"pantry_tin":
+			key.rotation_degrees = Vector3(-52,-18,0)
+			key.light_color = Color(0.92,0.92,0.88)
+			key.light_energy = base_energy*0.78
+			fill.position = Vector3(-1.3,1.55,1.85)
+			fill.light_color = Color(0.78,0.82,0.84)
+			fill.light_energy = base_energy*0.60
+			rim.position = Vector3(1.55,1.15,-0.55)
+			rim.light_color = Color(1.0,0.78,0.52)
+			rim.light_energy = base_energy*0.52
+		"market_coldcase":
+			key.rotation_degrees = Vector3(-44,-30,0)
+			key.light_color = Color(0.90,0.96,1.0)
+			key.light_energy = base_energy*0.92
+			fill.position = Vector3(-1.65,1.80,2.25)
+			fill.light_color = Color(0.82,0.94,1.0)
+			fill.light_energy = base_energy*0.82
+			rim.position = Vector3(1.55,1.45,-0.65)
+			rim.light_color = Color(0.72,0.91,1.0)
+			rim.light_energy = base_energy*0.58
+		"market_can":
+			key.rotation_degrees = Vector3(-40,-40,0)
+			key.light_color = Color(0.86,1.0,0.95)
+			key.light_energy = base_energy*0.88
+			fill.position = Vector3(-1.8,1.65,2.0)
+			fill.light_color = Color(0.65,0.91,0.90)
+			fill.light_energy = base_energy*0.72
+			rim.position = Vector3(1.7,1.30,-0.7)
+			rim.light_color = Color(0.42,0.90,0.90)
+			rim.light_energy = base_energy*0.66
+		_:
+			key.rotation_degrees = Vector3(-47,-34,0)
+			key.light_color = Color(1.0,0.76,0.47)
+			key.light_energy = base_energy*0.82
+			fill.position = Vector3(-1.8,1.7,2.2)
+			fill.light_color = Color(1.0,0.87,0.66)
+			fill.light_energy = base_energy*0.68
+			rim.position = Vector3(1.65,1.40,-0.85)
+			rim.light_color = Color(1.0,0.58,0.26)
+			rim.light_energy = base_energy*0.48
