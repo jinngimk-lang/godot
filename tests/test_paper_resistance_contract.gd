@@ -67,6 +67,23 @@ func run() -> Array[String]:
 				failures.append("paper backing thickness should remain visible but thin, got %.4f" % thickness)
 			if roughness < 0.90:
 				failures.append("paper backing should be matte/fibrous, got roughness %.3f" % roughness)
+		# Target-image contract: the approved object-only mockup lifts a stiff paper
+		# flap from the LEFT edge and advances the bond front toward the right. At
+		# 38% gameplay progress only about the left quarter should be visually free.
+		if not corner.has_method("peel_side") or String(corner.call("peel_side")) != "left":
+			failures.append("PAPER_SILHOUETTE_RED: visible peel must originate from the left edge")
+		if not corner.has_method("peel_front_u_for_progress"):
+			failures.append("PAPER_SILHOUETTE_RED: corner renderer needs a deterministic left-to-right peel front")
+		else:
+			var start_u: float = float(corner.call("peel_front_u_for_progress",0.0))
+			var mid_u: float = float(corner.call("peel_front_u_for_progress",0.38))
+			var full_u: float = float(corner.call("peel_front_u_for_progress",1.0))
+			if start_u > 0.02:
+				failures.append("left-edge peel front must begin at u=0, got %.3f" % start_u)
+			if mid_u < 0.18 or mid_u > 0.30:
+				failures.append("38%% target silhouette should release only the left quarter, got u=%.3f" % mid_u)
+			if full_u < 0.999:
+				failures.append("full peel front must reach the right edge")
 		corner.free()
 
 	var backdrop_script = load("res://scripts/presentation/reference_backdrop.gd")
