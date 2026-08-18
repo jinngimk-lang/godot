@@ -8,31 +8,34 @@ func _ready() -> void:
 	_shader = load("res://art/shaders/reference_table.gdshader") as Shader
 
 func profile_parameters(profile_id: String) -> Dictionary:
-	if profile_id == "night_bar":
+	if profile_id in ["market_coldcase","market_can"]:
 		return {
-			"base_color": Vector3(0.105,0.045,0.018),
-			"roughness_value": 0.23,
-			"grain_strength": 0.16,
-			"grain_scale": 72.0,
-			"stone_mode": 0.0,
-			"grain_bump_strength": 0.034
+			"base_color": Vector3(0.76,0.75,0.71) if profile_id == "market_coldcase" else Vector3(0.42,0.36,0.29),
+			"roughness_value": 0.34 if profile_id == "market_coldcase" else 0.32,
+			"grain_strength": 0.018 if profile_id == "market_coldcase" else 0.10,
+			"grain_scale": 18.0 if profile_id == "market_coldcase" else 55.0,
+			"stone_mode": 1.0 if profile_id == "market_coldcase" else 0.0,
+			"grain_bump_strength": 0.022 if profile_id == "market_coldcase" else 0.030,
+			"surface_alpha": 0.42
 		}
-	if profile_id == "market_coldcase":
+	if profile_id in ["pantry_jar","pantry_tin"]:
 		return {
-			"base_color": Vector3(0.72,0.71,0.67),
-			"roughness_value": 0.38,
-			"grain_strength": 0.018,
-			"grain_scale": 18.0,
-			"stone_mode": 1.0,
-			"grain_bump_strength": 0.024
+			"base_color": Vector3(0.30,0.19,0.10),
+			"roughness_value": 0.36,
+			"grain_strength": 0.16,
+			"grain_scale": 64.0,
+			"stone_mode": 0.0,
+			"grain_bump_strength": 0.038,
+			"surface_alpha": 0.46
 		}
 	return {
-		"base_color": Vector3(0.26,0.105,0.035),
-		"roughness_value": 0.40,
-		"grain_strength": 0.12,
-		"grain_scale": 58.0,
+		"base_color": Vector3(0.34,0.15,0.050),
+		"roughness_value": 0.30,
+		"grain_strength": 0.21,
+		"grain_scale": 70.0,
 		"stone_mode": 0.0,
-		"grain_bump_strength": 0.044
+		"grain_bump_strength": 0.040,
+		"surface_alpha": 0.46
 	}
 
 func _process(_delta: float) -> void:
