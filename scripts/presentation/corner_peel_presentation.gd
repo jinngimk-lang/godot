@@ -76,6 +76,29 @@ func peel_side() -> String:
 func peel_front_u_for_progress(progress: float) -> float:
 	return visual_progress_for_gameplay(progress)
 
+func row_front_u_for_progress(progress: float, v: float) -> float:
+	var p := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	var row_v := clampf(v if is_finite(v) else 0.5,0.0,1.0)
+	if p >= 0.999:
+		return 1.0
+	if p <= 0.0001:
+		return 0.0
+	var base_front := peel_front_u_for_progress(p)
+	# The direct Coffee/Supermarket targets peel from a localized grip on the
+	# left edge, not as a full-height curtain. Early/mid progress therefore has
+	# a bell-shaped vertical envelope centred slightly below label mid-height.
+	var center_v := 0.44
+	var radius := 0.19+0.37*p
+	var normalized_distance := absf(row_v-center_v)/maxf(radius,0.001)
+	var envelope := 1.0-_smooth01(normalized_distance)
+	# Only late in the gesture should the release spread toward every row. This
+	# keeps 30–50% screenshots as a believable wedge while guaranteeing full
+	# detachment as progress approaches completion.
+	var full_height_mix := _smooth01((p-0.70)/0.285)
+	envelope = lerpf(envelope,1.0,full_height_mix)
+	var variation := (sin(row_v*17.0+0.7)+0.4*sin(row_v*37.0+1.3))*0.005*envelope
+	return clampf(base_front*envelope+variation,0.0,1.0)
+
 func get_visual_grip_world_position() -> Vector3:
 	return to_global(_visual_grip_local)
 
@@ -155,13 +178,6 @@ func _sync_texture() -> void:
 	if _front_material != null and _print != null:
 		_front_material.set_shader_parameter("print_texture",_print.get_texture())
 
-func _row_front_u(base_front: float, v: float) -> float:
-	if base_front <= 0.001 or base_front >= 0.999:
-		return base_front
-	# Subtle torn/bond-front irregularity, not the old diagonal staircase.
-	var variation := (sin(v*13.0+0.7)+0.45*sin(v*31.0+1.9))*0.006
-	return clampf(base_front+variation,0.0,1.0)
-
 func _smooth01(value: float) -> float:
 	var t := clampf(value,0.0,1.0)
 	return t*t*(3.0-2.0*t)
@@ -171,10 +187,9 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 		return
 	var cup_mesh := _cup.mesh as CylinderMesh
 	var full_release := progress >= 0.999
-	var front_base := peel_front_u_for_progress(progress)
-	# Keep a barely lifted discoverable lip at rest while preserving the pure
-	# progress contract u=0. This is visual affordance only, not gameplay progress.
-	var geometry_front_base := 1.0 if full_release else maxf(front_base,0.012)
+	# Keep a barely lifted, localized discoverable lip at rest without granting
+	# gameplay progress. The public row-front contract still reports zero at 0%.
+	var geometry_progress := 1.0 if full_release else maxf(progress,0.025)
 
 	var safe_drag := drag_delta
 	var max_drag := minf(maxf(_label.label_width*0.10,0.055),0.12)
@@ -200,7 +215,7 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 	for v_index in range(V_SEGMENTS+1):
 		var v := float(v_index)/float(V_SEGMENTS)
 		var y := _label.label_y-_label.label_height*0.5+_label.label_height*v
-		var front_u := _row_front_u(geometry_front_base,v)
+		var front_u := row_front_u_for_progress(geometry_progress,v)
 		var front_attached := CupSurface.attached_point_on_frustum(front_u,_label.label_width,y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
 		var front_normal := CupSurface.frustum_surface_normal(front_attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
 		var tangent := Vector3(front_normal.z,0.0,-front_normal.x).normalized()
@@ -217,7 +232,7 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 			var u := float(u_index)/float(U_SEGMENTS)
 			var attached := CupSurface.attached_point_on_frustum(u,_label.label_width,y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
 			var outward := CupSurface.frustum_surface_normal(attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
-			var is_free := full_release or u < front_u
+			var is_free := full_release or (front_u>0.0001 and u<front_u)
 			var moved := attached
 			var flap_normal := outward
 			if is_free:
@@ -226,13 +241,12 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 				var distance_from_front := maxf(front_u-u,0.0)*_label.label_width
 				var bend_width := maxf(_bend_band_ratio*_label.label_width,0.025)
 				var bend_weight := _smooth01(distance_from_front/bend_width)
-				# Preserve paper width in the tangent plane. Cursor movement changes the
-				# lift/pose only within a small bounded range; it cannot stretch the sheet.
 				var flat_sheet := front_attached-tangent*distance_from_front
 				var cursor_pose := tangent*drag_tangent*free_ratio+Vector3.UP*drag_vertical*free_ratio
-				var free_edge_curl := pow(free_ratio,2.2)
-				var curl_lift := front_normal*(lift_max*bend_weight+0.055*free_edge_curl)
-				var curl_drop := Vector3.DOWN*(_label.label_height*0.16*free_edge_curl)
+				var free_edge_curl := pow(free_ratio,2.15)
+				var vertical_wedge := 1.0-clampf(absf(v-0.44)/0.60,0.0,1.0)
+				var curl_lift := front_normal*(lift_max*bend_weight+0.058*free_edge_curl*vertical_wedge)
+				var curl_drop := Vector3.DOWN*(_label.label_height*0.13*free_edge_curl*vertical_wedge)
 				moved = flat_sheet+cursor_pose+curl_lift+curl_drop
 				flap_normal = front_normal
 			base_positions.append(attached)
@@ -250,10 +264,10 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 	var row := U_SEGMENTS+1
 	for v_index in range(V_SEGMENTS):
 		var center_v := (float(v_index)+0.5)/float(V_SEGMENTS)
-		var front_u := _row_front_u(geometry_front_base,center_v)
+		var front_u := row_front_u_for_progress(geometry_progress,center_v)
 		for u_index in range(U_SEGMENTS):
 			var center_u := (float(u_index)+0.5)/float(U_SEGMENTS)
-			var target := flap_indices if full_release or center_u<front_u else base_indices
+			var target := flap_indices if full_release or (front_u>0.0001 and center_u<front_u) else base_indices
 			var a := v_index*row+u_index
 			var b := a+1
 			var d := (v_index+1)*row+u_index
@@ -273,9 +287,7 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(adhesive_positions,adhesive_normals,uvs,flap_indices))
 		mesh.surface_set_material(mesh.get_surface_count()-1,_adhesive_material)
 	_visual.mesh = mesh
-	# The pointer/hand cursor follows the free LEFT edge around mid-height, matching
-	# the approved practical target instead of jumping to the old top-right corner.
-	var grip_row := clampi(int(round(float(V_SEGMENTS)*0.42)),0,V_SEGMENTS)
+	var grip_row := clampi(int(round(float(V_SEGMENTS)*0.44)),0,V_SEGMENTS)
 	var grip_index := grip_row*(U_SEGMENTS+1)
 	_visual_grip_local = flap_positions[grip_index]
 
