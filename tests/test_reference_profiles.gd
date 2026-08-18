@@ -34,8 +34,8 @@ func run() -> Array[String]:
 			failures.append("PROFILE_RED: variant %d label must remain a large tactile hero patch" % i)
 		if composition != null:
 			var fov := float(composition.target_fov_for_kind(expected_kinds[i]))
-			if fov < 37.0 or fov > 45.0:
-				failures.append("PROFILE_RED: %s hero framing must stay within 37-45 degrees, got %.2f" % [expected_kinds[i],fov])
+			if fov < 34.0 or fov > 42.0:
+				failures.append("PROFILE_RED: %s hero framing must stay within close 34-42 degree reference range, got %.2f" % [expected_kinds[i],fov])
 
 	for i in range(5):
 		model.select_variant(i)
