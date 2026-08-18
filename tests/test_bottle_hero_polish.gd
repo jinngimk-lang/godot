@@ -11,7 +11,7 @@ func run() -> Array[String]:
 		polish.free()
 		return failures
 	polish.call("build_preview_for_kind","clear_bottle")
-	for detail_name in ["BottleMetalCap","BottleNeckRing","BottleHighlightLeft","BottleHighlightRight"]:
+	for detail_name in ["BottleMetalCap","BottleNeckRing","BottleHighlightLeft","BottleHighlightRight","BottleLiquidHero"]:
 		if polish.get_node_or_null(detail_name) == null:
 			failures.append("BOTTLE_HERO_RED: clear bottle missing target cue %s" % detail_name)
 	if not polish.has_method("get_visual_contract"):
@@ -26,6 +26,10 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_HERO_RED: target glass center must stay optically clear, not milky")
 		if float(contract.get("liquid_alpha",0.0)) < 0.42:
 			failures.append("BOTTLE_HERO_RED: pale Yuzu liquid must read separately through clear glass")
+		if float(contract.get("liquid_top_y",0.0)) < 0.68:
+			failures.append("BOTTLE_HERO_RED: Yuzu liquid should rise into the shoulder like the target bottle")
+		if String(contract.get("liquid_shape","")) != "shouldered":
+			failures.append("BOTTLE_HERO_RED: Yuzu liquid needs a shouldered bottle-following volume, not a floating cylinder")
 		if float(contract.get("target_focus_y",0.0)) < 0.24:
 			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
 	polish.free()
