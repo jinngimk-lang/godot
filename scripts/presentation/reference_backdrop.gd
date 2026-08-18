@@ -1,11 +1,12 @@
 extends Sprite3D
 class_name ReferenceBackdrop
 
+const TARGET_WORLD_WIDTH := 8.40
 const BASE_POSITION := Vector3(0.0,0.72,-1.43)
 const PROFILES := {
 	"cafe_window":{
 		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
-		"world_width":8.40,
+		"world_width":TARGET_WORLD_WIDTH,
 		"offset":Vector2(0.0,0.0),
 		"modulate":Color(0.94,0.92,0.89,1.0)
 	},
@@ -23,7 +24,7 @@ const PROFILES := {
 	},
 	"market_coldcase":{
 		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":8.40,
+		"world_width":TARGET_WORLD_WIDTH,
 		"offset":Vector2(0.0,0.02),
 		"modulate":Color(0.98,0.985,0.99,1.0)
 	},
@@ -66,7 +67,7 @@ func profile_visual_signature(profile_id: String) -> String:
 	var tint: Color = profile.get("modulate",Color.WHITE)
 	return "%s|%.2f|%.2f,%.2f|%.2f,%.2f,%.2f" % [
 		String(profile.get("texture","")),
-		float(profile.get("world_width",8.4)),
+		float(profile.get("world_width",TARGET_WORLD_WIDTH)),
 		offset.x,offset.y,
 		tint.r,tint.g,tint.b
 	]
@@ -79,7 +80,7 @@ func _apply(profile_id: String) -> void:
 	var loaded := load(String(profile.get("texture",""))) as Texture2D
 	if loaded != null:
 		texture = loaded
-		pixel_size = float(profile.get("world_width",8.40))/maxf(float(loaded.get_width()),1.0)
+		pixel_size = float(profile.get("world_width",TARGET_WORLD_WIDTH))/maxf(float(loaded.get_width()),1.0)
 	var offset: Vector2 = profile.get("offset",Vector2.ZERO)
 	position = BASE_POSITION+Vector3(offset.x,offset.y,0.0)
 	var tint_value = profile.get("modulate",Color.WHITE)
