@@ -29,6 +29,9 @@ func _init(config: Dictionary = {}) -> void:
 	_residue_gain = clampf(_finite_or(float(config.get("residue_gain", 0.18)), 0.18), 0.0, 2.0)
 	_breakaway_multiplier = clampf(_finite_or(float(config.get("breakaway_multiplier",1.18)),1.18),1.0,1.8)
 
+func set_breakaway_multiplier(value: float) -> void:
+	_breakaway_multiplier = clampf(_finite_or(value,1.18),1.0,1.8)
+
 func reset() -> void:
 	_progress = 0.0
 	_completion_emitted = false
@@ -74,14 +77,7 @@ func step(tension: float, pull_speed: float, peel_angle: float, delta: float, re
 		_completion_emitted = true
 		completed_now = true
 
-	return {
-		"progress": _progress,
-		"released": maxf(_progress - previous, 0.0),
-		"completed_now": completed_now,
-		"bond_load": _bond_load,
-		"integrity": _integrity,
-		"residue": _residue
-	}
+	return {"progress":_progress,"released":maxf(_progress-previous,0.0),"completed_now":completed_now,"bond_load":_bond_load,"integrity":_integrity,"residue":_residue}
 
 func get_progress() -> float: return _progress
 func get_bond_load() -> float: return _bond_load
@@ -90,18 +86,7 @@ func get_residue() -> float: return _residue
 func is_complete() -> bool: return _progress >= 1.0
 
 func get_config() -> Dictionary:
-	return {
-		"base_adhesion": _base_adhesion,
-		"release_increment": _release_increment,
-		"speed_gain": _speed_gain,
-		"angle_gain": _angle_gain,
-		"bond_response": _bond_response,
-		"bond_relaxation": _bond_relaxation,
-		"safe_pull_speed": _safe_pull_speed,
-		"tear_pull_speed": _tear_pull_speed,
-		"residue_gain": _residue_gain,
-		"breakaway_multiplier":_breakaway_multiplier
-	}
+	return {"base_adhesion":_base_adhesion,"release_increment":_release_increment,"speed_gain":_speed_gain,"angle_gain":_angle_gain,"bond_response":_bond_response,"bond_relaxation":_bond_relaxation,"safe_pull_speed":_safe_pull_speed,"tear_pull_speed":_tear_pull_speed,"residue_gain":_residue_gain,"breakaway_multiplier":_breakaway_multiplier}
 
 func _finite_or(value: float, fallback: float) -> float:
 	if is_nan(value) or is_inf(value): return fallback
