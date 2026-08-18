@@ -36,9 +36,6 @@ func _ensure_built() -> void:
 	_world = WorldEnvironment.new()
 	_world.name = "ReferenceEnvironment"
 	add_child(_world)
-	# These roots are intentionally lightweight. The photographic backdrop owns
-	# environmental detail; VenuePresentation owns only semantic scene state,
-	# ambient response and the real-time hero/table lighting.
 	_cafe = Node3D.new(); _cafe.name = "CafeWindows"; add_child(_cafe)
 	_pantry = Node3D.new(); _pantry.name = "BarBackShelf"; add_child(_pantry)
 	_market = Node3D.new(); _market.name = "MarketCooler"; add_child(_market)
@@ -70,8 +67,16 @@ func _apply_parent_stage(profile: Dictionary) -> void:
 		var table_mat := StandardMaterial3D.new()
 		table_mat.albedo_color = Color(profile.get("table_color",Color(0.22,0.115,0.055)))
 		table_mat.roughness = clampf(float(profile.get("table_roughness",0.54)),0.05,1.0)
-		table_mat.metallic = 0.0
 		table.material_override = table_mat
+
+	# The approved Coffee Shop mockup uses warm kraft paper, not a nearly white
+	# takeaway cup. Apply this after ProductPresentation has created the live paper
+	# shader so the order sticker remains the lighter focal surface.
+	if _active_profile_id == "cafe_window":
+		var cup := parent.get_node_or_null("Cup") as MeshInstance3D
+		if cup != null and cup.material_override is ShaderMaterial:
+			(cup.material_override as ShaderMaterial).set_shader_parameter("paper_color",Color(0.70,0.58,0.46,1.0))
+
 	var key := parent.get_node_or_null("KeyLight") as DirectionalLight3D
 	var fill := parent.get_node_or_null("FillLight") as OmniLight3D
 	var rim := parent.get_node_or_null("RimLight") as OmniLight3D
