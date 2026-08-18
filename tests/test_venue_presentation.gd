@@ -11,7 +11,7 @@ func run() -> Array[String]:
 		venue.apply_profile({"id":id,"table_color":Color(0.28,0.22,0.18),"table_roughness":0.55})
 		if venue.get_active_profile_id() != id:
 			failures.append("VENUE_RED: venue should activate %s" % id)
-		var count_before := venue.get_child_count()
+		var count_before: int = int(venue.get_child_count())
 		venue.apply_profile({"id":id,"table_color":Color(0.28,0.22,0.18),"table_roughness":0.55})
 		if venue.get_child_count() != count_before:
 			failures.append("VENUE_RED: %s application must be idempotent" % id)
