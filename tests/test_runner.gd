@@ -18,6 +18,7 @@ func _init() -> void:
 		"res://tests/test_tactile_peel_pacing.gd",
 		"res://tests/test_paper_resistance_contract.gd",
 		"res://tests/test_substrate_peel_feel.gd",
+		"res://tests/test_paper_surface_shader.gd",
 		"res://tests/test_label_visual_geometry.gd",
 		"res://tests/test_label_lifecycle.gd",
 		"res://tests/test_label_visual_v2.gd",
