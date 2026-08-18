@@ -3,15 +3,13 @@ class_name CornerPeelPresentation
 
 const U_SEGMENTS := 30
 const V_SEGMENTS := 20
-const SURFACE_OFFSET := 0.024
-const PAPER_THICKNESS := 0.0026
+const SURFACE_OFFSET := 0.025
 
 var _label: LabelVisual
 var _cup: MeshInstance3D
 var _print: LabelPrint
 var _visual: MeshInstance3D
 var _front_material: StandardMaterial3D
-var _back_material: StandardMaterial3D
 var _last_progress := -1.0
 var _last_drag := Vector3(INF,INF,INF)
 var _last_size := Vector2.ZERO
@@ -67,17 +65,13 @@ func _bind() -> void:
 		add_child(_visual)
 		_front_material = StandardMaterial3D.new()
 		_front_material.resource_name = "CornerPeelFront"
+		# One continuous two-sided printed sheet avoids the previous coplanar
+		# front/back z-fight. A dedicated underside can be added later only on the
+		# actually lifted polygon if the reference comparison still needs it.
 		_front_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_front_material.roughness = 0.86
+		_front_material.roughness = 0.87
 		_front_material.metallic = 0.0
-		_front_material.metallic_specular = 0.22
-		_back_material = StandardMaterial3D.new()
-		_back_material.resource_name = "CornerPeelBack"
-		_back_material.albedo_color = Color(0.93,0.89,0.79,1.0)
-		_back_material.roughness = 0.96
-		_back_material.metallic = 0.0
-		_back_material.metallic_specular = 0.08
-		_back_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_front_material.metallic_specular = 0.20
 	_sync_texture()
 	_rebuild(0.0,Vector3.ZERO)
 
@@ -90,17 +84,19 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	if _visual == null or _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
 		return
 	var cup_mesh := _cup.mesh as CylinderMesh
-	var positions: Array[Vector3] = []
+	var positions := PackedVector3Array()
+	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var threshold := _area_threshold(progress)
-	var feather := 0.055
+	var feather := 0.070
 	var safe_drag := drag_delta
-	var max_drag := maxf(_label.label_width*0.48,0.12)
+	var max_drag := maxf(_label.label_width*0.27,0.105)
 	if safe_drag.length()>max_drag:
 		safe_drag = safe_drag.normalized()*max_drag
 	if progress<=0.001 and safe_drag.length_squared()<0.000001:
-		safe_drag = Vector3(0.035,0.015,0.035)
+		safe_drag = Vector3(0.018,0.008,0.025)
 
+	var flap_normal := Vector3(0.30,0.02,0.954).normalized()
 	for v_index in range(V_SEGMENTS+1):
 		var v := float(v_index)/float(V_SEGMENTS)
 		var y := _label.label_y-_label.label_height*0.5+_label.label_height*v
@@ -110,53 +106,16 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var d := (1.0-u)+(1.0-v)
 			var influence := 1.0-smoothstep(maxf(threshold-feather,0.0),threshold+feather,d)
 			if progress<=0.001:
-				influence *= smoothstep(1.72,2.0,u+v)
-			var boundary_t := clampf(d/maxf(threshold,0.001),0.0,1.0)
-			var lift_curve := sin(clampf(boundary_t,0.0,1.0)*PI)
-			var outward := CupSurface.attached_normal(u,_label.label_width,SURFACE_OFFSET)
-			var local_drag := safe_drag*pow(influence,1.15)
-			var curl := outward*(0.045+progress*0.055)*lift_curve*influence
-			curl += Vector3.UP*(0.020+progress*0.035)*lift_curve*influence
+				influence *= smoothstep(1.82,2.0,u+v)
+			var hinge_weight := 1.0-smoothstep(maxf(threshold-feather*2.2,0.0),threshold,d)
+			var local_drag := safe_drag*pow(influence,1.05)
+			var outward := CupSurface.frustum_surface_normal(attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
+			var curl := outward*(0.010+progress*0.024)*hinge_weight
+			curl += Vector3.UP*(0.006+progress*0.016)*hinge_weight
 			positions.append(attached+local_drag+curl)
+			normals.append(outward.lerp(flap_normal,influence*0.82).normalized())
 			uvs.append(Vector2(u,1.0-v))
 
-	var normals := _compute_normals(positions)
-	var vertices := PackedVector3Array(positions)
-	var indices := _build_indices(false)
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	mesh.surface_set_material(0,_front_material)
-
-	# Keep the blank underside physically separate from the printed face. The
-	# previous coplanar duplicate z-fought and hid the SubViewport print texture.
-	var back_vertices := PackedVector3Array()
-	var back_normals := PackedVector3Array()
-	for i in range(positions.size()):
-		var radial := Vector3(positions[i].x,0.0,positions[i].z).normalized()
-		if radial.length_squared()<0.000001:
-			radial = Vector3.FORWARD
-		back_vertices.append(positions[i]-radial*PAPER_THICKNESS)
-		back_normals.append(-normals[i])
-	var back_arrays: Array = []
-	back_arrays.resize(Mesh.ARRAY_MAX)
-	back_arrays[Mesh.ARRAY_VERTEX] = back_vertices
-	back_arrays[Mesh.ARRAY_NORMAL] = back_normals
-	back_arrays[Mesh.ARRAY_TEX_UV] = uvs
-	back_arrays[Mesh.ARRAY_INDEX] = _build_indices(true)
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,back_arrays)
-	mesh.surface_set_material(1,_back_material)
-	_visual.mesh = mesh
-
-	var corner_index := V_SEGMENTS*(U_SEGMENTS+1)+U_SEGMENTS
-	_visual_grip_local = positions[corner_index]
-
-func _build_indices(reverse: bool) -> PackedInt32Array:
 	var indices := PackedInt32Array()
 	var row := U_SEGMENTS+1
 	for v_index in range(V_SEGMENTS):
@@ -165,33 +124,22 @@ func _build_indices(reverse: bool) -> PackedInt32Array:
 			var b := a+1
 			var d := (v_index+1)*row+u_index
 			var c := d+1
-			if reverse:
-				indices.append(a); indices.append(c); indices.append(d)
-				indices.append(a); indices.append(b); indices.append(c)
-			else:
-				indices.append(a); indices.append(d); indices.append(c)
-				indices.append(a); indices.append(c); indices.append(b)
-	return indices
+			indices.append(a); indices.append(d); indices.append(c)
+			indices.append(a); indices.append(c); indices.append(b)
 
-func _compute_normals(positions: Array[Vector3]) -> PackedVector3Array:
-	var normals := PackedVector3Array()
-	var row := U_SEGMENTS+1
-	for v_index in range(V_SEGMENTS+1):
-		for u_index in range(U_SEGMENTS+1):
-			var left := positions[v_index*row+maxi(u_index-1,0)]
-			var right := positions[v_index*row+mini(u_index+1,U_SEGMENTS)]
-			var down := positions[maxi(v_index-1,0)*row+u_index]
-			var up := positions[mini(v_index+1,V_SEGMENTS)*row+u_index]
-			var normal := (up-down).cross(right-left).normalized()
-			if normal.length_squared()<0.000001:
-				normal = Vector3.FORWARD
-			# Ensure front normals face away from the vessel center.
-			var center := positions[v_index*row+u_index]
-			var radial := Vector3(center.x,0.0,center.z).normalized()
-			if radial.length_squared()>0.000001 and normal.dot(radial)<0.0:
-				normal = -normal
-			normals.append(normal)
-	return normals
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = positions
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	mesh.surface_set_material(0,_front_material)
+	_visual.mesh = mesh
+
+	var corner_index := V_SEGMENTS*(U_SEGMENTS+1)+U_SEGMENTS
+	_visual_grip_local = positions[corner_index]
 
 func _area_threshold(progress: float) -> float:
 	var p := clampf(progress,0.0,1.0)
