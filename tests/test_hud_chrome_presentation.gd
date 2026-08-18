@@ -7,49 +7,46 @@ func run() -> Array[String]:
 		failures.append("HudChromePresentation script did not load")
 		return failures
 
-	var methods: Array[String] = []
-	for method in script.get_script_method_list():
-		methods.append(String(method.get("name", "")))
-	if not methods.has("_compact_hud_text"):
-		failures.append("RED: reference HUD must expose compact player-facing copy")
-		return failures
-
 	var root := Node.new()
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
 	root.add_child(layer)
 	var label := Label.new()
 	label.name = "Instructions"
+	label.text = "AMBER BAR  •  Amber Bar Bottle\nPeel 48%  •  Quality B  •  residue 12%\nsteady pull\nlegacy controls"
 	layer.add_child(label)
-	label.text = "AMBER BAR  •  Amber Bar Bottle\nPeel 48%  •  Quality A  •  residue 0%\nsteady pull • ease off if the paper starts to tear\nLMB Peel anywhere  •  RMB Inspect  •  Q/E Scene  •  1/2/3  •  Esc Pause  •  R Reset"
 
 	var chrome = script.new()
 	root.add_child(chrome)
 	chrome._process(0.0)
 
-	var panel := layer.get_node_or_null("ReferenceHudPanel") as Panel
-	if panel == null:
-		failures.append("reference HUD panel was not created")
-	else:
-		if panel.size.y > 52.0:
-			failures.append("RED: reference HUD chrome must stay <= 52 px tall so photography remains primary, got %.1f" % panel.size.y)
-		if panel.size.x > 440.0:
-			failures.append("RED: reference HUD chrome must stay <= 440 px wide on the 1152 px capture, got %.1f" % panel.size.x)
+	for node_name in ["ProgressPanel","ObjectivePanel","ControlsPanel","HowToPanel"]:
+		if layer.get_node_or_null(node_name) == null:
+			failures.append("HUD_RED: unified HUD missing %s" % node_name)
 
-	var lines := label.text.split("\n", false)
-	if lines.size() > 2:
-		failures.append("RED: normal reference HUD must use at most two persistent lines, got %d" % lines.size())
-	for debug_fragment in ["Quality", "residue", "1/2/3", "Q/E Scene", "q/e scene"]:
-		if label.text.contains(debug_fragment):
-			failures.append("GUIDE_RED: primary HUD must not persist expert-only scene-navigation fragment: %s" % debug_fragment)
-	if not label.text.contains("Peel 48%"):
-		failures.append("compact HUD must preserve peel progress")
-	if not label.text.contains("Mouse / touch peel"):
-		failures.append("compact HUD must preserve input-neutral peel discoverability")
-	if not label.text.contains("RMB inspect"):
-		failures.append("compact HUD must preserve inspect discoverability")
-	if not label.text.contains("Esc Pause") or not label.text.contains("R Reset"):
-		failures.append("compact HUD must preserve pause and reset affordances")
+	var how_to := layer.get_node_or_null("HowToPanel") as Control
+	if how_to != null:
+		var copy := _collect_text(how_to).to_upper()
+		for required in ["GRAB EDGE","PEEL GENTLY","INSPECT","CLEAN PEEL"]:
+			if not copy.contains(required):
+				failures.append("HUD_RED: how-to panel missing %s" % required)
+
+	var controls := layer.get_node_or_null("ControlsPanel") as Control
+	if controls != null:
+		var control_copy := _collect_text(controls)
+		for required in ["LMB", "RMB", "R Inspect", "T Reset", "1/2/3", "Esc"]:
+			if not control_copy.contains(required):
+				failures.append("HUD_RED: control legend missing %s" % required)
 
 	root.free()
 	return failures
+
+func _collect_text(node: Node) -> String:
+	var output := ""
+	if node is Label:
+		output += (node as Label).text + "\n"
+	if node is Button:
+		output += (node as Button).text + "\n"
+	for child in node.get_children():
+		output += _collect_text(child)
+	return output
