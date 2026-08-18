@@ -42,7 +42,8 @@ func _init() -> void:
 		"res://tests/test_residue_visual.gd",
 		"res://tests/test_table_surface_material.gd",
 		"res://tests/test_hud_chrome_presentation.gd",
-		"res://tests/test_guided_journey_presentation.gd"
+		"res://tests/test_guided_journey_presentation.gd",
+		"res://tests/test_completion_flow_presentation.gd"
 	]:
 		if ResourceLoader.exists(suite_path):
 			var suite = load(suite_path).new()
