@@ -32,7 +32,7 @@ func _run() -> void:
 		_fail("runtime must keep the production CupContentsPresentation reference",scene)
 		return
 
-	# Fresh café state: paper cup, closed lid, no ice, touch-safe onboarding.
+	# Fresh café state: paper cup, closed lid, no ice, and the unified reference control contract.
 	if String(session.current_variant().get("id","")) != "warm_paper":
 		_fail("fresh run must start at warm_paper",scene)
 		return
@@ -42,10 +42,15 @@ func _run() -> void:
 	if int(contents.call("get_content_count")) != 0 or not lid.visible:
 		_fail("fresh café paper cup must be closed and ice-free",scene)
 		return
-	var onboarding := hud.text.to_lower()
-	if not onboarding.contains("mouse") or not onboarding.contains("touch") or onboarding.contains("hold left mouse"):
-		_fail("onboarding must make mouse and touch equally valid",scene)
+	if not scene.has_method("get_control_contract"):
+		_fail("runtime must expose the unified player control contract",scene)
 		return
+	var controls: Dictionary = scene.call("get_control_contract")
+	var expected_controls := {"peel":"LMB","rotate":"RMB","inspect":"R","reset":"T","scenes":"1/2/3","pause":"Esc"}
+	for key in expected_controls.keys():
+		if String(controls.get(key,"")) != String(expected_controls[key]):
+			_fail("control %s must map to %s" % [key,expected_controls[key]],scene)
+			return
 
 	# Reset must re-seat the interaction hand on the fresh label without changing progression.
 	if not right_hand.has_method("get_pinch_world_position") or not right_hand.has_method("snap_to"):
@@ -88,14 +93,13 @@ func _run() -> void:
 
 	var reset_key := InputEventKey.new()
 	reset_key.pressed = true
-	reset_key.keycode = KEY_R
+	reset_key.keycode = KEY_T
 	scene.call("_unhandled_key_input",reset_key)
 	if ritual.get_phase_name() != "PEEL" or crumple.get_progress() != 0.0 or session.get_clean_peels() != 1:
-		_fail("paper next/reset must clear tactile transients without erasing progression",scene)
+		_fail("T reset must clear tactile transients without erasing progression",scene)
 		return
 
-	# Direct scene navigation is a comfort/showcase affordance and must switch the
-	# complete vessel + venue bundle, not only recolor the same paper cup.
+	# Direct scene navigation switches the complete vessel + venue bundle.
 	scene.call("debug_select_variant",1)
 	await process_frame
 	if String(session.current_variant().get("id","")) != "silky_long":
@@ -108,7 +112,6 @@ func _run() -> void:
 		_fail("amber glass bottle must inspect rather than crumple and must not inherit ice/lid",scene)
 		return
 
-	# Glass completion remains score-independent but never enters the paper crush ritual.
 	var before_glass := int(session.get_clean_peels())
 	scene.call("_handle_detached_label")
 	scene.call("_handle_detached_label")
@@ -119,7 +122,7 @@ func _run() -> void:
 		_fail("glass bottle must not enter paper PEEL_SETTLE/CRUMPLE flow",scene)
 		return
 
-	# Market vessel preserves V6 deterministic contents while adopting clear glass.
+	# Market vessel preserves deterministic contents while adopting clear glass.
 	scene.call("debug_select_variant",2)
 	await process_frame
 	if venue.call("get_active_profile_id") != "market_coldcase" or product.call("get_active_kind") != "clear_bottle":
@@ -145,15 +148,15 @@ func _run() -> void:
 		_fail("inspection yaw must rotate cup/label/residue/contents coherently",scene)
 		return
 
-	# Full restart restores the quiet café baseline and removes every market transient.
+	# Full restart is Shift+T under the new control contract.
 	var restart := InputEventKey.new()
 	restart.pressed = true
-	restart.keycode = KEY_R
+	restart.keycode = KEY_T
 	restart.shift_pressed = true
 	scene.call("_unhandled_key_input",restart)
 	await process_frame
 	if session.get_clean_peels() != 0 or session.get_total_score() != 0 or session.get_unlocked_count() != 1:
-		_fail("Shift+R must restart progression cleanly",scene)
+		_fail("Shift+T must restart progression cleanly",scene)
 		return
 	if String(session.current_variant().get("id","")) != "warm_paper" or venue.call("get_active_profile_id") != "cafe_window" or product.call("get_active_kind") != "paper_cup":
 		_fail("full restart must restore the café paper-cup bundle",scene)
@@ -175,7 +178,7 @@ func _run() -> void:
 		_fail("idle time after restart must not resurrect stale state",scene)
 		return
 
-	print("PASS: café paper ritual -> amber inspect -> iced market inspect -> quiet full restart")
+	print("PASS: café paper ritual -> amber inspect -> iced market inspect -> quiet Shift+T full restart")
 	scene.queue_free()
 	await process_frame
 	quit(0)
