@@ -23,5 +23,15 @@ func run() -> Array[String]:
 		failures.append("COMPLETION_FLOW_RED: after disposal the player must be able to inspect residue or continue")
 	if float(resolved.get("hero_occlusion",1.0)) > 0.05:
 		failures.append("COMPLETION_FLOW_RED: collected label UI must not block the hero product")
+	if not flow.has_method("layout_contract"):
+		failures.append("COMPLETION_FLOW_RED: completion tray needs deterministic non-overlap layout")
+	else:
+		var layout: Dictionary = flow.call("layout_contract")
+		if String(layout.get("region","")) != "lower_left":
+			failures.append("COMPLETION_FLOW_RED: completion tray should resolve in lower-left free rail, not overlap HOW TO PLAY")
+		if float(layout.get("right",1280.0)) > 390.0:
+			failures.append("COMPLETION_FLOW_RED: completion tray may not intrude into centered hero product")
+		if float(layout.get("bottom",720.0)) > 640.0:
+			failures.append("COMPLETION_FLOW_RED: completion tray must stay above scene selector rail")
 	flow.free()
 	return failures
