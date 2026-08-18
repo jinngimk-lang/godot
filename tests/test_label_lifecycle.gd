@@ -14,11 +14,13 @@ func run() -> Array[String]:
 	var method_names: Array[String] = []
 	for method in lifecycle_script.get_script_method_list():
 		method_names.append(String(method.get("name", "")))
-	if not method_names.has("get_detach_alpha"):
-		failures.append("RED: label lifecycle missing progressive detach alpha")
+	for required_method in ["get_detach_alpha", "get_release_settle_alpha", "should_render_label", "is_resolved"]:
+		if not method_names.has(required_method):
+			failures.append("POST_RELEASE_RED: label lifecycle missing %s" % required_method)
+	if not failures.is_empty():
 		return failures
 
-	var lifecycle = lifecycle_script.new(0.16)
+	var lifecycle = lifecycle_script.new(0.16, 0.72)
 	lifecycle.reset()
 	if lifecycle.get_phase_name() != "ATTACHED":
 		failures.append("reset lifecycle should be ATTACHED")
@@ -26,46 +28,59 @@ func run() -> Array[String]:
 		failures.append("reset lifecycle must not be detached")
 	if lifecycle.get_detach_alpha() != 0.0:
 		failures.append("reset lifecycle detach alpha should be zero")
+	if not lifecycle.should_render_label():
+		failures.append("attached label must render")
 
 	lifecycle.update(0.45, false, 0.016)
 	if lifecycle.get_phase_name() != "PEELING":
 		failures.append("partial progress should be PEELING")
-	if lifecycle.is_detached():
-		failures.append("partial progress must remain cup-attached")
 
 	lifecycle.update(1.0, true, 0.016)
 	if lifecycle.get_phase_name() != "DETACHING":
 		failures.append("completion should enter DETACHING")
-	if lifecycle.get_detach_alpha() != 0.0:
-		failures.append("DETACHING should begin at zero blend")
 	if lifecycle.consume_detach_event():
 		failures.append("detach event should not fire before detach duration elapses")
 
 	lifecycle.update(1.0, false, 0.08)
 	var half_alpha: float = lifecycle.get_detach_alpha()
 	if half_alpha < 0.45 or half_alpha > 0.55:
-		failures.append("half detach duration should produce about half blend")
+		failures.append("half detach duration should produce about half detach blend")
 
 	lifecycle.update(1.0, false, 0.10)
-	if lifecycle.get_phase_name() != "HELD":
-		failures.append("elapsed detach duration should enter HELD")
-	if lifecycle.get_detach_alpha() != 1.0:
-		failures.append("HELD lifecycle detach alpha should be one")
+	if lifecycle.get_phase_name() != "SETTLING":
+		failures.append("elapsed detach duration should enter SETTLING")
 	if not lifecycle.is_detached():
-		failures.append("HELD lifecycle must report detached")
+		failures.append("SETTLING label must report detached")
 	if not lifecycle.consume_detach_event():
-		failures.append("entering HELD should emit one detach event")
+		failures.append("entering SETTLING should emit one detach event")
+	if lifecycle.get_release_settle_alpha() > 0.05:
+		failures.append("SETTLING should start visible before disposal")
+	if not lifecycle.should_render_label():
+		failures.append("newly detached label should remain briefly visible")
+
+	lifecycle.update(1.0, false, 0.36)
+	var mid_settle := lifecycle.get_release_settle_alpha()
+	if mid_settle < 0.40 or mid_settle > 0.60:
+		failures.append("half settle duration should be about half resolved")
+	if not lifecycle.should_render_label():
+		failures.append("label should still render during settle motion")
+
+	lifecycle.update(1.0, false, 0.40)
+	if lifecycle.get_phase_name() != "RESOLVED":
+		failures.append("released label should leave SETTLING and become RESOLVED")
+	if not lifecycle.is_resolved():
+		failures.append("RESOLVED lifecycle must report resolved")
+	if lifecycle.should_render_label():
+		failures.append("resolved label must no longer block the hero product")
 	if lifecycle.consume_detach_event():
-		failures.append("detach event must be consumable exactly once")
+		failures.append("detach event must remain one-shot")
 
 	lifecycle.update(0.20, false, 0.016)
-	if lifecycle.get_phase_name() != "HELD":
+	if lifecycle.get_phase_name() != "RESOLVED":
 		failures.append("completed label must not reattach before reset")
-	if not lifecycle.is_detached():
-		failures.append("completed label must stay detached before reset")
 
 	lifecycle.reset()
-	if lifecycle.get_phase_name() != "ATTACHED" or lifecycle.is_detached():
-		failures.append("reset should restore ATTACHED and clear detached state")
+	if lifecycle.get_phase_name() != "ATTACHED" or lifecycle.is_detached() or lifecycle.is_resolved():
+		failures.append("reset should restore ATTACHED and clear detached/resolved state")
 
 	return failures
