@@ -30,6 +30,20 @@ var _backing_thickness := DEFAULT_BACKING_THICKNESS
 func _ready() -> void:
 	call_deferred("_bind")
 
+func _exit_tree() -> void:
+	# Dynamic ArrayMesh resources can remain referenced by the GL renderer for a
+	# frame after the scene goes away. Drop production references explicitly so
+	# automated capture shutdown and normal project exit stay clean.
+	if _visual != null:
+		_visual.mesh = null
+	_front_material = null
+	_back_material = null
+	_adhesive_material = null
+	_label = null
+	_cup = null
+	_print = null
+	_lifecycle = null
+
 func _process(_delta: float) -> void:
 	if _label == null or _cup == null or _print == null or _lifecycle == null:
 		_bind()
@@ -84,16 +98,10 @@ func row_front_u_for_progress(progress: float, v: float) -> float:
 	if p <= 0.0001:
 		return 0.0
 	var base_front := peel_front_u_for_progress(p)
-	# The direct Coffee/Supermarket targets peel from a localized grip on the
-	# left edge, not as a full-height curtain. Early/mid progress therefore has
-	# a bell-shaped vertical envelope centred slightly below label mid-height.
 	var center_v := 0.44
 	var radius := 0.19+0.37*p
 	var normalized_distance := absf(row_v-center_v)/maxf(radius,0.001)
 	var envelope := 1.0-_smooth01(normalized_distance)
-	# Only late in the gesture should the release spread toward every row. This
-	# keeps 30–50% screenshots as a believable wedge while guaranteeing full
-	# detachment as progress approaches completion.
 	var full_height_mix := _smooth01((p-0.70)/0.285)
 	envelope = lerpf(envelope,1.0,full_height_mix)
 	var variation := (sin(row_v*17.0+0.7)+0.4*sin(row_v*37.0+1.3))*0.005*envelope
@@ -187,8 +195,6 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 		return
 	var cup_mesh := _cup.mesh as CylinderMesh
 	var full_release := progress >= 0.999
-	# Keep a barely lifted, localized discoverable lip at rest without granting
-	# gameplay progress. The public row-front contract still reports zero at 0%.
 	var geometry_progress := 1.0 if full_release else maxf(progress,0.025)
 
 	var safe_drag := drag_delta
