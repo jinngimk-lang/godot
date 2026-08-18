@@ -14,6 +14,7 @@ const PAPER_SHADER_PATH := "res://art/shaders/peeled_paper.gdshader"
 var _label: LabelVisual
 var _cup: MeshInstance3D
 var _print: LabelPrint
+var _lifecycle
 var _visual: MeshInstance3D
 var _front_material: ShaderMaterial
 var _back_material: ShaderMaterial
@@ -21,6 +22,7 @@ var _adhesive_material: StandardMaterial3D
 var _last_progress := -1.0
 var _last_drag := Vector3(INF,INF,INF)
 var _last_size := Vector2.ZERO
+var _last_release_settle_alpha := -1.0
 var _visual_grip_local := Vector3.ZERO
 var _bend_band_ratio := DEFAULT_BEND_BAND_RATIO
 var _backing_thickness := DEFAULT_BACKING_THICKNESS
@@ -29,30 +31,41 @@ func _ready() -> void:
 	call_deferred("_bind")
 
 func _process(_delta: float) -> void:
-	if _label == null or _cup == null or _print == null:
+	if _label == null or _cup == null or _print == null or _lifecycle == null:
 		_bind()
 	if _label == null or _cup == null or _print == null or not (_cup.mesh is CylinderMesh):
 		return
 	_label.visible = false
 	transform = _label.transform
 	_sync_texture()
+	var should_render := true
+	var settle_alpha := 0.0
+	if _lifecycle != null:
+		should_render = bool(_lifecycle.call("should_render_label"))
+		settle_alpha = clampf(float(_lifecycle.call("get_release_settle_alpha")),0.0,1.0)
+	if _visual != null:
+		_visual.visible = should_render
+	if not should_render:
+		return
 	var progress := clampf(float(_label.get("_last_progress")),0.0,1.0)
 	var hidden_grip := Vector3(_label.get("_last_grip"))
 	var hidden_front := _label.get_front_position(progress)
 	var drag := hidden_grip-hidden_front
 	var size := Vector2(_label.label_width,_label.label_height)
-	if absf(progress-_last_progress)<0.001 and drag.distance_to(_last_drag)<0.002 and size.distance_to(_last_size)<0.001:
+	if absf(progress-_last_progress)<0.001 and drag.distance_to(_last_drag)<0.002 and size.distance_to(_last_size)<0.001 and absf(settle_alpha-_last_release_settle_alpha)<0.002:
 		return
 	_last_progress = progress
 	_last_drag = drag
 	_last_size = size
-	_rebuild(progress,drag)
+	_last_release_settle_alpha = settle_alpha
+	_rebuild(progress,drag,settle_alpha)
 
 func set_paper_profile(profile: Dictionary) -> void:
 	_bend_band_ratio = clampf(float(profile.get("bend_band_ratio",DEFAULT_BEND_BAND_RATIO)),0.06,0.22)
 	_backing_thickness = clampf(float(profile.get("backing_thickness",DEFAULT_BACKING_THICKNESS)),0.0015,0.010)
 	_last_progress = -1.0
 	_last_drag = Vector3(INF,INF,INF)
+	_last_release_settle_alpha = -1.0
 
 func get_paper_surface_shader_path() -> String:
 	return PAPER_SHADER_PATH
@@ -95,6 +108,7 @@ func _bind() -> void:
 	_label = parent.get_node_or_null("PeelLabel") as LabelVisual
 	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
 	_print = parent.get_node_or_null("LabelPrint") as LabelPrint
+	_lifecycle = parent.get("_lifecycle")
 	if _label == null or _cup == null or _print == null:
 		return
 	if _visual == null:
@@ -130,13 +144,13 @@ func _bind() -> void:
 		_adhesive_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_adhesive_material.render_priority = 2
 	_sync_texture()
-	_rebuild(0.0,Vector3.ZERO)
+	_rebuild(0.0,Vector3.ZERO,0.0)
 
 func _sync_texture() -> void:
 	if _front_material != null and _print != null:
 		_front_material.set_shader_parameter("print_texture",_print.get_texture())
 
-func _rebuild(progress: float, drag_delta: Vector3) -> void:
+func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float = 0.0) -> void:
 	if _visual == null or _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
 		return
 	var cup_mesh := _cup.mesh as CylinderMesh
@@ -151,6 +165,13 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 		safe_drag = Vector3(0.014,0.006,0.022)
 	elif full_release and safe_drag.length()<0.075:
 		safe_drag = Vector3(0.10,0.025,0.085)
+
+	var settle_t := clampf(release_settle_alpha,0.0,1.0)
+	var settle_eased := settle_t*settle_t*(3.0-2.0*settle_t)
+	# Once fully released, acknowledge the clean peel briefly, then move the
+	# physical sheet into a lower-left discard/collection direction instead of
+	# leaving it floating forever in front of the hero product.
+	var settle_offset := Vector3(-0.34*settle_eased,-0.56*settle_eased,0.12*settle_eased)
 
 	var corner_y := _label.label_y+_label.label_height*0.5
 	var corner_attached := CupSurface.attached_point_on_frustum(1.0,_label.label_width,corner_y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
@@ -187,6 +208,8 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 				rigid_weight = 1.0
 			var flat_reference := corner_attached+tangent_axis*((u-1.0)*_label.label_width)+Vector3.UP*((v-1.0)*_label.label_height)
 			var free_target := flat_reference+safe_drag+free_normal*lift_distance+Vector3.UP*(progress*0.010)
+			if full_release:
+				free_target += settle_offset
 			var moved := attached.lerp(free_target,rigid_weight)
 			var flap_normal := outward.lerp(free_normal,rigid_weight).normalized()
 			base_positions.append(attached)
