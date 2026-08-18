@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/hero_product_detail_presentation.gd" id="19_hero_detail"]
 [ext_resource type="Script" path="res://scripts/presentation/substrate_peel_feel_binding.gd" id="20_substrate_feel"]
 [ext_resource type="Script" path="res://scripts/presentation/bottle_hero_polish.gd" id="21_bottle_polish"]
+[ext_resource type="Script" path="res://scripts/presentation/completion_flow_presentation.gd" id="22_completion_flow"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -39,6 +40,9 @@ script = ExtResource("9_hud")
 
 [node name="GuidedJourneyPresentation" type="Node" parent="."]
 script = ExtResource("14_journey")
+
+[node name="CompletionFlowPresentation" type="Node" parent="."]
+script = ExtResource("22_completion_flow")
 
 [node name="CafeReceiptReadabilityPresentation" type="Node" parent="."]
 script = ExtResource("15_receipt_readability")
