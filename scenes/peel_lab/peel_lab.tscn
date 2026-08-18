@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/guided_journey_presentation.gd" id="14_journey"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_receipt_readability_presentation.gd" id="15_receipt_readability"]
 [ext_resource type="Script" path="res://scripts/presentation/cafe_lid_molded_presentation.gd" id="16_lid_molding"]
+[ext_resource type="Script" path="res://scripts/presentation/cursor_presentation.gd" id="17_cursor"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -40,3 +41,6 @@ script = ExtResource("15_receipt_readability")
 
 [node name="CafeLidMoldedPresentation" type="Node" parent="."]
 script = ExtResource("16_lid_molding")
+
+[node name="CursorPresentation" type="Node" parent="."]
+script = ExtResource("17_cursor")
