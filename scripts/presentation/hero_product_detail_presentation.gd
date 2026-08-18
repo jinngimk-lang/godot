@@ -71,32 +71,37 @@ func _build_jar() -> void:
 		Vector2(0.43,0.408),Vector2(0.48,0.402),Vector2(0.54,0.382),
 		Vector2(0.59,0.345),Vector2(0.62,0.315),Vector2(0.70,0.315)
 	]
-	_add_lathe("JarHeroShell",glass_profile,_glass_material(Color(0.84,0.93,0.95),0.13,0.035),false,false)
+	_add_lathe("JarHeroShell",glass_profile,_glass_material(Color(0.88,0.95,0.97),0.095,0.032),false,false)
 
+	# Keep a clear glass border around the sauce. The previous almost-full-radius
+	# red cylinder made the jar read as opaque plastic rather than glass.
 	var sauce_profile: Array[Vector2] = [
-		Vector2(-0.595,0.333),Vector2(-0.57,0.355),Vector2(-0.52,0.360),
-		Vector2(0.39,0.360),Vector2(0.43,0.350),Vector2(0.47,0.326)
+		Vector2(-0.565,0.305),Vector2(-0.54,0.328),Vector2(-0.49,0.335),
+		Vector2(0.31,0.335),Vector2(0.35,0.324),Vector2(0.39,0.300)
 	]
-	var sauce := _mat(Color(0.50,0.045,0.020),0.48)
-	sauce.metallic_specular = 0.18
+	var sauce := _mat(Color(0.50,0.045,0.020),0.52)
+	sauce.metallic_specular = 0.16
 	_add_lathe("JarSauceVolume",sauce_profile,sauce,true,true)
 
-	_add_cylinder("JarHeroLid",Vector3(0,0.735,0),0.338,0.338,0.125,_metal_material(Color(0.25,0.105,0.045),0.33,0.72),112)
-	_add_ring("JarThreadBand0",0.680,0.345,0.014,Color(0.42,0.18,0.075),0.34)
-	_add_ring("JarThreadBand1",0.713,0.347,0.012,Color(0.48,0.21,0.085),0.31)
-	_add_ring("JarThreadBand2",0.746,0.345,0.011,Color(0.40,0.16,0.065),0.34)
-	_add_ring("JarGlassBase",-0.647,0.407,0.022,Color(0.86,0.94,0.95,0.20),0.08,true)
+	_add_cylinder("JarHeroLid",Vector3(0,0.735,0),0.338,0.338,0.125,_metal_material(Color(0.36,0.18,0.075),0.34,0.42),112)
+	_add_ring("JarThreadBand0",0.680,0.345,0.014,Color(0.46,0.24,0.10),0.34,false,0.38)
+	_add_ring("JarThreadBand1",0.713,0.347,0.012,Color(0.52,0.28,0.12),0.31,false,0.38)
+	_add_ring("JarThreadBand2",0.746,0.345,0.011,Color(0.44,0.21,0.09),0.34,false,0.38)
+	_add_ring("JarGlassBase",-0.647,0.407,0.022,Color(0.86,0.94,0.95,0.20),0.08,true,0.0)
 
 func _build_tin_can() -> void:
 	var body_profile: Array[Vector2] = [
 		Vector2(-0.655,0.385),Vector2(-0.628,0.398),Vector2(-0.585,0.402),
 		Vector2(0.585,0.402),Vector2(0.628,0.398),Vector2(0.655,0.385)
 	]
-	_add_lathe("TinHeroBody",body_profile,_metal_material(Color(0.62,0.64,0.65),0.27,0.90),true,true)
-	_add_ring("TinHeroTopRoll",0.665,0.418,0.030,Color(0.78,0.79,0.80),0.22)
-	_add_ring("TinHeroBottomRoll",-0.665,0.418,0.030,Color(0.69,0.70,0.71),0.25)
-	_add_cylinder("TinHeroTopDisk",Vector3(0,0.681,0),0.382,0.382,0.010,_metal_material(Color(0.72,0.74,0.75),0.34,0.92),112)
-	_add_cylinder("TinHeroTopInset",Vector3(0,0.688,0),0.315,0.315,0.006,_metal_material(Color(0.66,0.68,0.70),0.38,0.90),96)
+	# GL compatibility has no rich reflected environment. Use a deliberately
+	# lower metallic factor plus high specular so manufactured aluminum stays
+	# silver instead of collapsing to near-black.
+	_add_lathe("TinHeroBody",body_profile,_metal_material(Color(0.80,0.82,0.84),0.30,0.34),true,true)
+	_add_ring("TinHeroTopRoll",0.665,0.418,0.030,Color(0.88,0.89,0.90),0.23,false,0.36)
+	_add_ring("TinHeroBottomRoll",-0.665,0.418,0.030,Color(0.76,0.78,0.80),0.27,false,0.34)
+	_add_cylinder("TinHeroTopDisk",Vector3(0,0.681,0),0.382,0.382,0.010,_metal_material(Color(0.84,0.85,0.86),0.34,0.35),112)
+	_add_cylinder("TinHeroTopInset",Vector3(0,0.688,0),0.315,0.315,0.006,_metal_material(Color(0.72,0.74,0.76),0.42,0.30),96)
 
 func _build_soda_can() -> void:
 	var body_profile: Array[Vector2] = [
@@ -104,10 +109,10 @@ func _build_soda_can() -> void:
 		Vector2(0.54,0.402),Vector2(0.585,0.396),Vector2(0.625,0.378),
 		Vector2(0.660,0.344),Vector2(0.682,0.332)
 	]
-	_add_lathe("SodaHeroBody",body_profile,_metal_material(Color(0.74,0.76,0.78),0.20,0.94),true,true)
-	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.86,0.87,0.88),0.17)
-	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.70,0.72,0.73),0.22)
-	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.79,0.80,0.81),0.22,0.95),112)
+	_add_lathe("SodaHeroBody",body_profile,_metal_material(Color(0.84,0.86,0.88),0.24,0.32),true,true)
+	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.91,0.92,0.93),0.18,false,0.35)
+	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.78,0.80,0.82),0.24,false,0.34)
+	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.86,0.87,0.88),0.24,0.34),112)
 	_add_pull_tab()
 	_add_condensation(0.405,-0.50,0.54,30)
 
@@ -119,7 +124,7 @@ func _add_pull_tab() -> void:
 	tab.mesh = mesh
 	tab.position = Vector3(0.0,0.710,0.035)
 	tab.rotation_degrees.y = 8.0
-	tab.material_override = _metal_material(Color(0.64,0.66,0.68),0.24,0.94)
+	tab.material_override = _metal_material(Color(0.78,0.80,0.82),0.25,0.40)
 	_detail_root.add_child(tab)
 	var opening := MeshInstance3D.new()
 	opening.name = "SodaOpening"
@@ -190,9 +195,12 @@ func _lathe_mesh(profile: Array[Vector2], cap_bottom: bool, cap_top: bool) -> Ar
 		_add_cap(vertices,normals,uvs,indices,profile[0],false)
 	if cap_top:
 		_add_cap(vertices,normals,uvs,indices,profile[profile.size()-1],true)
-	var arrays: Array=[]
+	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX]=vertices; arrays[Mesh.ARRAY_NORMAL]=normals; arrays[Mesh.ARRAY_TEX_UV]=uvs; arrays[Mesh.ARRAY_INDEX]=indices
+	arrays[Mesh.ARRAY_VERTEX]=vertices
+	arrays[Mesh.ARRAY_NORMAL]=normals
+	arrays[Mesh.ARRAY_TEX_UV]=uvs
+	arrays[Mesh.ARRAY_INDEX]=indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	return mesh
@@ -200,12 +208,16 @@ func _lathe_mesh(profile: Array[Vector2], cap_bottom: bool, cap_top: bool) -> Ar
 func _add_cap(vertices: PackedVector3Array, normals: PackedVector3Array, uvs: PackedVector2Array, indices: PackedInt32Array, sample: Vector2, top: bool) -> void:
 	var center := vertices.size()
 	var normal := Vector3.UP if top else Vector3.DOWN
-	vertices.append(Vector3(0,sample.x,0)); normals.append(normal); uvs.append(Vector2(0.5,0.5))
+	vertices.append(Vector3(0,sample.x,0))
+	normals.append(normal)
+	uvs.append(Vector2(0.5,0.5))
 	var start := vertices.size()
 	for side_index in range(LATHE_SEGMENTS+1):
 		var u := float(side_index)/float(LATHE_SEGMENTS)
 		var angle := u*TAU
-		vertices.append(Vector3(cos(angle)*sample.y,sample.x,sin(angle)*sample.y)); normals.append(normal); uvs.append(Vector2(0.5+cos(angle)*0.5,0.5+sin(angle)*0.5))
+		vertices.append(Vector3(cos(angle)*sample.y,sample.x,sin(angle)*sample.y))
+		normals.append(normal)
+		uvs.append(Vector2(0.5+cos(angle)*0.5,0.5+sin(angle)*0.5))
 	for side_index in range(LATHE_SEGMENTS):
 		if top:
 			indices.append(center); indices.append(start+side_index); indices.append(start+side_index+1)
@@ -216,13 +228,18 @@ func _add_cylinder(node_name: String, at: Vector3, top_radius: float, bottom_rad
 	var instance := MeshInstance3D.new()
 	instance.name = node_name
 	var mesh := CylinderMesh.new()
-	mesh.top_radius=top_radius; mesh.bottom_radius=bottom_radius; mesh.height=height; mesh.radial_segments=segments
-	instance.mesh=mesh; instance.position=at; instance.material_override=material
+	mesh.top_radius = top_radius
+	mesh.bottom_radius = bottom_radius
+	mesh.height = height
+	mesh.radial_segments = segments
+	instance.mesh = mesh
+	instance.position = at
+	instance.material_override = material
 	_detail_root.add_child(instance)
 	return instance
 
-func _add_ring(node_name: String, y: float, radius: float, height: float, color: Color, roughness: float, transparent := false) -> void:
-	var mat := _metal_material(Color(color.r,color.g,color.b,1.0),roughness,0.55)
+func _add_ring(node_name: String, y: float, radius: float, height: float, color: Color, roughness: float, transparent: bool = false, metallic: float = 0.35) -> void:
+	var mat := _metal_material(Color(color.r,color.g,color.b,1.0),roughness,metallic)
 	if transparent:
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.albedo_color.a = color.a
@@ -230,20 +247,26 @@ func _add_ring(node_name: String, y: float, radius: float, height: float, color:
 
 func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
-	material.albedo_color=color; material.roughness=roughness
+	material.albedo_color = color
+	material.roughness = roughness
 	return material
 
 func _metal_material(color: Color, roughness: float, metallic: float) -> StandardMaterial3D:
 	var material := _mat(color,roughness)
-	material.metallic=metallic; material.metallic_specular=0.78
+	material.metallic = metallic
+	material.metallic_specular = 0.82
 	return material
 
 func _glass_material(color: Color, alpha: float, roughness: float) -> StandardMaterial3D:
 	var material := _mat(color,roughness)
-	material.albedo_color.a=alpha
-	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.metallic_specular=0.90
-	material.rim_enabled=true; material.rim=0.86; material.rim_tint=0.50
-	material.clearcoat_enabled=true; material.clearcoat=0.92; material.clearcoat_roughness=0.035
-	material.cull_mode=BaseMaterial3D.CULL_DISABLED
+	material.albedo_color.a = alpha
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.metallic_specular = 0.90
+	material.rim_enabled = true
+	material.rim = 0.86
+	material.rim_tint = 0.50
+	material.clearcoat_enabled = true
+	material.clearcoat = 0.92
+	material.clearcoat_roughness = 0.035
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
