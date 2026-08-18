@@ -46,8 +46,13 @@ func _run() -> void:
 		_resume_scene(scene)
 		await _settle_frames(2)
 
+	# Input owns the imported cursor texture outside the scene tree. Release it
+	# before tearing down RenderingServer so GL compatibility capture exits cleanly.
+	Input.set_custom_mouse_cursor(null,Input.CURSOR_POINTING_HAND)
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	scene.queue_free()
 	await process_frame
+	await RenderingServer.frame_post_draw
 	print("PASS: captured five object-only base + direct mouse-peel evidence pairs")
 	quit(0)
 
@@ -76,8 +81,6 @@ func _stage_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 
 	var progress := float(capture_case["progress"])
 	var front := label.get_front_position(progress)
-	# The pointer is staged to the camera-left of the live peel edge, matching the
-	# approved mockup: a readable lifted flap, not an extreme ribbon or hand pose.
 	var desired_grip_local := front+Vector3(-0.62,0.08,0.34)
 	var grip_local := label.get_effective_grip(progress,desired_grip_local)
 	label.visible = true
