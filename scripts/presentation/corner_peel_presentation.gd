@@ -9,13 +9,14 @@ const COMPLETE_RAMP_START := 0.84
 const DEFAULT_BEND_BAND_RATIO := 0.14
 const DEFAULT_BACKING_THICKNESS := 0.0036
 const PAPER_BACKING_ROUGHNESS := 0.96
+const PAPER_SHADER_PATH := "res://art/shaders/peeled_paper.gdshader"
 
 var _label: LabelVisual
 var _cup: MeshInstance3D
 var _print: LabelPrint
 var _visual: MeshInstance3D
-var _front_material: StandardMaterial3D
-var _back_material: StandardMaterial3D
+var _front_material: ShaderMaterial
+var _back_material: ShaderMaterial
 var _adhesive_material: StandardMaterial3D
 var _last_progress := -1.0
 var _last_drag := Vector3(INF,INF,INF)
@@ -52,6 +53,9 @@ func set_paper_profile(profile: Dictionary) -> void:
 	_backing_thickness = clampf(float(profile.get("backing_thickness",DEFAULT_BACKING_THICKNESS)),0.0015,0.010)
 	_last_progress = -1.0
 	_last_drag = Vector3(INF,INF,INF)
+
+func get_paper_surface_shader_path() -> String:
+	return PAPER_SHADER_PATH
 
 func get_visual_grip_world_position() -> Vector3:
 	return to_global(_visual_grip_local)
@@ -98,19 +102,25 @@ func _bind() -> void:
 		_visual.name = "CornerPeelLabel"
 		_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_visual)
-		_front_material = StandardMaterial3D.new()
+		var paper_shader := load(PAPER_SHADER_PATH) as Shader
+		if paper_shader == null:
+			return
+		_front_material = ShaderMaterial.new()
 		_front_material.resource_name = "CornerPeelPrintedPaper"
-		_front_material.cull_mode = BaseMaterial3D.CULL_BACK
-		_front_material.roughness = 0.91
-		_front_material.metallic = 0.0
-		_front_material.metallic_specular = 0.12
-		_back_material = StandardMaterial3D.new()
+		_front_material.shader = paper_shader
+		_front_material.set_shader_parameter("use_print",true)
+		_front_material.set_shader_parameter("paper_tint",Color.WHITE)
+		_front_material.set_shader_parameter("base_roughness",0.91)
+		_front_material.set_shader_parameter("fiber_strength",0.036)
+		_front_material.set_shader_parameter("fiber_scale",220.0)
+		_back_material = ShaderMaterial.new()
 		_back_material.resource_name = "CornerPeelFibrousBacking"
-		_back_material.albedo_color = Color(0.86,0.82,0.72,1.0)
-		_back_material.cull_mode = BaseMaterial3D.CULL_BACK
-		_back_material.roughness = PAPER_BACKING_ROUGHNESS
-		_back_material.metallic = 0.0
-		_back_material.metallic_specular = 0.06
+		_back_material.shader = paper_shader
+		_back_material.set_shader_parameter("use_print",false)
+		_back_material.set_shader_parameter("paper_tint",Color(0.86,0.82,0.72,1.0))
+		_back_material.set_shader_parameter("base_roughness",PAPER_BACKING_ROUGHNESS)
+		_back_material.set_shader_parameter("fiber_strength",0.058)
+		_back_material.set_shader_parameter("fiber_scale",270.0)
 		_adhesive_material = StandardMaterial3D.new()
 		_adhesive_material.resource_name = "CornerPeelAdhesiveTrace"
 		_adhesive_material.albedo_color = Color(0.80,0.72,0.58,0.30)
@@ -124,8 +134,7 @@ func _bind() -> void:
 
 func _sync_texture() -> void:
 	if _front_material != null and _print != null:
-		_front_material.albedo_texture = _print.get_texture()
-		_front_material.albedo_color = Color.WHITE
+		_front_material.set_shader_parameter("print_texture",_print.get_texture())
 
 func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	if _visual == null or _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
@@ -176,7 +185,6 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var rigid_weight := band_t*band_t*(3.0-2.0*band_t)
 			if full_release:
 				rigid_weight = 1.0
-
 			var flat_reference := corner_attached+tangent_axis*((u-1.0)*_label.label_width)+Vector3.UP*((v-1.0)*_label.label_height)
 			var free_target := flat_reference+safe_drag+free_normal*lift_distance+Vector3.UP*(progress*0.010)
 			var moved := attached.lerp(free_target,rigid_weight)
@@ -220,7 +228,6 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(adhesive_positions,adhesive_normals,uvs,flap_indices))
 		mesh.surface_set_material(mesh.get_surface_count()-1,_adhesive_material)
 	_visual.mesh = mesh
-
 	var corner_index := V_SEGMENTS*(U_SEGMENTS+1)+U_SEGMENTS
 	_visual_grip_local = flap_positions[corner_index]
 
@@ -228,9 +235,7 @@ func _reversed_indices(source: PackedInt32Array) -> PackedInt32Array:
 	var reversed := PackedInt32Array()
 	for i in range(0,source.size(),3):
 		if i+2 >= source.size(): break
-		reversed.append(source[i])
-		reversed.append(source[i+2])
-		reversed.append(source[i+1])
+		reversed.append(source[i]); reversed.append(source[i+2]); reversed.append(source[i+1])
 	return reversed
 
 func _arrays(vertices: PackedVector3Array, normals: PackedVector3Array, tex_uv: PackedVector2Array, indices: PackedInt32Array) -> Array:
