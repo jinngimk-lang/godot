@@ -58,6 +58,11 @@ func _refresh_status(root: Node, fallback_text: String) -> void:
 		var variant: Dictionary = session.current_variant()
 		var name := String(variant.get("name","Peel Calm"))
 		var progress := float(controller.get_progress()) if controller != null and controller.has_method("get_progress") else 0.0
+		# Capture fixtures stage the real LabelVisual/hand/residue directly while
+		# leaving PeelController untouched. Preserve that exact staged percentage
+		# from the hidden legacy status so screenshot evidence never lies about the
+		# frame being inspected. Normal gameplay writes the same value to both.
+		progress = maxf(progress,_parse_legacy_progress(fallback_text))
 		var residue := float(controller.get_residue()) if controller != null and controller.has_method("get_residue") else 0.0
 		var integrity := float(controller.get_integrity()) if controller != null and controller.has_method("get_integrity") else 1.0
 		var state := "PAUSED" if paused else "Peel Progress %d%%" % int(round(progress*100.0))
@@ -72,6 +77,20 @@ func _refresh_status(root: Node, fallback_text: String) -> void:
 	if lines.size() > 1:
 		status = String(lines[1]).get_slice("•",0).strip_edges().replace("Peel ","Peel Progress ")
 	_progress_copy.text = "%s\n%s" % [title,status]
+
+func _parse_legacy_progress(text: String) -> float:
+	var marker := "Peel "
+	var start := text.find(marker)
+	if start < 0:
+		return 0.0
+	start += marker.length()
+	var percent := text.find("%",start)
+	if percent < 0:
+		return 0.0
+	var raw := text.substr(start,percent-start).strip_edges()
+	if not raw.is_valid_int():
+		return 0.0
+	return clampf(float(raw.to_int())/100.0,0.0,1.0)
 
 func _panel(node_name: String, at: Vector2, panel_size: Vector2) -> Panel:
 	var panel := Panel.new()
