@@ -67,9 +67,6 @@ func run() -> Array[String]:
 				failures.append("paper backing thickness should remain visible but thin, got %.4f" % thickness)
 			if roughness < 0.90:
 				failures.append("paper backing should be matte/fibrous, got roughness %.3f" % roughness)
-		# Target-image contract: the approved object-only mockup lifts a stiff paper
-		# flap from the LEFT edge and advances the bond front toward the right. At
-		# 38% gameplay progress only about the left quarter should be visually free.
 		if not corner.has_method("peel_side") or String(corner.call("peel_side")) != "left":
 			failures.append("PAPER_SILHOUETTE_RED: visible peel must originate from the left edge")
 		if not corner.has_method("peel_front_u_for_progress"):
@@ -84,6 +81,20 @@ func run() -> Array[String]:
 				failures.append("38%% target silhouette should release only the left quarter, got u=%.3f" % mid_u)
 			if full_u < 0.999:
 				failures.append("full peel front must reach the right edge")
+		# Direct Coffee/Supermarket targets do not release a full-height vertical
+		# strip. They form a localized paper wedge around the grabbed left edge.
+		if not corner.has_method("row_front_u_for_progress"):
+			failures.append("PAPER_WEDGE_RED: renderer needs a vertical envelope for localized left-edge peel")
+		else:
+			var center_front: float = float(corner.call("row_front_u_for_progress",0.38,0.44))
+			var top_front: float = float(corner.call("row_front_u_for_progress",0.38,0.96))
+			var bottom_front: float = float(corner.call("row_front_u_for_progress",0.38,0.04))
+			if center_front < 0.18:
+				failures.append("PAPER_WEDGE_RED: 38%% grab zone should visibly peel at the left-center")
+			if top_front > center_front*0.42 or bottom_front > center_front*0.42:
+				failures.append("PAPER_WEDGE_RED: 38%% flap should taper vertically instead of releasing a full-height strip")
+			if float(corner.call("row_front_u_for_progress",1.0,0.02)) < 0.999 or float(corner.call("row_front_u_for_progress",1.0,0.98)) < 0.999:
+				failures.append("PAPER_WEDGE_RED: complete release must still free every row")
 		corner.free()
 
 	var backdrop_script = load("res://scripts/presentation/reference_backdrop.gd")
