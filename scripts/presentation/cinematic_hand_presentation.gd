@@ -44,6 +44,12 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if _hands.size() < HAND_NAMES.size():
 		_bind()
+	# ForearmPresentation still maintains compatibility geometry and may toggle
+	# its café cuff visible when venue materials update. This later presentation
+	# owns what reaches the viewport, so retire those compatibility pieces after
+	# every upstream update instead of allowing two visible wrist layers.
+	for hand_name in _hands.keys():
+		_enforce_retired_compatibility_geometry(String(hand_name))
 	_update_venue_materials()
 
 func get_ready_hand_count() -> int:
@@ -160,6 +166,7 @@ func _bind_hand(parent: Node3D, hand_name: String) -> void:
 	}
 	_hands[hand_name] = data
 	_build_cinematic_forearm(hand_name, wrist, palm_forward)
+	_enforce_retired_compatibility_geometry(hand_name)
 
 func _polish_authored_meshes(node: Node, output: Array[MeshInstance3D]) -> void:
 	if node is MeshInstance3D:
@@ -188,6 +195,26 @@ func _mesh_has_cinematic_override(mesh_instance: MeshInstance3D) -> bool:
 		if material == _skin_material or material == _nail_material:
 			return true
 	return false
+
+func _enforce_retired_compatibility_geometry(hand_name: String) -> void:
+	if not _hands.has(hand_name):
+		return
+	var data: Dictionary = _hands[hand_name]
+	var hand := data.get("hand") as Node3D
+	if hand == null:
+		return
+	var legacy_forearm := hand.get_node_or_null("ForearmNatural") as MeshInstance3D
+	if legacy_forearm != null:
+		legacy_forearm.visible = false
+	var legacy_cuff := hand.get_node_or_null("SleeveCuffNatural") as MeshInstance3D
+	if legacy_cuff != null:
+		legacy_cuff.visible = false
+	var authored_sleeve := hand.get_node_or_null("AuthoredHand/WristSleeve") as MeshInstance3D
+	if authored_sleeve != null:
+		authored_sleeve.visible = false
+	var authored_cuff := hand.get_node_or_null("AuthoredHand/WristCuff") as MeshInstance3D
+	if authored_cuff != null:
+		authored_cuff.visible = false
 
 func _build_cinematic_forearm(hand_name: String, wrist: Vector3, palm_forward: Vector3) -> void:
 	if not _hands.has(hand_name):
