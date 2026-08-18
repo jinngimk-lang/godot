@@ -6,6 +6,7 @@ const MAX_FOREARM_RADIUS := 0.21
 const MIN_AUTHORED_HAND_SCALE := 4.00
 const MIN_FOREARM_TANGENT_DEFLECTION_DEGREES := 24.0
 const MIN_WRIST_OVERLAP_AUTHORED := 0.009
+const MIN_MIDARM_SIDE_ASYMMETRY := 0.020
 const EXPECTED_OPEN_WRIST_INDEX_COUNT := 6816
 
 func _init() -> void:
@@ -32,6 +33,18 @@ func _run() -> void:
 		if radius <= 0.0 or radius > MAX_FOREARM_RADIUS:
 			_fail("forearm radius out of anatomical bound at %.2f: %.3f" % [sample,radius],scene)
 			return
+
+	# A smooth curved centerline and a simple oval are not enough to read as a
+	# human bare forearm. At the muscle belly the radial and ulnar silhouettes
+	# must be measurably asymmetric instead of mirror-image pipe walls. This is
+	# a structural cross-section gate; it does not prescribe hand pose, path,
+	# wrist overlap, overall radius, or a parameter sweep.
+	var mid_radial: Vector2 = presentation.call("_sleeve_cross_section",0.55,0.0) as Vector2
+	var mid_ulnar: Vector2 = presentation.call("_sleeve_cross_section",0.55,PI) as Vector2
+	var side_asymmetry := absf(absf(mid_radial.x)-absf(mid_ulnar.x))
+	if side_asymmetry < MIN_MIDARM_SIDE_ASYMMETRY:
+		_fail("bare forearm cross-section stays too pipe-symmetric at mid-arm: %.3f < %.3f" % [side_asymmetry,MIN_MIDARM_SIDE_ASYMMETRY],scene)
+		return
 
 	if not presentation.has_method("_path_tangent_deflection_degrees"):
 		_fail("forearm path must expose an anatomical tangent-deflection contract",scene)
@@ -122,7 +135,7 @@ func _run() -> void:
 			_fail("market %s forearm must stay natural HandSkin" % hand_name,scene)
 			return
 
-	print("PASS: reference-scale hands, seamless curved forearms and single-owner grip choreography stay coherent")
+	print("PASS: reference-scale hands, anatomically asymmetric curved forearms and single-owner grip choreography stay coherent")
 	scene.queue_free()
 	await process_frame
 	quit(0)
