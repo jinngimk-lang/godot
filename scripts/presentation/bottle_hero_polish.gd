@@ -2,8 +2,8 @@ extends Node3D
 class_name BottleHeroPolish
 
 const HIGHLIGHT_ALPHA := 0.125
-const OUTER_GLASS_ALPHA := 0.014
-const LIQUID_ALPHA := 0.62
+const OUTER_GLASS_ALPHA := 0.0
+const LIQUID_ALPHA := 0.74
 const TARGET_FOCUS_Y := 0.42
 
 var _active_kind := ""
@@ -61,32 +61,38 @@ func _bind() -> void:
 func _tune_base_bottle() -> void:
 	if _product == null:
 		return
+	# The direct target reads the vessel through its liquid, bright contour and
+	# specular streaks. Alpha-blended full glass shells stack into a milky blue
+	# bottle in GL compatibility, so keep those shells out of the color pass and
+	# let the dedicated Fresnel/highlight geometry describe the transparent glass.
 	var outer := _product.get_node_or_null("BottleOuterGlass") as MeshInstance3D
-	if outer != null and outer.material_override is StandardMaterial3D:
-		var material := outer.material_override as StandardMaterial3D
-		material.albedo_color = Color(0.985,0.995,0.990,OUTER_GLASS_ALPHA)
-		material.roughness = 0.014
-		material.metallic_specular = 0.98
-		material.rim = 0.98
-		material.rim_tint = 0.76
+	if outer != null:
+		outer.visible = false
 	var inner := _product.get_node_or_null("BottleInnerGlass") as MeshInstance3D
-	if inner != null and inner.material_override is StandardMaterial3D:
-		var inner_material := inner.material_override as StandardMaterial3D
-		inner_material.albedo_color = Color(1.0,1.0,1.0,0.004)
-		inner_material.roughness = 0.014
+	if inner != null:
+		inner.visible = false
 	var liquid := _product.get_node_or_null("BottleLiquid") as MeshInstance3D
 	if liquid != null and liquid.material_override is StandardMaterial3D:
+		liquid.visible = true
 		var liquid_material := liquid.material_override as StandardMaterial3D
-		liquid_material.albedo_color = Color(0.935,0.925,0.705,LIQUID_ALPHA)
-		liquid_material.roughness = 0.10
-		liquid_material.metallic_specular = 0.28
+		liquid_material.albedo_color = Color(0.945,0.925,0.685,LIQUID_ALPHA)
+		liquid_material.roughness = 0.11
+		liquid_material.metallic_specular = 0.24
 	var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
 	if edge != null and edge.material_override is ShaderMaterial:
+		edge.visible = true
 		edge.scale = Vector3.ONE*1.002
 		var edge_material := edge.material_override as ShaderMaterial
-		edge_material.set_shader_parameter("edge_color",Color(0.94,0.99,1.0,1.0))
-		edge_material.set_shader_parameter("edge_alpha",0.32)
-		edge_material.set_shader_parameter("fresnel_power",2.55)
+		edge_material.set_shader_parameter("edge_color",Color(0.965,0.995,1.0,1.0))
+		edge_material.set_shader_parameter("edge_alpha",0.38)
+		edge_material.set_shader_parameter("fresnel_power",2.35)
+	var base_ring := _product.get_node_or_null("BottleBaseRing") as MeshInstance3D
+	if base_ring != null:
+		base_ring.visible = true
+		if base_ring.material_override is StandardMaterial3D:
+			var ring_material := base_ring.material_override as StandardMaterial3D
+			ring_material.albedo_color = Color(0.96,0.99,1.0,0.22)
+			ring_material.roughness = 0.04
 
 func _build_metal_cap() -> void:
 	var cap := MeshInstance3D.new()
