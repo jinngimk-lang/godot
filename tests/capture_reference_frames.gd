@@ -106,12 +106,13 @@ func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	label.set_peel(1.0,grip_local)
 	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
 	# Stage the actual post-peel lifecycle rather than freezing the old HELD state.
-	# The final "done" capture must prove the released sheet no longer floats in
-	# front of the hero object after its brief acknowledgement/settle window.
+	# LabelLifecycle intentionally clamps any single delta to 0.5 s, so advance the
+	# 0.72 s settle window in two bounded updates to prove true RESOLVED state.
 	lifecycle.reset()
 	lifecycle.update(1.0,true,0.016)
 	lifecycle.update(1.0,false,0.18)
-	lifecycle.update(1.0,false,0.80)
+	lifecycle.update(1.0,false,0.50)
+	lifecycle.update(1.0,false,0.30)
 	label.set_phase(String(lifecycle.get_phase_name()))
 	label.set_detach_alpha(float(lifecycle.get_detach_alpha()))
 	scene.set_process(false)
