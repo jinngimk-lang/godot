@@ -31,9 +31,6 @@ func _ready() -> void:
 	call_deferred("_bind")
 
 func _exit_tree() -> void:
-	# Dynamic ArrayMesh resources can remain referenced by the GL renderer for a
-	# frame after the scene goes away. Drop production references explicitly so
-	# automated capture shutdown and normal project exit stay clean.
 	if _visual != null:
 		_visual.mesh = null
 	_front_material = null
@@ -251,8 +248,12 @@ func _rebuild(progress: float, drag_delta: Vector3, release_settle_alpha: float 
 				var cursor_pose := tangent*drag_tangent*free_ratio+Vector3.UP*drag_vertical*free_ratio
 				var free_edge_curl := pow(free_ratio,2.15)
 				var vertical_wedge := 1.0-clampf(absf(v-0.44)/0.60,0.0,1.0)
-				var curl_lift := front_normal*(lift_max*bend_weight+0.058*free_edge_curl*vertical_wedge)
-				var curl_drop := Vector3.DOWN*(_label.label_height*0.13*free_edge_curl*vertical_wedge)
+				# A cylinder tangent alone turns behind the vessel as it extends left.
+				# Real peeled paper instead comes toward the viewer; add outward travel
+				# proportional to released arc length so the free wedge remains visible.
+				var peel_outward := distance_from_front*0.98
+				var curl_lift := front_normal*(peel_outward+lift_max*bend_weight*0.48+0.050*free_edge_curl*vertical_wedge)
+				var curl_drop := Vector3.DOWN*(_label.label_height*0.12*free_edge_curl*vertical_wedge)
 				moved = flat_sheet+cursor_pose+curl_lift+curl_drop
 				flap_normal = front_normal
 			base_positions.append(attached)
