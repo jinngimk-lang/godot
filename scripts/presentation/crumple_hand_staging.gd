@@ -1,8 +1,9 @@
 extends Node3D
 class_name CrumpleHandStaging
 
-const SUPPORT_MAX_INWARD_OFFSET := 0.085
-const PEEL_MAX_INWARD_OFFSET := 0.150
+const CAFE_SUPPORT_HOME_INSET := 0.10
+const SUPPORT_MAX_INWARD_OFFSET := 0.075
+const PEEL_MAX_INWARD_OFFSET := 0.135
 const MAX_DOWN_OFFSET := 0.018
 
 var _support_hand: Node3D
@@ -25,7 +26,11 @@ func _bind() -> void:
 	_source = parent.get_node_or_null("CupCrumplePresentation") as CupCrumplePresentation
 	if _support_hand == null or _source == null:
 		return
-	_support_home = _support_hand.position
+	# The new smooth support hand has a smaller palm than the retired XR render
+	# mesh. Start it closer to the paper cup so later squeeze contact is achieved
+	# by a restrained press instead of a large corrective teleport.
+	_support_home = _support_hand.position + Vector3(-CAFE_SUPPORT_HOME_INSET,0.0,0.0)
+	_support_hand.position = _support_home
 	_has_support_home = true
 	if _peel_hand != null:
 		_peel_home = _peel_hand.position
@@ -37,24 +42,17 @@ func _bind() -> void:
 func _on_crumple_changed(progress: float) -> void:
 	if not _has_support_home or _support_hand == null:
 		return
-	var safe_progress := clampf(progress if is_finite(progress) else 0.0, 0.0, 1.0)
-	# Smoothstep keeps the first touch calm, then adds visible pressure as the
-	# paper shell yields. Only presentation roots move; the independently
-	# verified authored skeleton poses remain untouched.
-	var eased := safe_progress * safe_progress * (3.0 - 2.0 * safe_progress)
-	var support_inward := SUPPORT_MAX_INWARD_OFFSET * eased
-	var peel_inward := PEEL_MAX_INWARD_OFFSET * eased
-	var down := MAX_DOWN_OFFSET * eased
-	_support_hand.position = _support_home + Vector3(-support_inward, -down, 0.0)
+	var safe_progress := clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	var eased := safe_progress*safe_progress*(3.0-2.0*safe_progress)
+	var support_inward := SUPPORT_MAX_INWARD_OFFSET*eased
+	var peel_inward := PEEL_MAX_INWARD_OFFSET*eased
+	var down := MAX_DOWN_OFFSET*eased
+	_support_hand.position = _support_home+Vector3(-support_inward,-down,0.0)
 	if _has_peel_home and _peel_hand != null:
-		_peel_hand.position = _peel_home + Vector3(peel_inward, -down, 0.0)
+		_peel_hand.position = _peel_home+Vector3(peel_inward,-down,0.0)
 
-	# The authored root choreography above establishes the ritual silhouette,
-	# but a fixed offset cannot track a deforming paper shell. Once the cup is
-	# visibly crumpling, finish each motion by translating the whole hand so its
-	# actual rendered pinch anchor lands on the nearest vertex of the current
-	# CrumpledCup ArrayMesh. This is a geometry-derived residual, not an IK or
-	# parameter search, and it leaves the authored skeleton pose untouched.
+	# Ground the visible interaction anchors on the current deformed paper shell.
+	# The correction is geometry-derived and preserves the authored pose authority.
 	if safe_progress > 0.001:
 		_ground_visible_pinch_on_shell(_support_hand)
 		if _has_peel_home and _peel_hand != null:
@@ -73,7 +71,6 @@ func _ground_visible_pinch_on_shell(hand: Node3D) -> void:
 	var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
 	if vertices.is_empty():
 		return
-
 	var visual := hand as HandVisual
 	var pinch_world := visual.get_pinch_world_position()
 	var target_world := pinch_world
@@ -84,7 +81,7 @@ func _ground_visible_pinch_on_shell(hand: Node3D) -> void:
 		if distance_squared < best_distance_squared:
 			best_distance_squared = distance_squared
 			target_world = candidate_world
-	visual.global_position += target_world - pinch_world
+	visual.global_position += target_world-pinch_world
 
 func reset_staging() -> void:
 	if _has_support_home and _support_hand != null:
