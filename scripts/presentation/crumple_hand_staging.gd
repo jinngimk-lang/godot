@@ -6,6 +6,7 @@ const PEEL_MAX_INWARD_OFFSET := 0.135
 const MAX_DOWN_OFFSET := 0.018
 const SUPPORT_CONTACT_HEIGHT := 0.04
 const SUPPORT_CONTACT_DEPTH := 0.08
+const CAFE_SUPPORT_ROTATION := Vector3(0.122173,0.349066,-1.326450)
 
 var _support_hand: Node3D
 var _peel_hand: Node3D
@@ -29,10 +30,11 @@ func _bind() -> void:
 	_cup = parent.get_node_or_null("Cup") as MeshInstance3D
 	if _support_hand == null or _source == null:
 		return
-	# The visible hand was scaled up to first-person hero proportions. Derive its
-	# resting root from the *visible pinch anchor* and the actual cup radius instead
-	# of retaining the legacy fixed root offset. That makes subsequent crumple
-	# grounding a small correction rather than a large teleport.
+	# The reference support hand lives on the cup's right flank, with fingers
+	# disappearing around the far side. Apply that viewing rotation before
+	# deriving the visible contact anchor, so the staging position is solved for
+	# the same pose the player actually sees.
+	_support_hand.rotation = CAFE_SUPPORT_ROTATION
 	_place_support_home_on_cup()
 	_support_home = _support_hand.position
 	_has_support_home = true
