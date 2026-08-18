@@ -3,7 +3,7 @@ class_name BottleHeroPolish
 
 const HIGHLIGHT_ALPHA := 0.125
 const OUTER_GLASS_ALPHA := 0.0
-const LIQUID_ALPHA := 0.74
+const LIQUID_ALPHA := 1.0
 const TARGET_FOCUS_Y := 0.42
 
 var _active_kind := ""
@@ -61,10 +61,8 @@ func _bind() -> void:
 func _tune_base_bottle() -> void:
 	if _product == null:
 		return
-	# The direct target reads the vessel through its liquid, bright contour and
-	# specular streaks. Alpha-blended full glass shells stack into a milky blue
-	# bottle in GL compatibility, so keep those shells out of the color pass and
-	# let the dedicated Fresnel/highlight geometry describe the transparent glass.
+	# In the GL compatibility renderer the target works better as a clear edge-
+	# defined vessel around a cloudy citrus drink than as stacked alpha shells.
 	var outer := _product.get_node_or_null("BottleOuterGlass") as MeshInstance3D
 	if outer != null:
 		outer.visible = false
@@ -75,17 +73,18 @@ func _tune_base_bottle() -> void:
 	if liquid != null and liquid.material_override is StandardMaterial3D:
 		liquid.visible = true
 		var liquid_material := liquid.material_override as StandardMaterial3D
-		liquid_material.albedo_color = Color(0.945,0.925,0.685,LIQUID_ALPHA)
-		liquid_material.roughness = 0.11
-		liquid_material.metallic_specular = 0.24
+		liquid_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		liquid_material.albedo_color = Color(0.88,0.84,0.54,1.0)
+		liquid_material.roughness = 0.18
+		liquid_material.metallic_specular = 0.18
 	var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
 	if edge != null and edge.material_override is ShaderMaterial:
 		edge.visible = true
 		edge.scale = Vector3.ONE*1.002
 		var edge_material := edge.material_override as ShaderMaterial
 		edge_material.set_shader_parameter("edge_color",Color(0.965,0.995,1.0,1.0))
-		edge_material.set_shader_parameter("edge_alpha",0.38)
-		edge_material.set_shader_parameter("fresnel_power",2.35)
+		edge_material.set_shader_parameter("edge_alpha",0.40)
+		edge_material.set_shader_parameter("fresnel_power",2.30)
 	var base_ring := _product.get_node_or_null("BottleBaseRing") as MeshInstance3D
 	if base_ring != null:
 		base_ring.visible = true
