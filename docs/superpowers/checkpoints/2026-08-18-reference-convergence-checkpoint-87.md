@@ -19,7 +19,7 @@ A fresh capability check still found no live Blender/native-rig visual-authoring
 1. **R1 Macro — hero support-hand anatomy / true vessel enclosure.** Still the largest visible mismatch and still prohibited from another CCD/grip/wrist/orbit/yaw/translation/per-finger numeric search.
 2. **R2/Meso — whole-hand peel pinch / full-hand following of lifted flap.**
 3. **Idle interaction-state Meso — untouched Café/Bar/Market frames showed the peel hand already making a pinch gesture while floating away from the actual attached paper edge.**
-4. **Bare-arm anatomy / silhouette — generated limb remains tube-like; prior terminal-cap and subdivision routes are already disproven.
+4. **Bare-arm anatomy / silhouette — generated limb remains tube-like; prior terminal-cap and subdivision routes are already disproven.**
 5. **Micro — skin, paper fibre, glass/liquid, residue, condensation.** Frozen while lower-frequency reds dominate.
 
 ## Scoped hypothesis
@@ -117,6 +117,20 @@ The product merge contains only:
 - `scripts/presentation/hand_choreography_presentation.gd`
 - `tests/test_forearm_presentation_smoke.gd`
 
+## Fresh integrated-product proof
+
+Checkpoint PR #152 was branched directly from merged product commit `2db2eaa0bcd9ee7a44e8dc8450d1e6e195369372`; its first documentation head `bdb306a415dd95d6f576c1f40be62e28410999fb` therefore exercised the real merged product tree plus this checkpoint file.
+
+Godot Check:
+
+- run `32086713581` — PASS
+- Godot 4.7.1 import / launch / unit / scene / reference / label-surface / café / crumple / live crumpled-shell contact / contents / forearm / ritual / repeated reset / pause and reset isolation all PASS
+- nine-frame capture PASS
+- artifact `9306956726`
+- digest `sha256:197ea8fad8db4a6eadca04f287d83c2914574d0b56ea34c455bbaea855e349be`
+
+This is fresh integration verification after product merge, not reuse of the feature-branch GREEN.
+
 ## Closed reds
 
 Closed in checkpoint 87:
@@ -137,19 +151,15 @@ Closed in checkpoint 87:
 - Do not use idle edge contact as evidence that R2 whole-hand pinch is solved.
 - Do not descend into decorative Micro polish while R1/R2 remain dominant.
 
-## Integration verification state
-
-The product merge commit is `2db2eaa0bcd9ee7a44e8dc8450d1e6e195369372`. This checkpoint branch is created directly from that merged product commit so its PR-triggered Godot Check validates the real integrated product tree plus this documentation file. Record the resulting exact-head run/artifact before merging the checkpoint PR.
-
 ## Next exact action
 
 On recovery:
 
 1. read this checkpoint, master prompt v3 and multiscale skill;
-2. confirm the checkpoint integration PR exact-head Godot Check and newest nine-frame artifact;
-3. inspect newest main/open PRs/branches and live authoring capability;
-4. if live Blender/native-rig authoring is available, immediately return to R1 whole-hand support-grasp authoring against locked references;
+2. inspect newest main/open PRs/branches, exact-head CI and newest nine-frame artifact;
+3. check again for live Blender/native-rig visual-authoring capability;
+4. if available, immediately return to R1 whole-hand support-grasp authoring against locked references;
 5. otherwise select one independent falsifiable Macro/Meso structural red from the freshest interaction frames without reopening prohibited hand/forearm parameter searches;
-6. preserve exact-head runtime comparison and Challenger gates before any product merge.
+6. preserve exact-head runtime comparison and Challenger gates before any next product merge.
 
 Completion remains blocked by the locked-reference hand/anatomy gates and later owner aesthetic/playtest gates. CI green alone is not visual completion.
