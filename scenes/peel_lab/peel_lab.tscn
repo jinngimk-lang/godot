@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/cursor_presentation.gd" id="17_cursor"]
 [ext_resource type="Script" path="res://scripts/presentation/corner_peel_presentation.gd" id="18_corner"]
 [ext_resource type="Script" path="res://scripts/presentation/hero_product_detail_presentation.gd" id="19_hero_detail"]
+[ext_resource type="Script" path="res://scripts/presentation/substrate_peel_feel_binding.gd" id="20_substrate_feel"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -49,6 +50,9 @@ script = ExtResource("19_hero_detail")
 
 [node name="CornerPeelPresentation" type="Node3D" parent="."]
 script = ExtResource("18_corner")
+
+[node name="SubstratePeelFeelBinding" type="Node" parent="."]
+script = ExtResource("20_substrate_feel")
 
 [node name="CursorPresentation" type="Node" parent="."]
 script = ExtResource("17_cursor")
