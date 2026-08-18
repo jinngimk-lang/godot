@@ -37,6 +37,14 @@ func set_edge_position(screen_position: Vector2) -> void:
 
 func set_grab_region(screen_region: Rect2) -> void:
 	_grab_region = screen_region.abs()
+	# The approved object-only label advertises a lifted top-right corner. PeelLab
+	# still provides a scalar model edge for progression, but before any paper is
+	# free the visible corner is the true mouse target. Because set_grab_region()
+	# runs after set_edge_position() each frame, this becomes the first-grab
+	# authority without adding another proxy object between mouse and label.
+	if _model.get_progress() <= 0.001 and _grab_region.size.x > 0.0 and _grab_region.size.y > 0.0 and _state in [State.IDLE,State.EDGE_HOVER,State.RELEASED]:
+		_edge_position = _grab_region.position+Vector2(_grab_region.size.x,0.0)
+		_hand_position = _edge_position
 
 func process_pointer(pointer: PointerState, delta: float) -> Dictionary:
 	var can_grab := _can_grab(pointer.position)
@@ -107,6 +115,9 @@ func is_complete() -> bool:
 func get_hand_position() -> Vector2:
 	return _hand_position
 
+func get_edge_position() -> Vector2:
+	return _edge_position
+
 func get_state_name() -> String:
 	return State.keys()[_state]
 
@@ -114,8 +125,6 @@ func get_model_config() -> Dictionary:
 	return _model.get_config()
 
 func _can_grab(position: Vector2) -> bool:
-	# The first peel has to begin at the actual lifted edge. Once some paper is
-	# already free, let the whole visible label remain forgiving to re-grab.
 	if _model.get_progress() > 0.001:
 		if _grab_region.size.x > 0.0 and _grab_region.size.y > 0.0 and _grab_region.grow(7.0).has_point(position):
 			return true
