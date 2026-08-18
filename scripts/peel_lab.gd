@@ -31,6 +31,17 @@ var _pending_score := 0
 var _advance_after_reset := false
 var _detach_reward_recorded := false
 var _paused := false
+var _rmb_rotating := false
+
+func get_control_contract() -> Dictionary:
+	return {
+		"peel":"LMB",
+		"rotate":"RMB",
+		"inspect":"R",
+		"reset":"T",
+		"scenes":"1/2/3",
+		"pause":"Esc"
+	}
 
 func _ready() -> void:
 	_build_world()
@@ -99,8 +110,6 @@ func _process(delta: float) -> void:
 	var pinch_world := _right_hand.get_pinch_world_position()
 	_label.set_peel(progress,_label.to_local(pinch_world))
 
-	# Legacy gold point is kept only as a hidden discoverability node. The label
-	# surface owns peel input, so interaction never depends on this marker.
 	_edge_marker.global_position = front_world
 	_edge_marker.visible = false
 
@@ -305,7 +314,7 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 	var post_action := String(variant.get("post_peel_action","crumple"))
 	var hint := String(variant.get("hint","slow pull feels cleaner"))
 	if _paused:
-		_hud.text = "%s  •  PAUSED\nEsc Resume  •  R Reset  •  Q/E Scene  •  1/2/3" % venue_name
+		_hud.text = "%s  •  PAUSED\nEsc Resume  •  T Reset  •  1/2/3 Scene" % venue_name
 		return
 	if phase_name == "DETACHING": hint = "last adhesive fibers releasing…"
 	elif phase_name == "HELD": hint = "label released • inspect or Continue"
@@ -315,8 +324,8 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 		var crumple_percent := int(round((_crumple.get_progress() if _crumple != null else 0.0)*100.0))
 		hint = "optional squeeze %d%% • Continue when ready" % crumple_percent
 	elif post_action == "inspect" and phase_name == "HELD":
-		hint = "RMB drag to inspect residue • Continue when ready"
-	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Peel anywhere  •  RMB Inspect  •  Q/E Scene  •  1/2/3  •  Esc Pause  •  R Reset" % [
+		hint = "R Inspect / return • RMB rotate • Continue when ready"
+	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Grab / Peel  •  RMB Rotate  •  R Inspect  •  T Reset  •  1/2/3 Scene  •  Esc Pause" % [
 		venue_name,String(variant.get("name","Peel Calm")),percent,grade,int(round(residue*100.0)),hint
 	]
 
@@ -344,7 +353,7 @@ func _handle_detached_label() -> void:
 	if _uses_crumple():
 		reward_text += "\noptional squeeze • Continue when ready"
 	else:
-		reward_text += "\nRMB inspect • Continue when ready"
+		reward_text += "\nR inspect • RMB rotate • Continue when ready"
 	_reward.text = reward_text
 	_reset_timer = -1.0
 	_advance_after_reset = false
@@ -371,6 +380,7 @@ func _on_continue_pressed() -> void:
 		return
 	if _inspection != null:
 		_inspection.end()
+	_rmb_rotating = false
 	if _uses_crumple():
 		if _crumple != null:
 			_crumple.end_gesture()
@@ -384,8 +394,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if event.pressed and not _paused:
+			_rmb_rotating = true
 			_inspection.begin()
-		else:
+		elif _rmb_rotating:
+			_rmb_rotating = false
 			_inspection.end()
 	elif event is InputEventMouseMotion and _inspection.is_active() and not _paused:
 		_inspection.drag(event.relative.x,0.0)
@@ -400,21 +412,26 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		else:
 			_pointer.suspend_gameplay_input()
 			_paused = true
+			_rmb_rotating = false
 			if _inspection != null: _inspection.end()
 		_audio.reset_feedback()
 		_update_hud("",_lifecycle.get_phase_name(),_controller.get_progress())
 		return
-	if event.keycode == KEY_Q:
-		_select_showcase_relative(-1)
-		return
-	if event.keycode == KEY_E:
-		_select_showcase_relative(1)
-		return
 	if event.keycode in [KEY_1,KEY_2,KEY_3]:
 		_select_showcase(int(event.keycode-KEY_1))
 		return
-	if event.keycode == KEY_R:
+	if event.keycode == KEY_R and not _paused:
+		_rmb_rotating = false
+		if _inspection.is_active():
+			_inspection.reset()
+			_apply_inspection_yaw(0.0)
+		else:
+			_inspection.begin()
+			_inspection.drag(92.0,0.0)
+		return
+	if event.keycode == KEY_T:
 		_paused = false
+		_rmb_rotating = false
 		if event.shift_pressed:
 			_session.restart_run()
 			_apply_current_variant()
@@ -430,6 +447,7 @@ func _select_showcase_relative(direction: int) -> void:
 
 func _select_showcase(index: int) -> void:
 	_paused = false
+	_rmb_rotating = false
 	if _inspection != null: _inspection.reset()
 	_session.select_variant(index)
 	_apply_current_variant()
@@ -498,6 +516,7 @@ func _apply_current_variant() -> void:
 	_apply_inspection_yaw(0.0)
 
 func _reset_session() -> void:
+	_rmb_rotating = false
 	if _pointer != null:
 		_pointer.resume_gameplay_input()
 		_pointer.quarantine_current_press()
