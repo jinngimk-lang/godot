@@ -17,16 +17,16 @@ func _run() -> void:
 
 	var controller = scene.get("_controller")
 	var pointer := scene.get_node_or_null("PointerAdapter") as PointerAdapter
-	var label := scene.get_node_or_null("PeelLabel") as LabelVisual
-	var camera := scene.get_node_or_null("Camera") as Camera3D
-	if controller == null or pointer == null or label == null or camera == null:
-		push_error("PAUSE_INPUT_RED: missing controller/pointer/label/camera contract")
+	if controller == null or pointer == null:
+		push_error("PAUSE_INPUT_RED: missing controller/pointer contract")
 		quit(1)
 		return
 
 	controller.reset()
-	var edge_world := label.to_global(label.get_front_position(controller.get_progress()))
-	var edge_screen := camera.unproject_position(edge_world)
+	# One dry frame lets PeelLab project the real label region; PeelController then
+	# publishes the approved top-right visible corner as its first-grab edge.
+	scene.call("_process",1.0/60.0)
+	var edge_screen: Vector2 = controller.get_edge_position()
 
 	var escape := InputEventKey.new()
 	escape.pressed = true
@@ -60,11 +60,11 @@ func _run() -> void:
 	_send_mouse(pointer,true,edge_screen)
 	scene.call("_process",1.0/60.0)
 	if String(controller.get_state_name()) != "EDGE_LIFT":
-		push_error("PAUSE_INPUT_RED: fresh post-resume press did not re-arm edge lift; actual=%s" % String(controller.get_state_name()))
+		push_error("PAUSE_INPUT_RED: fresh post-resume corner press did not re-arm edge lift; actual=%s" % String(controller.get_state_name()))
 		quit(1)
 		return
 
-	print("PASS: pause quarantines pointer input until release and a fresh post-resume press")
+	print("PASS: pause quarantines visible-corner pointer input until a fresh post-resume press")
 	scene.queue_free()
 	await process_frame
 	quit(0)
