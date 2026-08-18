@@ -26,7 +26,7 @@ func _smooth_descendants(node: Node) -> void:
 	if node is MeshInstance3D:
 		var mesh_instance := node as MeshInstance3D
 		if mesh_instance.visible and mesh_instance.mesh != null and not mesh_instance.has_meta("peel_calm_smoothed_normals"):
-			var replacement := smooth_mesh(mesh_instance.mesh)
+			var replacement: Mesh = smooth_mesh(mesh_instance.mesh)
 			if replacement != null and replacement != mesh_instance.mesh:
 				mesh_instance.mesh = replacement
 				mesh_instance.set_meta("peel_calm_smoothed_normals",true)
@@ -37,9 +37,6 @@ func _smooth_descendants(node: Node) -> void:
 func smooth_mesh(source: Mesh) -> Mesh:
 	if source == null or source.get_surface_count() <= 0:
 		return source
-	# The authored XR hands use skeletal skinning and no morph targets. If a
-	# future replacement adds blend shapes, keep that asset untouched instead
-	# of silently dropping its deformation data.
 	if source.get_blend_shape_count() > 0:
 		return source
 	var result := ArrayMesh.new()
@@ -47,11 +44,11 @@ func smooth_mesh(source: Mesh) -> Mesh:
 		var arrays: Array = source.surface_get_arrays(surface_index)
 		if arrays.size() != Mesh.ARRAY_MAX:
 			return source
-		var primitive := source.surface_get_primitive_type(surface_index)
+		var primitive: int = source.surface_get_primitive_type(surface_index)
 		if primitive == Mesh.PRIMITIVE_TRIANGLES:
 			arrays[Mesh.ARRAY_NORMAL] = _build_smooth_normals(arrays)
 		result.add_surface_from_arrays(primitive,arrays)
-		var material := source.surface_get_material(surface_index)
+		var material: Material = source.surface_get_material(surface_index)
 		if material != null:
 			result.surface_set_material(surface_index,material)
 		result.surface_set_name(surface_index,source.surface_get_name(surface_index))
@@ -67,26 +64,26 @@ func _build_smooth_normals(arrays: Array) -> PackedVector3Array:
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 	var group_accum: Dictionary = {}
 	if not indices.is_empty():
-		var triangle_count := indices.size() / 3
+		var triangle_count: int = int(indices.size() / 3)
 		for triangle_index in range(triangle_count):
-			var ia := indices[triangle_index*3]
-			var ib := indices[triangle_index*3+1]
-			var ic := indices[triangle_index*3+2]
+			var ia: int = indices[triangle_index*3]
+			var ib: int = indices[triangle_index*3+1]
+			var ic: int = indices[triangle_index*3+2]
 			if ia < 0 or ib < 0 or ic < 0 or ia >= vertices.size() or ib >= vertices.size() or ic >= vertices.size():
 				continue
-			var face := (vertices[ib]-vertices[ia]).cross(vertices[ic]-vertices[ia])
+			var face: Vector3 = (vertices[ib]-vertices[ia]).cross(vertices[ic]-vertices[ia])
 			if face.length_squared() <= 0.0000000001:
 				continue
 			_accumulate_group(group_accum,_position_key(vertices[ia]),face)
 			_accumulate_group(group_accum,_position_key(vertices[ib]),face)
 			_accumulate_group(group_accum,_position_key(vertices[ic]),face)
 	else:
-		var triangle_count := vertices.size() / 3
+		var triangle_count: int = int(vertices.size() / 3)
 		for triangle_index in range(triangle_count):
-			var ia := triangle_index*3
-			var ib := ia+1
-			var ic := ia+2
-			var face := (vertices[ib]-vertices[ia]).cross(vertices[ic]-vertices[ia])
+			var ia: int = triangle_index*3
+			var ib: int = ia+1
+			var ic: int = ia+2
+			var face: Vector3 = (vertices[ib]-vertices[ia]).cross(vertices[ic]-vertices[ia])
 			if face.length_squared() <= 0.0000000001:
 				continue
 			_accumulate_group(group_accum,_position_key(vertices[ia]),face)
@@ -94,7 +91,7 @@ func _build_smooth_normals(arrays: Array) -> PackedVector3Array:
 			_accumulate_group(group_accum,_position_key(vertices[ic]),face)
 	var source_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	for i in range(vertices.size()):
-		var key := _position_key(vertices[i])
+		var key: Vector3i = _position_key(vertices[i])
 		var accumulated: Vector3 = group_accum.get(key,Vector3.ZERO)
 		if accumulated.length_squared() > 0.0000000001:
 			normals[i] = accumulated.normalized()
