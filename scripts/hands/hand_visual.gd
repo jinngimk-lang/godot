@@ -5,6 +5,7 @@ const RIGHT_ASSET_PATH := "res://assets/models/hands/hand_right.glb"
 const LEFT_ASSET_PATH := "res://assets/models/hands/hand_left.glb"
 const FINGER_NAMES := ["Thumb", "Index", "Middle", "Ring", "Little"]
 const AUTHORED_PRESENTATION_SCALE := 2.25
+const REALTIME_PRESENTATION_SCALE := 3.0
 const FINGER_RINGS := 72
 const FINGER_SIDES := 40
 const BODY_SEGMENTS := 36
@@ -202,12 +203,10 @@ func _build_realtime_hand_shell() -> void:
 
 	_realtime_shell = Node3D.new()
 	_realtime_shell.name = "RealtimeHandShell"
+	_realtime_shell.scale = Vector3.ONE*REALTIME_PRESENTATION_SCALE
 	add_child(_realtime_shell)
 	_realtime_shell_vertex_budget = 0
 
-	# The final viewport hand is assembled from normal MeshInstance3D geometry,
-	# never runtime boolean CSG. This keeps startup and every interaction frame
-	# deterministic while retaining a dense smooth silhouette.
 	_add_ellipsoid(_realtime_shell,Vector3(0.0,-0.090,0.0),Vector3(0.090,0.112,0.042),"Palm")
 	_add_ellipsoid(_realtime_shell,_mirror(Vector3(0.047,-0.105,-0.003)),Vector3(0.052,0.071,0.043),"Thenar")
 	_add_ellipsoid(_realtime_shell,_mirror(Vector3(-0.050,-0.108,0.004)),Vector3(0.045,0.070,0.039),"Hypothenar")
@@ -220,24 +219,24 @@ func _build_realtime_hand_shell() -> void:
 		_add_swept_finger(_realtime_shell,points,base_radius,base_radius*0.76,finger_name)
 		_add_ellipsoid(_realtime_shell,points[points.size()-1],Vector3.ONE*base_radius*0.80,"%sTip" % finger_name)
 
-	_build_nail("Index",pose["Index"][pose["Index"].size()-1],pose["Index"][pose["Index"].size()-2],_realtime_finger_radius("Index"))
-	_build_nail("Thumb",pose["Thumb"][pose["Thumb"].size()-1],pose["Thumb"][pose["Thumb"].size()-2],_realtime_finger_radius("Thumb"))
+	_build_nail(_realtime_shell,"Index",pose["Index"][pose["Index"].size()-1],pose["Index"][pose["Index"].size()-2],_realtime_finger_radius("Index"))
+	_build_nail(_realtime_shell,"Thumb",pose["Thumb"][pose["Thumb"].size()-1],pose["Thumb"][pose["Thumb"].size()-2],_realtime_finger_radius("Thumb"))
 	_using_realtime_shell = true
 	_set_render_mesh_visibility(_authored_root,false)
 
 func _add_ellipsoid(parent: Node, center: Vector3, extents: Vector3, node_name: String) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.name = node_name
+	var instance := MeshInstance3D.new()
+	instance.name = node_name
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
 	sphere.radial_segments = BODY_SEGMENTS
 	sphere.rings = BODY_RINGS
-	mesh_instance.mesh = sphere
-	mesh_instance.material_override = _skin
-	mesh_instance.position = center
-	mesh_instance.scale = extents
-	parent.add_child(mesh_instance)
+	instance.mesh = sphere
+	instance.material_override = _skin
+	instance.position = center
+	instance.scale = extents
+	parent.add_child(instance)
 	_realtime_shell_vertex_budget += BODY_SEGMENTS*BODY_RINGS
 
 func _add_swept_finger(parent: Node, points: Array, base_radius: float, tip_radius: float, node_name: String) -> void:
@@ -263,8 +262,6 @@ func _add_swept_finger(parent: Node, points: Array, base_radius: float, tip_radi
 		var ring_x := helper.cross(tangent).normalized()
 		var ring_y := tangent.cross(ring_x).normalized()
 		var radius := lerpf(base_radius,tip_radius,smoothstep(0.0,1.0,t))
-		# Slight oval section and subtle knuckle modulation keep the silhouette
-		# anatomical without introducing segmented bead joints.
 		var knuckle := 1.0+0.055*sin(PI*t)*sin(3.0*PI*t)
 		for side_index in range(FINGER_SIDES):
 			var u := float(side_index)/float(FINGER_SIDES)
@@ -299,7 +296,7 @@ func _add_swept_finger(parent: Node, points: Array, base_radius: float, tip_radi
 	parent.add_child(instance)
 	_realtime_shell_vertex_budget += vertices.size()
 
-func _build_nail(node_name: String, tip: Vector3, previous: Vector3, radius: float) -> void:
+func _build_nail(parent: Node, node_name: String, tip: Vector3, previous: Vector3, radius: float) -> void:
 	var nail := MeshInstance3D.new()
 	nail.name = "%sNail" % node_name
 	var mesh := SphereMesh.new()
@@ -312,7 +309,7 @@ func _build_nail(node_name: String, tip: Vector3, previous: Vector3, radius: flo
 	var direction := (tip-previous).normalized()
 	nail.position = tip+Vector3(0.0,0.0,-radius*0.60)-direction*radius*0.12
 	nail.scale = Vector3(0.72,0.92,0.16)
-	add_child(nail)
+	parent.add_child(nail)
 	_realtime_shell_vertex_budget += 28*14
 
 func _pinch_pose_points() -> Dictionary:
@@ -373,11 +370,11 @@ func _refresh_pinch_anchors() -> void:
 
 func _refresh_realtime_anchors() -> void:
 	if _dynamic:
-		_index_tip.position = Vector3(0.048,-0.244,-0.108)
-		_thumb_tip.position = Vector3(0.062,-0.224,-0.108)
+		_index_tip.position = Vector3(0.048,-0.244,-0.108)*REALTIME_PRESENTATION_SCALE
+		_thumb_tip.position = Vector3(0.062,-0.224,-0.108)*REALTIME_PRESENTATION_SCALE
 	else:
-		_index_tip.position = Vector3(-0.043,-0.303,-0.074)
-		_thumb_tip.position = Vector3(-0.110,-0.206,-0.070)
+		_index_tip.position = Vector3(-0.043,-0.303,-0.074)*REALTIME_PRESENTATION_SCALE
+		_thumb_tip.position = Vector3(-0.110,-0.206,-0.070)*REALTIME_PRESENTATION_SCALE
 	_pinch_point.position = (_index_tip.position+_thumb_tip.position)*0.5
 
 func _refresh_authored_anchors() -> void:
