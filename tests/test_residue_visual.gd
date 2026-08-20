@@ -22,8 +22,6 @@ func run() -> Array[String]:
 	residue.apply_profile(bar_profile)
 	residue.configure(0.45, 0.54, 1.45, 0.05, 1.15, 0.40)
 
-	# A clean, slow peel should still reveal the contact adhesive film. It should
-	# not fabricate torn backing fibers until actual peel damage/residue exists.
 	residue.set_residue(0.52, 0.0, 1.0)
 	if not residue.has_adhesive_trace():
 		failures.append("ADHESIVE_RED: clean partial peel must expose a visible adhesive/contact trace")
@@ -40,7 +38,6 @@ func run() -> Array[String]:
 		elif clean_adhesive.albedo_color.a < 0.10:
 			failures.append("ADHESIVE_RED: clean glue film needs readable but restrained opacity")
 
-	# Damage/residue should then add a separate dry fibrous backing layer.
 	residue.set_residue(0.62, 0.34, 0.72)
 	if residue.get_residue_amount() < 0.33:
 		failures.append("residue visual should retain deterministic residue amount")
@@ -63,8 +60,6 @@ func run() -> Array[String]:
 	if not residue.has_layered_residue():
 		failures.append("RED: damaged residue state should report layered adhesive + fiber presentation")
 
-	# Torn backing must read as a few broad irregular islands, not a row of tiny
-	# square cells. The drawing path consumes these exact deterministic spans.
 	if not residue.has_method("get_fiber_island_spans"):
 		failures.append("RESIDUE_SHAPE_RED: damaged residue needs deterministic broad fiber-island spans")
 	else:
@@ -83,13 +78,25 @@ func run() -> Array[String]:
 	if high_damage_fiber <= low_damage_fiber + 0.08:
 		failures.append("RED: lower label integrity should visibly increase fibrous backing strength")
 
-	# Scene profiles must materially change the clean tack trace, not just print.
 	var bar_trace: float = float(residue.get_adhesive_trace_amount())
 	residue.apply_profile({"substrate":"coated_citrus","adhesive_trace":0.11,"adhesive_tint":Color(0.78,0.86,0.66),"fiber_tint":Color(0.90,0.92,0.82),"fiber_gain":0.65})
 	residue.set_residue(0.62, 0.0, 1.0)
 	var market_trace: float = float(residue.get_adhesive_trace_amount())
 	if market_trace >= bar_trace - 0.04:
 		failures.append("ADHESIVE_RED: bar and market adhesive profiles must produce visibly different clean tack traces")
+
+	# The coated Yuzu label leaves a thin commercial adhesive haze on glass. At
+	# the normal resolved capture damage level it must not fabricate opaque paper
+	# islands that read as a shattered bottle or torn curtain over the liquid.
+	residue.set_residue(1.0, 0.08, 0.94)
+	if float(residue.get_fiber_strength()) > 0.02 or residue.has_layered_residue():
+		failures.append("YUZU_RESIDUE_RED: coated citrus residue must stay adhesive-only at normal peel damage")
+	if residue.mesh == null or residue.mesh.get_surface_count() != 1:
+		failures.append("YUZU_RESIDUE_RED: resolved Yuzu should render one thin glue-trace surface, not fiber islands")
+	else:
+		var yuzu_glue := residue.mesh.surface_get_material(0) as StandardMaterial3D
+		if yuzu_glue == null or yuzu_glue.albedo_color.a > 0.34:
+			failures.append("YUZU_RESIDUE_RED: glass adhesive haze is too opaque")
 
 	residue.set_residue(0.0, 0.0, 1.0)
 	if residue.get_residue_amount() != 0.0 or float(residue.get_adhesive_trace_amount()) != 0.0:
