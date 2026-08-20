@@ -8,7 +8,10 @@ const PROFILES := {
 		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
 		"world_width":8.40,
 		"offset":Vector2(0.0,0.00),
-		"modulate":Color(0.94,0.90,0.84,1.0)
+		# Direct Coffee target is a dark, warm interior with amber practicals.
+		# Suppress the source plate's green daylight dominance instead of tinting
+		# the realtime cup itself to compensate for a cold scene.
+		"modulate":Color(0.78,0.61,0.42,1.0)
 	},
 	"pantry_jar":{
 		# Bright warm grocery/food-prep crop. The realtime pale stone counter and
@@ -33,12 +36,13 @@ const PROFILES := {
 		"modulate":Color(0.98,0.99,1.00,1.0)
 	},
 	"market_can":{
-		# Window-heavy cool crop reads as a brighter beverage/patio counter and no
-		# longer shares the dark bar plate used by the tin/pantry scene.
-		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
-		"world_width":5.75,
-		"offset":Vector2(-1.18,0.16),
-		"modulate":Color(0.72,0.90,0.88,1.0)
+		# The direct Can target is an amber convenience/bar refrigerator scene,
+		# not a cyan patio. Reuse the darker stock-room plate with a different crop
+		# and warm grade; the silver can + stone counter remain realtime.
+		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
+		"world_width":6.55,
+		"offset":Vector2(-0.72,0.04),
+		"modulate":Color(0.88,0.71,0.49,1.0)
 	}
 }
 
