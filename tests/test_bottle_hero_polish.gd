@@ -28,6 +28,8 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_GLASS_RED: Yuzu center must not be filled by a broad blue Fresnel shell")
 		if float(contract.get("fresnel_power",0.0)) < 3.5:
 			failures.append("BOTTLE_GLASS_RED: glass contour should be confined to grazing edges")
+		if not bool(contract.get("orientation_safe_fresnel",false)):
+			failures.append("BOTTLE_GLASS_RED: Yuzu edge shader must treat reversed front normals symmetrically in GL")
 		if float(contract.get("liquid_alpha",0.0)) < 0.42:
 			failures.append("BOTTLE_HERO_RED: pale Yuzu liquid must read separately through clear glass")
 		if float(contract.get("liquid_top_y",0.0)) < 0.68:
