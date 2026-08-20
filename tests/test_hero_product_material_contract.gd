@@ -20,10 +20,15 @@ func run() -> Array[String]:
 	if float(tin.get("metallic",1.0)) > 0.22:
 		failures.append("HERO_MATERIAL_RED: tin must not collapse into black metal without an HDR reflection probe")
 	var can: Dictionary = hero.call("material_contract_for_kind","soda_can")
-	var paint: Color = can.get("paint_color",Color.BLACK)
-	if paint.g <= paint.r or paint.g <= paint.b*0.85:
-		failures.append("HERO_MATERIAL_RED: target beverage can should use a distinct green/teal painted body")
-	if float(can.get("metallic",1.0)) > 0.22:
-		failures.append("HERO_MATERIAL_RED: painted can body should remain readable instead of mirror-black")
+	if String(can.get("finish","")) != "bare_aluminum":
+		failures.append("HERO_CAN_RED: target can is bare aluminum beneath the yellow paper label, not teal paint")
+	var body_color: Color = can.get("body_color",Color.BLACK)
+	var channel_span := maxf(body_color.r,maxf(body_color.g,body_color.b))-minf(body_color.r,minf(body_color.g,body_color.b))
+	if maxf(body_color.r,maxf(body_color.g,body_color.b)) < 0.78 or channel_span > 0.08:
+		failures.append("HERO_CAN_RED: bare aluminum body must stay bright and near-neutral in GL rendering")
+	if float(can.get("metallic",1.0)) > 0.24:
+		failures.append("HERO_CAN_RED: aluminum body must remain readable without an HDR reflection probe")
+	if not bool(can.get("condensation",false)):
+		failures.append("HERO_CAN_RED: cold beverage can target requires visible condensation")
 	hero.free()
 	return failures
