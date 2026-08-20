@@ -116,7 +116,15 @@ func _process(_delta: float) -> void:
 		var box := table.mesh as BoxMesh
 		box.size = Vector3(5.8,0.12,3.5)
 	table.position = Vector3(0.0,-0.73,0.18)
-	if next_id == _active_id or _shader == null:
+	if _shader == null:
+		return
+	# VenuePresentation intentionally reapplies a simple fallback material whenever
+	# a variant is selected. Re-selecting the SAME venue therefore invalidates the
+	# rich table material even though the venue id did not change. Compare actual
+	# renderer ownership as well as the id so Coffee index 0 cannot silently fall
+	# back to the flat brown block after debug/reset/scene selection.
+	var material_is_current := _active_material != null and table.material_override == _active_material
+	if next_id == _active_id and material_is_current:
 		return
 	_active_id = next_id
 	# Drop the previous venue material before creating the next one. This keeps
