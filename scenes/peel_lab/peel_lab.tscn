@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/peel_lab.gd" id="1_lab"]
 [ext_resource type="Script" path="res://scripts/presentation/venue_presentation.gd" id="6_venue"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/presentation/substrate_peel_feel_binding.gd" id="20_substrate_feel"]
 [ext_resource type="Script" path="res://scripts/presentation/bottle_hero_polish.gd" id="21_bottle_polish"]
 [ext_resource type="Script" path="res://scripts/presentation/completion_flow_presentation.gd" id="22_completion_flow"]
+[ext_resource type="Script" path="res://scripts/presentation/post_peel_object_play_presentation.gd" id="23_post_peel_play"]
 
 [node name="PeelLab" type="Node3D"]
 script = ExtResource("1_lab")
@@ -64,3 +65,6 @@ script = ExtResource("20_substrate_feel")
 
 [node name="CursorPresentation" type="Node" parent="."]
 script = ExtResource("17_cursor")
+
+[node name="PostPeelObjectPlayPresentation" type="Node" parent="."]
+script = ExtResource("23_post_peel_play")
