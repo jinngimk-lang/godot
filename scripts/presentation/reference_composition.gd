@@ -2,11 +2,11 @@ extends Node
 class_name ReferenceComposition
 
 const FOV_BY_KIND := {
-	"paper_cup":35.5,
-	"sauce_jar":36.5,
-	"tin_can":36.5,
-	"clear_bottle":41.5,
-	"soda_can":36.5
+	"paper_cup":34.0,
+	"sauce_jar":35.0,
+	"tin_can":35.0,
+	"clear_bottle":36.5,
+	"soda_can":34.0
 }
 const FOCUS_Y_BY_KIND := {
 	"paper_cup":0.06,
@@ -60,4 +60,4 @@ func _sync_variant_framing() -> void:
 	_last_target = target
 
 static func target_fov_for_kind(kind: String) -> float:
-	return float(FOV_BY_KIND.get(kind,36.5))
+	return float(FOV_BY_KIND.get(kind,35.0))
