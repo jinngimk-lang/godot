@@ -26,7 +26,6 @@ func release_table_resources() -> void:
 func profile_parameters(profile_id: String) -> Dictionary:
 	match profile_id:
 		"pantry_jar":
-			# Target: bright food-prep / pantry counter, not the café/bar wood.
 			return {
 				"base_color": Vector3(0.74,0.69,0.61),
 				"roughness_value": 0.43,
@@ -40,8 +39,6 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"specular_variation": 0.025
 			}
 		"pantry_tin":
-			# Neutral brushed/stone grocery worktop gives the tin a manufactured,
-			# industrial silhouette instead of another warm café surface.
 			return {
 				"base_color": Vector3(0.43,0.45,0.44),
 				"roughness_value": 0.31,
@@ -68,22 +65,22 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"specular_variation": 0.028
 			}
 		"market_can":
+			# Direct Can target uses a warm, slightly polished stone/concrete service
+			# counter under the cold silver can. Keep it distinct from both Coffee
+			# walnut and Supermarket's pale refrigerated counter.
 			return {
-				"base_color": Vector3(0.20,0.25,0.24),
-				"roughness_value": 0.28,
-				"grain_strength": 0.075,
-				"grain_scale": 54.0,
-				"stone_mode": 0.0,
-				"grain_bump_strength": 0.028,
+				"base_color": Vector3(0.43,0.35,0.27),
+				"roughness_value": 0.32,
+				"grain_strength": 0.030,
+				"grain_scale": 24.0,
+				"stone_mode": 1.0,
+				"grain_bump_strength": 0.026,
 				"surface_alpha": 1.0,
-				"plank_count": 5.0,
-				"plank_contrast": 0.070,
-				"specular_variation": 0.085
+				"plank_count": 1.0,
+				"plank_contrast": 0.0,
+				"specular_variation": 0.055
 			}
 		_:
-			# Coffee target: rich walnut with broad plank separation, long grain and
-			# highlight breakup. This must read as real foreground wood rather than
-			# a flat brown mask over the photographic café plate.
 			return {
 				"base_color": Vector3(0.31,0.128,0.041),
 				"roughness_value": 0.29,
@@ -107,10 +104,6 @@ func _process(_delta: float) -> void:
 		return
 	_table = table
 	var next_id := String(venue.call("get_active_profile_id"))
-	# The target boards consistently use a real counter/table beneath the hero.
-	# Keeping the photographed backdrop all the way to the bottom exposed source-
-	# image hands/foreground blobs and made every venue feel like the same plate.
-	# Restore the realtime contact surface and tune it per venue instead.
 	table.visible = true
 	if table.mesh is BoxMesh:
 		var box := table.mesh as BoxMesh
@@ -118,17 +111,10 @@ func _process(_delta: float) -> void:
 	table.position = Vector3(0.0,-0.73,0.18)
 	if _shader == null:
 		return
-	# VenuePresentation intentionally reapplies a simple fallback material whenever
-	# a variant is selected. Re-selecting the SAME venue therefore invalidates the
-	# rich table material even though the venue id did not change. Compare actual
-	# renderer ownership as well as the id so Coffee index 0 cannot silently fall
-	# back to the flat brown block after debug/reset/scene selection.
 	var material_is_current := _active_material != null and table.material_override == _active_material
 	if next_id == _active_id and material_is_current:
 		return
 	_active_id = next_id
-	# Drop the previous venue material before creating the next one. This keeps
-	# renderer ownership deterministic through repeated scene switching.
 	table.material_override = null
 	_active_material = null
 	var mat := ShaderMaterial.new()
