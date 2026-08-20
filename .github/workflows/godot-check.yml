@@ -155,7 +155,7 @@ jobs:
         run: |
           set -euo pipefail
           xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_post_peel_play.gd 2>&1 | tee godot-post-play-capture.log
-          for name in coffee_play market_play can_play; do
+          for name in coffee_play jar_play tin_play market_play can_play; do
             test -s "artifacts/reference_frames/${name}.png"
           done
           grep -Fq 'PASS: captured resolved object-play states' godot-post-play-capture.log
