@@ -38,8 +38,11 @@ func run() -> Array[String]:
 			var can_ambient: Color = can.get("ambient_color",Color.WHITE)
 			if cold_key.b <= cold_key.r:
 				failures.append("VENUE_LIGHT_RED: Yuzu supermarket should retain cool refrigerated key light")
-			if can_key.b > can_key.r or can_fill.b > can_fill.r:
-				failures.append("VENUE_LIGHT_RED: Can convenience scene must not repaint bare aluminum cyan")
+			var key_span := maxf(can_key.r,maxf(can_key.g,can_key.b))-minf(can_key.r,minf(can_key.g,can_key.b))
+			if minf(can_key.r,minf(can_key.g,can_key.b)) < 0.94 or key_span > 0.06:
+				failures.append("VENUE_LIGHT_RED: aluminum key light must be near-neutral; warmth belongs in ambient/rim, not painted across the can")
+			if can_fill.b > can_fill.r + 0.05:
+				failures.append("VENUE_LIGHT_RED: Can fill may be slightly cool but must not repaint aluminum cyan")
 			if can_ambient.b > can_ambient.r:
 				failures.append("VENUE_LIGHT_RED: Can ambient must stay warm-neutral and distinct from supermarket coldcase")
 		lighting.free()
