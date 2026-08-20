@@ -49,6 +49,22 @@ func run() -> Array[String]:
 		if control_copy.contains("T Reset") or control_copy.contains("R Inspect"):
 			failures.append("HUD_RED: obsolete hand-era R Inspect / T Reset mapping is still visible")
 
+	if not chrome.has_method("copy_for_mode"):
+		failures.append("HUD_OBJECT_PLAY_RED: HUD needs deterministic peel/object-play copy modes")
+	else:
+		var peel_copy: Dictionary = chrome.call("copy_for_mode",false)
+		var play_copy: Dictionary = chrome.call("copy_for_mode",true)
+		var peel_controls := String(peel_copy.get("controls",""))
+		var play_controls := String(play_copy.get("controls",""))
+		var play_howto := String(play_copy.get("how_to",""))
+		if not peel_controls.contains("LMB     Peel"):
+			failures.append("HUD_OBJECT_PLAY_RED: peel mode must retain LMB Peel")
+		if play_controls.contains("LMB     Peel") or not play_controls.contains("Squeeze / Shake"):
+			failures.append("HUD_OBJECT_PLAY_RED: resolved mode must repurpose LMB to Squeeze / Shake")
+		for required in ["OBJECT PLAY","SQUEEZE","SHAKE","INSPECT","CONTINUE"]:
+			if not play_howto.to_upper().contains(required):
+				failures.append("HUD_OBJECT_PLAY_RED: resolved how-to missing %s" % required)
+
 	root.free()
 	return failures
 
