@@ -25,7 +25,7 @@ Do not lose or reorder these five product priorities without new owner feedback 
 2. **Optimize models** — cup, glass jar/bottle, tin can and aluminum can must read as believable hero products rather than primitive geometry.
 3. **Optimize label material** — paper front/back/edge, fibers, adhesive boundary, residue and local bending must read as paper rather than tape.
 4. **Optimize post-peel label handling** — after 100% release the label must enter an intentional completion lifecycle; it must not remain indefinitely floating over the product as if still being peeled.
-5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, receive calm completion feedback, and continue to the next product/scene without dead ends.
+5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, play with the bare object, receive calm completion feedback, and continue to the next product/scene without dead ends.
 
 The project is not complete merely because any one item is green. Treat these five as a whole-game completion stack.
 
@@ -58,7 +58,8 @@ Additional cups, bottles, tins, cans, jars, cartons, tubs, or similar label-bear
 
 The intended interaction language is direct and simple:
 
-- LMB: grab/peel label.
+- LMB before label resolution: grab/peel label.
+- LMB after label resolution: direct object play (bounded squeeze and/or shake depending on container material).
 - RMB drag: rotate/inspect product.
 - Wheel: zoom.
 - R: reset.
@@ -96,11 +97,24 @@ Do not collapse all products to one generic feel profile without new evidence.
 
 ## Post-peel lifecycle north star
 
-A fully removed label must not remain forever as an unexplained floating object. Completion should have an authored calm resolution, for example:
+A fully removed label must not remain forever as an unexplained floating object. Completion should have an authored calm resolution:
 
-`ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> DISPOSED_OR_COLLECTED -> NEXT_READY`
+`ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> DISPOSED_OR_COLLECTED -> BARE_OBJECT_PLAY -> NEXT_READY`
 
-The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. Preferred behavior is a brief 0.4–1.2 second completion hold/settle so the user sees success, followed by one of: settle onto a tray/table area, slide/fall to an unobtrusive discard area, or collapse into a small collected-label UI stack. It should then stop blocking the hero object. The next action must be obvious.
+The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. Preferred behavior is a brief 0.4–1.2 second completion hold/settle so the user sees success, followed by one of: settle onto a tray/table area, slide/fall to an unobtrusive discard area, or collapse into a small collected-label UI stack. It should then stop blocking the hero object.
+
+**Label disappearance is not the end of interaction.** Once the label lifecycle reaches resolved, the bare container becomes a short tactile toy before Continue:
+
+- paper cup: visibly compliant squeeze, light shake;
+- glass jar: effectively rigid squeeze, contents lag during shake;
+- tin can: low shell compliance, modest shake;
+- clear Yuzu bottle: rigid glass, strongest readable liquid inertia during shake;
+- aluminum soda can: springy squeeze plus shake, then calm recovery.
+
+LMB changes from peel authority to object-play authority only after label resolution. RMB remains inspect/rotate. Continue remains explicit and always available so object play is optional and cannot dead-end the session. Reset/scene change clears squeeze/shake state.
+
+Implementation checkpoint:
+`docs/superpowers/checkpoints/2026-08-20-post-peel-object-play.md`
 
 ## Five-scene identity rule
 
@@ -151,10 +165,11 @@ For meaningful gameplay/visual work:
 4. Run Godot 4.7.1 import/parser guard and configured default launch.
 5. Run deterministic unit/input/scene smokes.
 6. Capture every affected product at attached, representative mid-peel, and fully released states.
-7. Inspect captures manually against the target/template image.
-8. If the image is worse or still visibly off, reject the direction and continue.
-9. Merge only exact-head verified work.
-10. Do not claim merged-main verification unless merged `main` itself was separately checked.
+7. For post-peel interaction changes, also capture representative bare-object play states (squeeze/shake/liquid lag) rather than proving only the label lifecycle.
+8. Inspect captures manually against the target/template image.
+9. If the image is worse or still visibly off, reject the direction and continue.
+10. Merge only exact-head verified work.
+11. Do not claim merged-main verification unless merged `main` itself was separately checked.
 
 Functional green is necessary but never sufficient for visual completion.
 
@@ -179,8 +194,9 @@ After this file, read:
 
 1. `.agents/skills/peel-calm-reference-realism/SKILL.md`
 2. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
-3. `docs/superpowers/checkpoints/2026-08-18-paper-resistance-and-scene-separation.md`
-4. `docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
-5. current `main` production code/tests/workflows and newest runtime captures.
+3. `docs/superpowers/checkpoints/2026-08-20-post-peel-object-play.md`
+4. `docs/superpowers/checkpoints/2026-08-18-paper-resistance-and-scene-separation.md`
+5. `docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
+6. current production code/tests/workflows and newest runtime captures.
 
-As of the checkpoint that created this document, the project is already on the no-hands/object-only architecture with displacement-gated paper peel, complete 100% release, per-substrate feel profiles, fibrous paper rendering, and pre-release tactile-loading audio. Highest-value remaining work follows the owner-locked order above: scene quality, model quality, label material, post-peel label lifecycle, then complete interaction-flow polish.
+The project is on the no-hands/object-only architecture with displacement-gated paper peel, complete 100% release, per-substrate feel profiles, fibrous paper rendering, pre-release tactile-loading audio, resolved-label handling, and a post-peel bare-object play phase. Highest-value remaining work still follows the owner-locked order above: scene quality, model quality, label material, post-peel label lifecycle, then complete interaction-flow polish. Do not stop at mechanics green; continue visual convergence until the controllable Godot result reaches the owner’s target bar.
