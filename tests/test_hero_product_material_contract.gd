@@ -46,6 +46,8 @@ func run() -> Array[String]:
 		failures.append("HERO_TIN_RED: cylindrical tin needs at least three reflection bands")
 	if int(tin.get("brush_band_count",0)) < 5:
 		failures.append("HERO_TIN_RED: bare tin needs subtle circumferential manufacturing bands")
+	if String(tin.get("brush_band_geometry","")) != "open_shell":
+		failures.append("HERO_TIN_RED: brush bands must be uncapped shell rings; capped cylinders become stacked plates")
 
 	var can: Dictionary = hero.call("material_contract_for_kind","soda_can")
 	if String(can.get("finish","")) != "bare_aluminum":
