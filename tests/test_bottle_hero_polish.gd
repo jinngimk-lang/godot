@@ -20,10 +20,13 @@ func run() -> Array[String]:
 		"BottleHighlightLeft",
 		"BottleHighlightRight",
 		"BottleLiquidHero",
-		"BottleLiquidMeniscus"
+		"BottleLiquidMeniscus",
+		"BottleLiquidSurface"
 	]:
 		if polish.get_node_or_null(detail_name) == null:
 			failures.append("BOTTLE_HERO_RED: clear bottle missing target cue %s" % detail_name)
+	if not polish.has_method("set_liquid_inertia"):
+		failures.append("BOTTLE_LIQUID_RED: visible Yuzu liquid needs a dedicated surface-inertia presenter")
 	if not polish.has_method("get_visual_contract"):
 		failures.append("BOTTLE_HERO_RED: missing bottle visual contract")
 	else:
@@ -46,8 +49,10 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_GLASS_RED: glass contour should be confined tightly to grazing edges")
 		if not bool(contract.get("orientation_safe_fresnel",false)):
 			failures.append("BOTTLE_GLASS_RED: Yuzu edge shader must treat reversed front normals symmetrically in GL")
-		if float(contract.get("liquid_alpha",0.0)) < 0.60 or float(contract.get("liquid_alpha",1.0)) > 0.90:
-			failures.append("BOTTLE_LIQUID_RED: Yuzu liquid should read as translucent liquid, not opaque bottle plastic")
+		if String(contract.get("liquid_rendering","")) != "stable_volume_translucent_surface":
+			failures.append("BOTTLE_LIQUID_RED: closed transparent liquid volume caused GL sort breakup; use stable body plus translucent surface cues")
+		if String(contract.get("liquid_inertia","")) != "surface_countertilt":
+			failures.append("BOTTLE_LIQUID_RED: shake inertia must tilt the free surface, not rotate the whole liquid volume through the bottle")
 		if String(contract.get("liquid_tone","")) != "warm_yuzu_yellow":
 			failures.append("BOTTLE_LIQUID_RED: target liquid must be warm yellow rather than grey-green")
 		if float(contract.get("liquid_top_y",0.0)) < 0.68:
@@ -58,6 +63,14 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_LIQUID_RED: liquid surface needs a restrained visible meniscus cue")
 		if float(contract.get("target_focus_y",0.0)) < 0.24:
 			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
+	if polish.has_method("set_liquid_inertia"):
+		polish.call("set_liquid_inertia",0.08)
+		var body := polish.get_node_or_null("BottleLiquidHero") as Node3D
+		var surface := polish.get_node_or_null("BottleLiquidSurface") as Node3D
+		if body != null and absf(body.rotation.z) > 0.005:
+			failures.append("BOTTLE_LIQUID_RED: main liquid volume must stay stable during shake")
+		if surface != null and absf(surface.rotation.z) < 0.02:
+			failures.append("BOTTLE_LIQUID_RED: free surface must visibly counter-tilt during shake")
 	if not polish.has_method("release_preview_resources"):
 		failures.append("BOTTLE_RESOURCE_RED: bottle hero needs explicit preview resource teardown")
 	else:
