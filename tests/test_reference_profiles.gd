@@ -34,8 +34,16 @@ func run() -> Array[String]:
 			failures.append("PROFILE_RED: variant %d label must remain a large tactile hero patch" % i)
 		if composition != null:
 			var fov := float(composition.target_fov_for_kind(expected_kinds[i]))
-			if fov < 34.0 or fov > 42.0:
-				failures.append("PROFILE_RED: %s hero framing must stay within close 34-42 degree reference range, got %.2f" % [expected_kinds[i],fov])
+			if fov < 33.5 or fov > 38.0:
+				failures.append("PROFILE_RED: %s hero framing must stay close enough to dominate the target, got %.2f" % [expected_kinds[i],fov])
+
+	if composition != null:
+		if float(composition.target_fov_for_kind("paper_cup")) > 34.5:
+			failures.append("HERO_SCALE_RED: Coffee target cup must fill more of the viewport")
+		if float(composition.target_fov_for_kind("soda_can")) > 34.5:
+			failures.append("HERO_SCALE_RED: Can target must read as a large central hero")
+		if float(composition.target_fov_for_kind("clear_bottle")) > 37.0:
+			failures.append("HERO_SCALE_RED: Yuzu bottle is currently too distant relative to the direct target")
 
 	for i in range(5):
 		model.select_variant(i)
