@@ -4,6 +4,9 @@ class_name HudChromePresentation
 const GOLD := Color(1.0,0.66,0.08,1.0)
 
 var _applied := false
+var _progress_panel: Panel
+var _controls_panel: Panel
+var _how_to_panel: Panel
 var _progress_copy: Label
 var _progress_bar: ProgressBar
 var _controls_copy: Label
@@ -37,14 +40,29 @@ func copy_for_mode(object_play: bool) -> Dictionary:
 		"how_to":"HOW TO PLAY\n\n1   GRAB EDGE\nMove the cursor to a corner or edge of the label.\n\n2   PEEL GENTLY\nClick and drag slowly. The real label follows the cursor.\n\n3   INSPECT\nRMB drag to rotate. Use Wheel to zoom and inspect residue.\n\n4   CLEAN PEEL\nRemove the label with minimal residue and tearing."
 	}
 
+func layout_for_mode(object_play: bool) -> Dictionary:
+	if object_play:
+		return {
+			"controls_visible":false,
+			"how_to_visible":false,
+			"progress_bar_visible":false,
+			"progress_size":Vector2(280,72)
+		}
+	return {
+		"controls_visible":true,
+		"how_to_visible":true,
+		"progress_bar_visible":true,
+		"progress_size":Vector2(318,118)
+	}
+
 func _build_ui(layer: CanvasLayer, legacy: Label) -> void:
 	legacy.visible = false
 
-	var progress_panel := _panel("ProgressPanel",Vector2(24,22),Vector2(318,118))
-	layer.add_child(progress_panel)
+	_progress_panel = _panel("ProgressPanel",Vector2(24,22),Vector2(318,118))
+	layer.add_child(_progress_panel)
 	_progress_copy = _label("ProgressCopy",Vector2(14,10),Vector2(288,54),18)
 	_progress_copy.add_theme_font_size_override("font_size",18)
-	progress_panel.add_child(_progress_copy)
+	_progress_panel.add_child(_progress_copy)
 	_progress_bar = ProgressBar.new()
 	_progress_bar.name = "ProgressBar"
 	_progress_bar.position = Vector2(14,78)
@@ -56,18 +74,18 @@ func _build_ui(layer: CanvasLayer, legacy: Label) -> void:
 	_progress_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_progress_bar.add_theme_stylebox_override("background",_bar_track_style())
 	_progress_bar.add_theme_stylebox_override("fill",_bar_fill_style())
-	progress_panel.add_child(_progress_bar)
+	_progress_panel.add_child(_progress_bar)
 
-	var controls_panel := _panel("ControlsPanel",Vector2(24,158),Vector2(268,278))
-	layer.add_child(controls_panel)
+	_controls_panel = _panel("ControlsPanel",Vector2(24,158),Vector2(268,278))
+	layer.add_child(_controls_panel)
 	_controls_copy = _label("ControlsCopy",Vector2(16,14),Vector2(236,248),16)
-	controls_panel.add_child(_controls_copy)
+	_controls_panel.add_child(_controls_copy)
 
-	var how_to_panel := _panel("HowToPanel",Vector2(982,22),Vector2(274,520))
-	layer.add_child(how_to_panel)
+	_how_to_panel = _panel("HowToPanel",Vector2(982,22),Vector2(274,520))
+	layer.add_child(_how_to_panel)
 	_how_to_copy = _label("HowToCopy",Vector2(16,14),Vector2(242,490),15)
 	_how_to_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	how_to_panel.add_child(_how_to_copy)
+	_how_to_panel.add_child(_how_to_copy)
 	_applied = true
 	_apply_mode_copy(false)
 
@@ -77,6 +95,21 @@ func _apply_mode_copy(object_play: bool) -> void:
 		_controls_copy.text = String(copy.get("controls",""))
 	if _how_to_copy != null:
 		_how_to_copy.text = String(copy.get("how_to",""))
+	_apply_mode_layout(object_play)
+
+func _apply_mode_layout(object_play: bool) -> void:
+	var layout := layout_for_mode(object_play)
+	if _controls_panel != null:
+		_controls_panel.visible = bool(layout.get("controls_visible",true))
+	if _how_to_panel != null:
+		_how_to_panel.visible = bool(layout.get("how_to_visible",true))
+	if _progress_panel != null:
+		_progress_panel.size = layout.get("progress_size",Vector2(318,118)) as Vector2
+	if _progress_bar != null:
+		_progress_bar.visible = bool(layout.get("progress_bar_visible",true))
+	if _progress_copy != null:
+		_progress_copy.size = Vector2(250,48) if object_play else Vector2(288,54)
+		_progress_copy.add_theme_font_size_override("font_size",16 if object_play else 18)
 
 func _is_object_play(root: Node) -> bool:
 	var lifecycle = root.get("_lifecycle")
@@ -99,11 +132,10 @@ func _refresh_status(root: Node, fallback_text: String, object_play: bool = fals
 	else:
 		progress = _parse_legacy_progress(fallback_text)
 	var percent := int(round(progress*100.0))
-	var status := "PAUSED" if paused else ("LABEL REMOVED • OBJECT PLAY" if object_play else "Peel Progress %d%%" % percent)
+	var status := "PAUSED" if paused else ("OBJECT PLAY" if object_play else "Peel Progress %d%%" % percent)
 	_progress_copy.text = "SCENE: %s\n%s" % [scene_name,status]
 	if _progress_bar != null:
 		_progress_bar.value = float(percent)
-		_progress_bar.modulate.a = 0.42 if object_play else 1.0
 
 func _parse_legacy_progress(text: String) -> float:
 	var marker := "Peel "
