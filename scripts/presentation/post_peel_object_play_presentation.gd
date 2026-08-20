@@ -183,17 +183,15 @@ func _restore_paper_cup_material() -> void:
 func _apply_liquid_lag(tilt: float) -> void:
 	if _product == null:
 		return
-	for name in ["BottleLiquid","JarContents"]:
-		var liquid := _product.get_node_or_null(name) as Node3D
-		if liquid != null:
-			liquid.rotation.z = tilt
+	var jar_contents := _product.get_node_or_null("JarContents") as Node3D
+	if jar_contents != null:
+		jar_contents.rotation.z = tilt
 	if _hero_detail != null:
 		_apply_liquid_lag_recursive(_hero_detail,tilt)
-	# BottleHeroPolish owns the visible Yuzu liquid, meniscus and free surface.
-	# Route the same inertia into those meshes; otherwise only the hidden base
-	# liquid moves and the user sees a rigid yellow plug during bottle shake.
-	if _bottle_polish != null:
-		_apply_liquid_lag_recursive(_bottle_polish,tilt)
+	# Yuzu has its own physically safer presentation: the closed liquid body is
+	# stable while only the free surface counter-tilts and the mass lags slightly.
+	if _bottle_polish != null and _bottle_polish.has_method("set_liquid_inertia"):
+		_bottle_polish.call("set_liquid_inertia",tilt)
 
 func _apply_liquid_lag_recursive(node: Node, tilt: float) -> void:
 	for child in node.get_children():
