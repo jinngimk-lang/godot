@@ -32,6 +32,7 @@ func _init() -> void:
 		"res://tests/test_peel_audio_mix.gd",
 		"res://tests/test_session_model.gd",
 		"res://tests/test_post_peel_progression.gd",
+		"res://tests/test_post_peel_object_play.gd",
 		"res://tests/test_reference_profiles.gd",
 		"res://tests/test_inspection_controller.gd",
 		"res://tests/test_venue_presentation.gd",
