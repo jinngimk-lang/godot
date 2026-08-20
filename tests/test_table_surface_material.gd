@@ -15,6 +15,10 @@ func run() -> Array[String]:
 		failures.append("RED: foreground table needs deterministic procedural micro-normal response instead of a flat color plane")
 	if "grain_bump_strength" not in code:
 		failures.append("RED: table shader needs a bounded micro-bump control per venue")
+	if "plank_contrast" not in code or "plank_count" not in code:
+		failures.append("TABLE_DEPTH_RED: wood target needs readable plank-to-plank value breakup, not one flat brown slab")
+	if "specular_variation" not in code:
+		failures.append("TABLE_DEPTH_RED: foreground surface needs directional roughness/specular variation")
 
 	var presentation = load("res://scripts/presentation/table_surface_presentation.gd").new()
 	if not presentation.has_method("profile_parameters"):
@@ -37,5 +41,11 @@ func run() -> Array[String]:
 		var bar_stone: float = bar_stone_value if typeof(bar_stone_value) in [TYPE_FLOAT,TYPE_INT] else 1.0
 		if cafe_stone > 0.25 or bar_stone > 0.25:
 			failures.append("wood café/bar profiles must remain directional wood rather than stone")
+		if float(cafe.get("plank_contrast",0.0)) < 0.08:
+			failures.append("TABLE_DEPTH_RED: cafe walnut needs visible plank value separation")
+		if float(cafe.get("specular_variation",0.0)) < 0.05:
+			failures.append("TABLE_DEPTH_RED: cafe walnut needs grain-following highlight breakup")
+		if float(cafe.get("plank_count",0.0)) < 4.0:
+			failures.append("TABLE_DEPTH_RED: cafe foreground should show several broad wood planks")
 	presentation.free()
 	return failures
