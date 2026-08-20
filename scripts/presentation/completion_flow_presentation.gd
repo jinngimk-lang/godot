@@ -41,8 +41,11 @@ func state_for_phase(phase_name: String, settle_alpha: float) -> Dictionary:
 				"settle":settle
 			}
 		"RESOLVED":
+			# Collection is a transient acknowledgement, not a permanent panel.
+			# Once the label is gone the next authored state is the bare-object toy,
+			# so clear the tray and hand visual priority back to the hero product.
 			return {
-				"visible":true,
+				"visible":false,
 				"stage":"COLLECTED",
 				"allow_inspect":true,
 				"allow_continue":true,
