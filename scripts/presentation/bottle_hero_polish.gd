@@ -5,7 +5,7 @@ const HIGHLIGHT_ALPHA := 0.125
 const OUTER_GLASS_ALPHA := 0.028
 const EDGE_ALPHA := 0.115
 const FRESNEL_POWER := 6.2
-const LIQUID_ALPHA := 0.76
+const LIQUID_ALPHA := 1.0
 const LIQUID_TOP_Y := 0.70
 const TARGET_FOCUS_Y := 0.42
 const CAP_RADIUS := 0.178
@@ -67,6 +67,8 @@ func get_visual_contract() -> Dictionary:
 		"fresnel_power":FRESNEL_POWER,
 		"orientation_safe_fresnel":true,
 		"liquid_alpha":LIQUID_ALPHA,
+		"liquid_rendering":"stable_volume_translucent_surface",
+		"liquid_inertia":"surface_countertilt",
 		"liquid_tone":"warm_yuzu_yellow",
 		"liquid_top_y":LIQUID_TOP_Y,
 		"liquid_shape":"shouldered",
@@ -89,6 +91,23 @@ func build_preview_for_kind(kind: String) -> void:
 	_build_highlight("BottleHighlightLeft",-0.232,0.24,1.02,HIGHLIGHT_ALPHA)
 	_build_highlight("BottleHighlightRight",0.242,0.18,0.74,HIGHLIGHT_ALPHA*0.48)
 	_tune_base_bottle()
+
+func set_liquid_inertia(tilt: float) -> void:
+	var bounded := clampf(tilt if is_finite(tilt) else 0.0,-0.12,0.12)
+	var liquid := get_node_or_null("BottleLiquidHero") as Node3D
+	if liquid != null:
+		# Keep the closed volume stable to avoid transparent/geometry clipping.
+		# A tiny lateral lag gives mass while the free surface carries the slosh.
+		liquid.rotation.z = 0.0
+		liquid.position.x = clampf(-bounded*0.12,-0.014,0.014)
+	var meniscus := get_node_or_null("BottleLiquidMeniscus") as Node3D
+	if meniscus != null:
+		meniscus.rotation.z = bounded
+		meniscus.position.x = clampf(-bounded*0.10,-0.012,0.012)
+	var surface := get_node_or_null("BottleLiquidSurface") as Node3D
+	if surface != null:
+		surface.rotation.z = bounded
+		surface.position.x = clampf(-bounded*0.10,-0.012,0.012)
 
 func release_preview_resources() -> void:
 	if is_instance_valid(_product) and _clear_edge_material != null:
@@ -184,14 +203,15 @@ func _build_liquid_hero() -> void:
 	]
 	liquid.mesh = _lathe_mesh(profile,true,true)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.965,0.815,0.345,LIQUID_ALPHA)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.16
-	material.metallic_specular = 0.18
+	# Closed alpha-blended lathe volumes produce severe triangle sorting in
+	# llvmpipe/GL compatibility. Keep the body stable and pale; the transparent
+	# meniscus/free-surface layers below provide the optical liquid cue.
+	material.albedo_color = Color(0.985,0.905,0.535,1.0)
+	material.roughness = 0.20
+	material.metallic_specular = 0.15
 	material.clearcoat_enabled = true
-	material.clearcoat = 0.18
-	material.clearcoat_roughness = 0.16
-	material.render_priority = 0
+	material.clearcoat = 0.10
+	material.clearcoat_roughness = 0.18
 	liquid.material_override = material
 	liquid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(liquid)
@@ -209,12 +229,12 @@ func _build_liquid_meniscus() -> void:
 	meniscus.mesh = mesh
 	meniscus.position.y = LIQUID_TOP_Y+0.001
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0,0.91,0.56,0.42)
+	material.albedo_color = Color(1.0,0.94,0.66,0.34)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.08
-	material.metallic_specular = 0.44
+	material.roughness = 0.06
+	material.metallic_specular = 0.50
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.render_priority = 2
+	material.render_priority = 3
 	meniscus.material_override = material
 	meniscus.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(meniscus)
@@ -229,11 +249,11 @@ func _build_liquid_meniscus() -> void:
 	surface.mesh = surface_mesh
 	surface.position.y = LIQUID_TOP_Y+0.003
 	var surface_material := StandardMaterial3D.new()
-	surface_material.albedo_color = Color(0.995,0.91,0.54,0.22)
+	surface_material.albedo_color = Color(1.0,0.955,0.70,0.24)
 	surface_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	surface_material.roughness = 0.10
-	surface_material.metallic_specular = 0.52
-	surface_material.render_priority = 2
+	surface_material.roughness = 0.07
+	surface_material.metallic_specular = 0.58
+	surface_material.render_priority = 3
 	surface.material_override = surface_material
 	surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(surface)
