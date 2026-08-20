@@ -3,9 +3,25 @@ class_name TableSurfacePresentation
 
 var _active_id := ""
 var _shader: Shader
+var _table: MeshInstance3D
+var _active_material: ShaderMaterial
 
 func _ready() -> void:
 	_shader = load("res://art/shaders/reference_table.gdshader") as Shader
+
+func _exit_tree() -> void:
+	release_table_resources()
+
+func release_table_resources() -> void:
+	# Runtime venue switching creates per-profile ShaderMaterials. Detach the
+	# renderer-owned resource explicitly before scene shutdown so the final table
+	# material cannot survive the five-scene capture process exit.
+	if is_instance_valid(_table):
+		_table.material_override = null
+	_active_material = null
+	_shader = null
+	_table = null
+	_active_id = ""
 
 func profile_parameters(profile_id: String) -> Dictionary:
 	match profile_id:
@@ -89,6 +105,7 @@ func _process(_delta: float) -> void:
 	var table := root.get_node_or_null("Table") as MeshInstance3D
 	if venue == null or table == null or not venue.has_method("get_active_profile_id"):
 		return
+	_table = table
 	var next_id := String(venue.call("get_active_profile_id"))
 	# The target boards consistently use a real counter/table beneath the hero.
 	# Keeping the photographed backdrop all the way to the bottom exposed source-
@@ -102,9 +119,14 @@ func _process(_delta: float) -> void:
 	if next_id == _active_id or _shader == null:
 		return
 	_active_id = next_id
+	# Drop the previous venue material before creating the next one. This keeps
+	# renderer ownership deterministic through repeated scene switching.
+	table.material_override = null
+	_active_material = null
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader
 	var parameters := profile_parameters(next_id)
 	for parameter_name in parameters:
 		mat.set_shader_parameter(StringName(parameter_name),parameters[parameter_name])
-	table.material_override = mat
+	_active_material = mat
+	table.material_override = _active_material
