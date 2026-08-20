@@ -41,10 +41,15 @@ func feed_drag(relative: Vector2, delta: float) -> void:
 	var safe_delta := maxf(delta,0.001)
 	var horizontal_speed := relative.x/safe_delta
 	var sign_now := signf(relative.x)
-	var reversal_boost := 1.35 if _last_drag_sign != 0.0 and sign_now != 0.0 and sign_now != _last_drag_sign else 1.0
+	var reversal_boost := 1.45 if _last_drag_sign != 0.0 and sign_now != 0.0 and sign_now != _last_drag_sign else 1.0
 	_last_drag_sign = sign_now if sign_now != 0.0 else _last_drag_sign
 	var shake_gain := float(_profile.get("shake_gain",0.0015))
-	_shake_velocity += horizontal_speed*shake_gain*0.0012*reversal_boost
+	var limit := float(_profile.get("shake_limit",0.08))
+	# A fast swipe must read on the same frame as user input. Angle impulse gives
+	# immediate tactile readability; velocity carries the object onward as a
+	# damped inertial follow-through. Direction reversals get a small boost.
+	_shake_angle = clampf(_shake_angle+relative.x*shake_gain*0.18*reversal_boost,-limit,limit)
+	_shake_velocity += horizontal_speed*shake_gain*0.010*reversal_boost
 	_shake_velocity = clampf(_shake_velocity,-1.8,1.8)
 
 	var squeeze_gain := float(_profile.get("squeeze_gain",0.0))
