@@ -15,10 +15,16 @@ func run() -> Array[String]:
 	if float(jar.get("fill_height_ratio",0.0)) < 0.80:
 		failures.append("HERO_MATERIAL_RED: jar target needs sauce visibly filling most of the vessel")
 	var tin: Dictionary = hero.call("material_contract_for_kind","tin_can")
-	if float(tin.get("body_value",0.0)) < 0.82:
+	if String(tin.get("finish","")) != "brushed_tin":
+		failures.append("HERO_TIN_RED: tin target needs a readable brushed-tin finish")
+	if float(tin.get("body_value",0.0)) < 0.86:
 		failures.append("HERO_MATERIAL_RED: tin body should stay bright silver in GL rendering")
-	if float(tin.get("metallic",1.0)) > 0.22:
+	if float(tin.get("metallic",1.0)) > 0.12:
 		failures.append("HERO_MATERIAL_RED: tin must not collapse into black metal without an HDR reflection probe")
+	if float(tin.get("rim_value",1.0)) > 0.90 or float(tin.get("rim_value",0.0)) < 0.70:
+		failures.append("HERO_TIN_RED: rolled seams should read as mid-silver metal, not white plastic hoops")
+	if int(tin.get("highlight_count",0)) < 2:
+		failures.append("HERO_TIN_RED: cylindrical tin needs at least two asymmetric reflection bands")
 	var can: Dictionary = hero.call("material_contract_for_kind","soda_can")
 	if String(can.get("finish","")) != "bare_aluminum":
 		failures.append("HERO_CAN_RED: target can is bare aluminum beneath the yellow paper label, not teal paint")
