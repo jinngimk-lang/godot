@@ -11,7 +11,17 @@ func run() -> Array[String]:
 		polish.free()
 		return failures
 	polish.call("build_preview_for_kind","clear_bottle")
-	for detail_name in ["BottleMetalCap","BottleNeckRing","BottleHighlightLeft","BottleHighlightRight","BottleLiquidHero"]:
+	for detail_name in [
+		"BottleGlassHeroShell",
+		"BottleMetalCap",
+		"BottleCapTop",
+		"BottleCapFlute0",
+		"BottleNeckRing",
+		"BottleHighlightLeft",
+		"BottleHighlightRight",
+		"BottleLiquidHero",
+		"BottleLiquidMeniscus"
+	]:
 		if polish.get_node_or_null(detail_name) == null:
 			failures.append("BOTTLE_HERO_RED: clear bottle missing target cue %s" % detail_name)
 	if not polish.has_method("get_visual_contract"):
@@ -20,22 +30,32 @@ func run() -> Array[String]:
 		var contract: Dictionary = polish.call("get_visual_contract")
 		if String(contract.get("cap","")) != "silver_crimp":
 			failures.append("BOTTLE_HERO_RED: direct Yuzu target requires silver crimp cap")
+		if String(contract.get("cap_detail","")) != "vertical_flutes":
+			failures.append("BOTTLE_CAP_RED: cap must use vertical crimp flutes, not screw-thread rings")
+		if float(contract.get("cap_radius",1.0)) > 0.19:
+			failures.append("BOTTLE_CAP_RED: target cap is compact; radius must stay <= 0.19")
+		if float(contract.get("cap_height",1.0)) > 0.085:
+			failures.append("BOTTLE_CAP_RED: target cap is shallow; height must stay <= 0.085")
 		if float(contract.get("glass_highlight_alpha",0.0)) < 0.10:
 			failures.append("BOTTLE_HERO_RED: glass needs readable edge/highlight breakup")
-		if float(contract.get("outer_glass_alpha",1.0)) > 0.055:
-			failures.append("BOTTLE_HERO_RED: target glass center must stay optically clear, not milky")
-		if float(contract.get("edge_alpha",1.0)) > 0.24:
-			failures.append("BOTTLE_GLASS_RED: Yuzu center must not be filled by a broad blue Fresnel shell")
-		if float(contract.get("fresnel_power",0.0)) < 3.5:
-			failures.append("BOTTLE_GLASS_RED: glass contour should be confined to grazing edges")
+		if float(contract.get("outer_glass_alpha",1.0)) > 0.04:
+			failures.append("BOTTLE_HERO_RED: Yuzu glass center must stay optically clear, not milky")
+		if float(contract.get("edge_alpha",1.0)) > 0.14:
+			failures.append("BOTTLE_GLASS_RED: Yuzu contour must be thin; broad Fresnel shell reads as frosted plastic")
+		if float(contract.get("fresnel_power",0.0)) < 5.0:
+			failures.append("BOTTLE_GLASS_RED: glass contour should be confined tightly to grazing edges")
 		if not bool(contract.get("orientation_safe_fresnel",false)):
 			failures.append("BOTTLE_GLASS_RED: Yuzu edge shader must treat reversed front normals symmetrically in GL")
-		if float(contract.get("liquid_alpha",0.0)) < 0.42:
-			failures.append("BOTTLE_HERO_RED: pale Yuzu liquid must read separately through clear glass")
+		if float(contract.get("liquid_alpha",0.0)) < 0.60 or float(contract.get("liquid_alpha",1.0)) > 0.90:
+			failures.append("BOTTLE_LIQUID_RED: Yuzu liquid should read as translucent liquid, not opaque bottle plastic")
+		if String(contract.get("liquid_tone","")) != "warm_yuzu_yellow":
+			failures.append("BOTTLE_LIQUID_RED: target liquid must be warm yellow rather than grey-green")
 		if float(contract.get("liquid_top_y",0.0)) < 0.68:
 			failures.append("BOTTLE_HERO_RED: Yuzu liquid should rise into the shoulder like the target bottle")
 		if String(contract.get("liquid_shape","")) != "shouldered":
 			failures.append("BOTTLE_HERO_RED: Yuzu liquid needs a shouldered bottle-following volume, not a floating cylinder")
+		if not bool(contract.get("liquid_meniscus",false)):
+			failures.append("BOTTLE_LIQUID_RED: liquid surface needs a restrained visible meniscus cue")
 		if float(contract.get("target_focus_y",0.0)) < 0.24:
 			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
 	if not polish.has_method("release_preview_resources"):
