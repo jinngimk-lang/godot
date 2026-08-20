@@ -65,6 +65,21 @@ func run() -> Array[String]:
 			if not play_howto.to_upper().contains(required):
 				failures.append("HUD_OBJECT_PLAY_RED: resolved how-to missing %s" % required)
 
+	if not chrome.has_method("layout_for_mode"):
+		failures.append("HUD_FOCUS_RED: resolved object play needs a deterministic uncluttered layout")
+	else:
+		var peel_layout: Dictionary = chrome.call("layout_for_mode",false)
+		var play_layout: Dictionary = chrome.call("layout_for_mode",true)
+		if not bool(peel_layout.get("controls_visible",false)) or not bool(peel_layout.get("how_to_visible",false)):
+			failures.append("HUD_FOCUS_RED: peel mode must retain full teaching chrome")
+		if bool(play_layout.get("controls_visible",true)) or bool(play_layout.get("how_to_visible",true)):
+			failures.append("HUD_FOCUS_RED: object-play focus must hide large side panels and expose the bare product")
+		if bool(play_layout.get("progress_bar_visible",true)):
+			failures.append("HUD_FOCUS_RED: resolved mode must remove the completed progress bar")
+		var size := play_layout.get("progress_size",Vector2(999,999)) as Vector2
+		if size.x > 300.0 or size.y > 82.0:
+			failures.append("HUD_FOCUS_RED: resolved status card must stay compact")
+
 	root.free()
 	return failures
 
