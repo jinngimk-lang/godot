@@ -62,9 +62,32 @@ func get_runtime_contract() -> Dictionary:
 func debug_stage_resolved(kind: String) -> void:
 	if _model == null:
 		_model = PostPeelObjectPlay.new()
+		_model.name = "PostPeelObjectPlayModel"
 		add_child(_model)
+	if _lab == null or _product == null:
+		_bind()
 	_model.configure_kind(kind)
 	_model.set_active(true)
+	_was_resolved = true
+	_apply_visuals(true)
+	_update_prompt(true)
+
+func debug_feed_drag(relative: Vector2, delta: float) -> void:
+	if _model == null:
+		return
+	_model.set_active(true)
+	_model.feed_drag(relative,maxf(delta,0.001))
+	_model.tick(maxf(delta,0.001))
+	_apply_visuals(true)
+	_update_prompt(true)
+
+func debug_release_play(delta: float = 0.016) -> void:
+	if _model == null:
+		return
+	_model.set_active(false)
+	_model.tick(maxf(delta,0.001))
+	_apply_visuals(true)
+	_update_prompt(true)
 
 func get_model() -> PostPeelObjectPlay:
 	return _model
@@ -112,8 +135,6 @@ func _apply_liquid_lag(tilt: float) -> void:
 		var liquid := _product.get_node_or_null(name) as Node3D
 		if liquid != null:
 			liquid.rotation.z = tilt
-	# Hero detail uses different child names across product families; use the
-	# semantic word rather than coupling the interaction model to one mesh build.
 	if _hero_detail != null:
 		for child in _hero_detail.get_children():
 			if child is Node3D and (String(child.name).contains("Sauce") or String(child.name).contains("Liquid")):
