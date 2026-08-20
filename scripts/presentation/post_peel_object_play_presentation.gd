@@ -1,6 +1,8 @@
 extends Node
 class_name PostPeelObjectPlayPresentation
 
+const PAPER_SQUEEZE_SHADER := "res://art/shaders/post_peel_paper_cup.gdshader"
+
 var _model: PostPeelObjectPlay
 var _lab: Node3D
 var _product: ProductPresentation
@@ -12,6 +14,9 @@ var _bottle_polish: Node3D
 var _prompt: Label
 var _lmb_playing := false
 var _was_resolved := false
+var _cup_original_material: Material
+var _paper_play_material: ShaderMaterial
+var _paper_material_active := false
 
 func _ready() -> void:
 	_model = PostPeelObjectPlay.new()
@@ -31,7 +36,10 @@ func _process(delta: float) -> void:
 		_model.set_active(false)
 		if resolved:
 			_model.configure_kind(_active_kind())
+			if _active_kind() == "paper_cup":
+				_activate_paper_cup_material()
 		else:
+			_restore_paper_cup_material()
 			_model.reset()
 	_model.tick(delta)
 	_apply_visuals(resolved)
@@ -56,7 +64,8 @@ func get_runtime_contract() -> Dictionary:
 		"fast_alternating_drag":"shake",
 		"inspect":"RMB drag",
 		"finish":"Continue",
-		"hands":false
+		"hands":false,
+		"paper_squeeze":"localized_vertex_band"
 	}
 
 func debug_stage_resolved(kind: String) -> void:
@@ -69,6 +78,10 @@ func debug_stage_resolved(kind: String) -> void:
 	_model.configure_kind(kind)
 	_model.set_active(true)
 	_was_resolved = true
+	if kind == "paper_cup":
+		_activate_paper_cup_material()
+	else:
+		_restore_paper_cup_material()
 	_apply_visuals(true)
 	_update_prompt(true)
 
@@ -118,15 +131,55 @@ func _active_kind() -> String:
 
 func _apply_visuals(resolved: bool) -> void:
 	var scale := _model.get_squeeze_scale() if resolved else Vector3.ONE
+	var squeeze_amount := _model.get_squeeze_amount() if resolved and _model.has_method("get_squeeze_amount") else 0.0
 	var shake := _model.get_shake_angle() if resolved else 0.0
 	var tilt := _model.get_liquid_tilt() if resolved else 0.0
+	var kind := _active_kind()
+	if kind == "paper_cup" and resolved:
+		_activate_paper_cup_material()
+		if _paper_play_material != null:
+			_paper_play_material.set_shader_parameter("squeeze_amount",squeeze_amount)
+		# Cup mouth/base/lid stay dimensionally stable; the shader dents the wall
+		# locally around the waist. Do not multiply the whole coffee hero by scale.
+		for node in [_cup,_lid,_product,_hero_detail,_bottle_polish]:
+			if node != null:
+				node.scale = Vector3.ONE
+		if _residue != null:
+			_residue.scale = Vector3(1.0-squeeze_amount*0.45,1.0,1.0+squeeze_amount*0.12)
+	else:
+		for node in [_cup,_lid,_product,_residue,_hero_detail,_bottle_polish]:
+			if node != null:
+				node.scale = scale
 	for node in [_cup,_lid,_product,_residue,_hero_detail,_bottle_polish]:
 		if node == null:
 			continue
-		node.scale = scale
 		node.rotation.z = shake
 		node.rotation.x = shake*0.22
 	_apply_liquid_lag(tilt)
+
+func _activate_paper_cup_material() -> void:
+	if _cup == null or _paper_material_active:
+		return
+	var shader := load(PAPER_SQUEEZE_SHADER) as Shader
+	if shader == null:
+		return
+	_cup_original_material = _cup.material_override
+	_paper_play_material = ShaderMaterial.new()
+	_paper_play_material.shader = shader
+	_paper_play_material.set_shader_parameter("paper_color",Color(0.95,0.935,0.895,1.0))
+	_paper_play_material.set_shader_parameter("fiber_strength",0.022)
+	_paper_play_material.set_shader_parameter("squeeze_amount",0.0)
+	_cup.material_override = _paper_play_material
+	_paper_material_active = true
+
+func _restore_paper_cup_material() -> void:
+	if not _paper_material_active:
+		return
+	if _cup != null:
+		_cup.material_override = _cup_original_material
+	_cup_original_material = null
+	_paper_play_material = null
+	_paper_material_active = false
 
 func _apply_liquid_lag(tilt: float) -> void:
 	if _product == null:
@@ -182,6 +235,7 @@ func _update_prompt(resolved: bool) -> void:
 	_prompt.text = "%s  •  LMB drag   RMB inspect   Continue" % verb
 
 func _exit_tree() -> void:
+	_restore_paper_cup_material()
 	if _model != null:
 		_model.reset()
 	_model = null
