@@ -38,6 +38,7 @@ func run() -> Array[String]:
 		elif clean_adhesive.albedo_color.a < 0.10:
 			failures.append("ADHESIVE_RED: clean glue film needs readable but restrained opacity")
 
+	# Deliberately damaged peel: this is where paper backing islands are allowed.
 	residue.set_residue(0.62, 0.34, 0.72)
 	if residue.get_residue_amount() < 0.33:
 		failures.append("residue visual should retain deterministic residue amount")
@@ -78,6 +79,32 @@ func run() -> Array[String]:
 	if high_damage_fiber <= low_damage_fiber + 0.08:
 		failures.append("RED: lower label integrity should visibly increase fibrous backing strength")
 
+	# These are the actual representative completion states captured by CI. They
+	# are imperfect but normal peels, so the paper sheet is gone and the hero
+	# container must read bare. Keep adhesive evidence, but do not regenerate a
+	# label-width curtain of backing fibers.
+	var normal_done_cases := [
+		{"substrate":"thermal_paper","trace":0.16,"gain":0.86,"residue":0.08,"integrity":0.94},
+		{"substrate":"rustic_jar_paper","trace":0.22,"gain":1.04,"residue":0.14,"integrity":0.88},
+		{"substrate":"grocery_wrap_paper","trace":0.27,"gain":1.18,"residue":0.18,"integrity":0.82},
+		{"substrate":"thin_can_wrap","trace":0.14,"gain":0.48,"residue":0.07,"integrity":0.96}
+	]
+	for capture_case in normal_done_cases:
+		residue.apply_profile({
+			"substrate":String(capture_case["substrate"]),
+			"adhesive_trace":float(capture_case["trace"]),
+			"adhesive_tint":Color(0.82,0.76,0.61),
+			"fiber_tint":Color(0.92,0.86,0.72),
+			"fiber_gain":float(capture_case["gain"])
+		})
+		residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
+		if float(residue.get_fiber_strength()) > 0.02 or residue.has_layered_residue():
+			failures.append("BARE_OBJECT_RED: normal resolved %s peel must expose container, not a recreated fiber band" % String(capture_case["substrate"]))
+		if not residue.has_adhesive_trace():
+			failures.append("BARE_OBJECT_RED: normal resolved %s peel should still preserve subtle glue evidence" % String(capture_case["substrate"]))
+
+	residue.apply_profile(bar_profile)
+	residue.set_residue(0.62,0.34,0.72)
 	var bar_trace: float = float(residue.get_adhesive_trace_amount())
 	residue.apply_profile({"substrate":"coated_citrus","adhesive_trace":0.11,"adhesive_tint":Color(0.78,0.86,0.66),"fiber_tint":Color(0.90,0.92,0.82),"fiber_gain":0.65})
 	residue.set_residue(0.62, 0.0, 1.0)
@@ -85,9 +112,6 @@ func run() -> Array[String]:
 	if market_trace >= bar_trace - 0.04:
 		failures.append("ADHESIVE_RED: bar and market adhesive profiles must produce visibly different clean tack traces")
 
-	# The coated Yuzu label leaves a thin commercial adhesive haze on glass. At
-	# the normal resolved capture damage level it must not fabricate opaque paper
-	# islands that read as a shattered bottle or torn curtain over the liquid.
 	residue.set_residue(1.0, 0.08, 0.94)
 	if float(residue.get_fiber_strength()) > 0.02 or residue.has_layered_residue():
 		failures.append("YUZU_RESIDUE_RED: coated citrus residue must stay adhesive-only at normal peel damage")
