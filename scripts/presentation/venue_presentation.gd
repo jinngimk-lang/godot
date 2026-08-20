@@ -58,9 +58,11 @@ func _apply_environment() -> void:
 			env.ambient_light_color = Color(0.83,0.91,0.98)
 			env.ambient_light_energy = 0.76
 		"market_can":
-			env.background_color = Color(0.24,0.34,0.34)
-			env.ambient_light_color = Color(0.69,0.88,0.86)
-			env.ambient_light_energy = 0.66
+			# Direct can target: warm convenience-store practicals around a cold
+			# reflective can, rather than the previous cyan/teal wash.
+			env.background_color = Color(0.18,0.12,0.075)
+			env.ambient_light_color = Color(0.88,0.72,0.54)
+			env.ambient_light_energy = 0.61
 		_:
 			env.background_color = Color(0.13,0.085,0.045)
 			env.ambient_light_color = Color(0.70,0.47,0.25)
@@ -123,15 +125,15 @@ func _apply_parent_stage(profile: Dictionary) -> void:
 			rim.light_color = Color(0.72,0.91,1.0)
 			rim.light_energy = base_energy*0.58
 		"market_can":
-			key.rotation_degrees = Vector3(-40,-40,0)
-			key.light_color = Color(0.86,1.0,0.95)
+			key.rotation_degrees = Vector3(-42,-38,0)
+			key.light_color = Color(1.0,0.82,0.60)
 			key.light_energy = base_energy*0.88
-			fill.position = Vector3(-1.8,1.65,2.0)
-			fill.light_color = Color(0.65,0.91,0.90)
-			fill.light_energy = base_energy*0.72
-			rim.position = Vector3(1.7,1.30,-0.7)
-			rim.light_color = Color(0.42,0.90,0.90)
-			rim.light_energy = base_energy*0.66
+			fill.position = Vector3(-1.75,1.60,2.05)
+			fill.light_color = Color(1.0,0.91,0.75)
+			fill.light_energy = base_energy*0.66
+			rim.position = Vector3(1.70,1.32,-0.70)
+			rim.light_color = Color(1.0,0.58,0.24)
+			rim.light_energy = base_energy*0.70
 		_:
 			key.rotation_degrees = Vector3(-47,-34,0)
 			key.light_color = Color(1.0,0.76,0.47)
