@@ -1,8 +1,10 @@
 extends Node3D
 class_name BottleHeroPolish
 
-const HIGHLIGHT_ALPHA := 0.125
+const HIGHLIGHT_ALPHA := 0.145
 const OUTER_GLASS_ALPHA := 0.0
+const EDGE_ALPHA := 0.19
+const FRESNEL_POWER := 4.25
 const LIQUID_ALPHA := 1.0
 const LIQUID_TOP_Y := 0.72
 const TARGET_FOCUS_Y := 0.42
@@ -37,6 +39,8 @@ func get_visual_contract() -> Dictionary:
 		"cap":"silver_crimp",
 		"glass_highlight_alpha":HIGHLIGHT_ALPHA,
 		"outer_glass_alpha":OUTER_GLASS_ALPHA,
+		"edge_alpha":EDGE_ALPHA,
+		"fresnel_power":FRESNEL_POWER,
 		"liquid_alpha":LIQUID_ALPHA,
 		"liquid_top_y":LIQUID_TOP_Y,
 		"liquid_shape":"shouldered",
@@ -91,17 +95,20 @@ func _tune_base_bottle() -> void:
 	var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
 	if edge != null and edge.material_override is ShaderMaterial:
 		edge.visible = true
-		edge.scale = Vector3.ONE*1.002
+		edge.scale = Vector3.ONE*1.0015
 		var edge_material := edge.material_override as ShaderMaterial
-		edge_material.set_shader_parameter("edge_color",Color(0.965,0.995,1.0,1.0))
-		edge_material.set_shader_parameter("edge_alpha",0.40)
-		edge_material.set_shader_parameter("fresnel_power",2.30)
+		# Direct Yuzu target is optically clear through the center. Keep the glass
+		# legible only at grazing angles and let the two dedicated highlight strips
+		# carry the frontal specular cues instead of filling the neck with cyan.
+		edge_material.set_shader_parameter("edge_color",Color(0.985,1.0,1.0,1.0))
+		edge_material.set_shader_parameter("edge_alpha",EDGE_ALPHA)
+		edge_material.set_shader_parameter("fresnel_power",FRESNEL_POWER)
 	var base_ring := _product.get_node_or_null("BottleBaseRing") as MeshInstance3D
 	if base_ring != null:
 		base_ring.visible = true
 		if base_ring.material_override is StandardMaterial3D:
 			var ring_material := base_ring.material_override as StandardMaterial3D
-			ring_material.albedo_color = Color(0.96,0.99,1.0,0.22)
+			ring_material.albedo_color = Color(0.96,0.99,1.0,0.18)
 			ring_material.roughness = 0.04
 
 func _build_liquid_hero() -> void:
@@ -117,12 +124,12 @@ func _build_liquid_hero() -> void:
 	]
 	liquid.mesh = _lathe_mesh(profile,true,true)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.90,0.87,0.57,1.0)
-	material.roughness = 0.24
-	material.metallic_specular = 0.12
+	material.albedo_color = Color(0.925,0.89,0.665,1.0)
+	material.roughness = 0.27
+	material.metallic_specular = 0.10
 	material.clearcoat_enabled = true
-	material.clearcoat = 0.14
-	material.clearcoat_roughness = 0.20
+	material.clearcoat = 0.10
+	material.clearcoat_roughness = 0.23
 	liquid.material_override = material
 	liquid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(liquid)
@@ -223,7 +230,7 @@ func _build_neck_ring() -> void:
 	ring.mesh = mesh
 	ring.position.y = 1.337
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.99,1.0,1.0,0.13)
+	material.albedo_color = Color(0.99,1.0,1.0,0.095)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.roughness = 0.024
 	material.metallic_specular = 0.96
