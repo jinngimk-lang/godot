@@ -37,7 +37,7 @@ func material_contract_for_kind(kind: String) -> Dictionary:
 		"sauce_jar":
 			return {"glass_alpha":0.055,"fill_height_ratio":0.86,"sauce_color":Color(0.46,0.055,0.018)}
 		"tin_can":
-			return {"body_value":0.90,"metallic":0.16,"roughness":0.24}
+			return {"finish":"brushed_tin","body_value":0.91,"metallic":0.07,"roughness":0.30,"rim_value":0.82,"highlight_count":2}
 		"soda_can":
 			return {"finish":"bare_aluminum","body_color":Color(0.89,0.90,0.91),"metallic":0.18,"roughness":0.20,"condensation":true}
 		_:
@@ -105,16 +105,24 @@ func _build_jar() -> void:
 
 func _build_tin_can() -> void:
 	var contract := material_contract_for_kind("tin_can")
+	var body_value := float(contract["body_value"])
+	var body_color := Color(body_value,body_value+0.008,body_value+0.015)
+	var rim_value := float(contract["rim_value"])
 	var body_profile: Array[Vector2] = [
 		Vector2(-0.655,0.385),Vector2(-0.628,0.398),Vector2(-0.585,0.402),
 		Vector2(0.585,0.402),Vector2(0.628,0.398),Vector2(0.655,0.385)
 	]
-	_add_lathe("TinHeroBody",body_profile,_metal_material(Color(0.90,0.91,0.92),float(contract["roughness"]),float(contract["metallic"])),true,true)
-	_add_ring("TinHeroTopRoll",0.665,0.418,0.030,Color(0.96,0.965,0.97),0.18,false,0.18)
-	_add_ring("TinHeroBottomRoll",-0.665,0.418,0.030,Color(0.88,0.89,0.90),0.22,false,0.16)
-	_add_cylinder("TinHeroTopDisk",Vector3(0,0.681,0),0.382,0.382,0.010,_metal_material(Color(0.94,0.945,0.95),0.26,0.16),112)
-	_add_cylinder("TinHeroTopInset",Vector3(0,0.688,0),0.315,0.315,0.006,_metal_material(Color(0.80,0.82,0.83),0.34,0.12),96)
-	_add_vertical_specular("TinSpecularLeft",-0.285,0.02,0.88,0.050,0.10)
+	_add_lathe("TinHeroBody",body_profile,_metal_material(body_color,float(contract["roughness"]),float(contract["metallic"])),true,true)
+	# Rolled seams on the target are silver/grey structure, not bright white
+	# plastic hoops. Keep them slightly darker than the lit body so their depth
+	# comes from silhouette and the top disk rather than clipping to white.
+	var rim_color := Color(rim_value,rim_value+0.012,rim_value+0.020)
+	_add_ring("TinHeroTopRoll",0.665,0.414,0.026,rim_color,0.23,false,0.09)
+	_add_ring("TinHeroBottomRoll",-0.665,0.414,0.026,rim_color.darkened(0.045),0.26,false,0.08)
+	_add_cylinder("TinHeroTopDisk",Vector3(0,0.680,0),0.380,0.380,0.009,_metal_material(Color(0.84,0.855,0.865),0.27,0.08),112)
+	_add_cylinder("TinHeroTopInset",Vector3(0,0.687,0),0.310,0.310,0.005,_metal_material(Color(0.70,0.72,0.73),0.36,0.05),96)
+	_add_vertical_specular("TinSpecularLeft",-0.278,0.02,0.90,0.040,0.15)
+	_add_vertical_specular("TinSpecularRight",0.275,-0.03,0.72,0.024,0.065)
 
 func _build_soda_can() -> void:
 	var contract := material_contract_for_kind("soda_can")
