@@ -6,6 +6,12 @@ func run() -> Array[String]:
 	if not ResourceLoader.exists(path):
 		return ["PRODUCT_RED: missing ProductPresentation"]
 	var product = load(path).new()
+	# The glass edge pass must be symmetric to normal orientation. Using raw
+	# dot(NORMAL, VIEW) lets a front-facing surface with the opposite winding
+	# become full Fresnel in GL compatibility and turns a clear bottle milky.
+	var edge_shader := String(product.GLASS_EDGE_SHADER)
+	if "abs(dot" not in edge_shader:
+		failures.append("BOTTLE_GLASS_RED: edge Fresnel must use absolute view/normal alignment so the bottle center stays clear")
 	var cases := [
 		[{"kind":"paper_cup","body_color":Color(0.88,0.82,0.70)},"CupPaperDetails"],
 		[{"kind":"sauce_jar","body_color":Color(0.92,0.97,0.98),"liquid_color":Color(0.55,0.08,0.035)},"JarGlass"],
