@@ -24,14 +24,11 @@ func lighting_contract_for_venue(venue_id: String) -> Dictionary:
 				"ambient_color":Color(0.76,0.84,0.90),"ambient_energy":0.60
 			}
 		"market_can":
-			# Preserve silver aluminum with a nearly neutral frontal key. Warmth now
-			# lives in the ambient/rim and environment plate instead of tinting the
-			# can itself brown; this keeps the convenience scene warm but metallic.
 			return {
-				"key_color":Color(1.0,0.985,0.955),"key_energy":0.88,
-				"fill_color":Color(0.965,0.970,0.990),"fill_energy":0.62,
-				"rim_color":Color(1.0,0.72,0.43),"rim_energy":0.50,
-				"ambient_color":Color(0.47,0.39,0.32),"ambient_energy":0.40
+				"key_color":Color(1.0,0.995,0.985),"key_energy":1.06,
+				"fill_color":Color(0.975,0.980,0.995),"fill_energy":0.48,
+				"rim_color":Color(1.0,0.72,0.43),"rim_energy":0.44,
+				"ambient_color":Color(0.34,0.31,0.28),"ambient_energy":0.22
 			}
 		"pantry_jar":
 			return {
@@ -42,10 +39,10 @@ func lighting_contract_for_venue(venue_id: String) -> Dictionary:
 			}
 		"pantry_tin":
 			return {
-				"key_color":Color(0.985,0.965,0.925),"key_energy":0.92,
-				"fill_color":Color(0.92,0.925,0.915),"fill_energy":0.72,
-				"rim_color":Color(0.98,0.83,0.62),"rim_energy":0.42,
-				"ambient_color":Color(0.52,0.50,0.47),"ambient_energy":0.52
+				"key_color":Color(1.0,0.985,0.955),"key_energy":1.06,
+				"fill_color":Color(0.965,0.965,0.950),"fill_energy":0.55,
+				"rim_color":Color(0.98,0.83,0.62),"rim_energy":0.36,
+				"ambient_color":Color(0.38,0.36,0.33),"ambient_energy":0.28
 			}
 		_:
 			return {
