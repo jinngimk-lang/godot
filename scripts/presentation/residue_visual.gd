@@ -95,6 +95,12 @@ func _recompute_semantics() -> void:
 		return
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
 	_adhesive_trace_amount = clampf(_adhesive_trace_profile*reveal + _residue_amount*0.30,0.0,0.68)
+	# The coated commercial Yuzu label does not leave dry paper backing islands
+	# at normal damage levels. On clear glass those opaque islands read as broken
+	# geometry, so this substrate uses adhesive haze/tack streaks only.
+	if _substrate == "coated_citrus":
+		_fiber_strength = 0.0
+		return
 	if _residue_amount <= 0.002 and _integrity >= 0.998:
 		_fiber_strength = 0.0
 	else:
@@ -162,7 +168,11 @@ func _rebuild() -> void:
 		return
 	_ensure_materials()
 
-	var adhesive_alpha := clampf(0.16+_adhesive_trace_amount*0.78+_residue_amount*0.14,0.16,0.62)
+	var adhesive_alpha: float
+	if _substrate == "coated_citrus":
+		adhesive_alpha = clampf(0.085+_adhesive_trace_amount*0.48+_residue_amount*0.08,0.08,0.30)
+	else:
+		adhesive_alpha = clampf(0.16+_adhesive_trace_amount*0.78+_residue_amount*0.14,0.16,0.62)
 	_adhesive_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,adhesive_alpha)
 	var fiber_alpha := clampf(0.88+_fiber_strength*0.10,0.88,0.98)
 	var white_mix := 0.38 if _substrate == "uncoated_fiber" else 0.20
@@ -176,7 +186,8 @@ func _rebuild() -> void:
 func _draw_adhesive_layer() -> void:
 	var segments := 40
 	var peeled_u := clampf(_progress,0.0,1.0)
-	var density := clampf(0.52+_adhesive_trace_amount*0.86+_residue_amount*0.30,0.52,0.99)
+	var coated := _substrate == "coated_citrus"
+	var density := clampf(0.40+_adhesive_trace_amount*0.62+_residue_amount*0.18,0.40,0.78) if coated else clampf(0.52+_adhesive_trace_amount*0.86+_residue_amount*0.30,0.52,0.99)
 	var started := false
 	for i in range(segments):
 		var u0 := float(i)/float(segments)
@@ -189,12 +200,17 @@ func _draw_adhesive_layer() -> void:
 		if not started:
 			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
 			started = true
-		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.12+0.08*_residue_amount)
-		var half_height := _label_height*(0.075+0.095*(1.0-signal_value)+0.065*_adhesive_trace_amount+0.035*_residue_amount)
+		var center_factor := 0.035 if coated else (0.12+0.08*_residue_amount)
+		var center_offset := sin(float(i)*1.43+0.25)*_label_height*center_factor
+		var half_height: float
+		if coated:
+			half_height = _label_height*(0.028+0.034*(1.0-signal_value)+0.020*_adhesive_trace_amount)
+		else:
+			half_height = _label_height*(0.075+0.095*(1.0-signal_value)+0.065*_adhesive_trace_amount+0.035*_residue_amount)
 		var y0_top := _label_y+center_offset+half_height
 		var y0_bottom := _label_y+center_offset-half_height
-		var next_offset := sin(float(i+1)*1.43+0.25)*_label_height*(0.12+0.08*_residue_amount)
-		var next_half := half_height*(0.82+0.22*_signal(i+1,9))
+		var next_offset := sin(float(i+1)*1.43+0.25)*_label_height*center_factor
+		var next_half := half_height*(0.86+0.16*_signal(i+1,9)) if coated else half_height*(0.82+0.22*_signal(i+1,9))
 		var y1_top := _label_y+next_offset+next_half
 		var y1_bottom := _label_y+next_offset-next_half
 		_emit_patch(u0,u1,y0_top,y0_bottom,y1_top,y1_bottom,0.0144)
@@ -205,18 +221,25 @@ func _draw_adhesive_layer() -> void:
 func _draw_tack_streaks(peeled_u: float) -> void:
 	if peeled_u <= 0.12:
 		return
-	var columns := 5
-	for row in range(3):
-		var row_center := _label_y+(float(row)-1.0)*_label_height*0.19
+	var coated := _substrate == "coated_citrus"
+	var columns := 6 if coated else 5
+	var rows := 2 if coated else 3
+	for row in range(rows):
+		var row_offset := float(row)-float(rows-1)*0.5
+		var row_center := _label_y+row_offset*_label_height*(0.10 if coated else 0.19)
 		for column in range(columns):
-			if _signal(column+row*7,83) > 0.78:
+			if _signal(column+row*7,83) > (0.66 if coated else 0.78):
 				continue
 			var u0 := peeled_u*float(column)/float(columns)
 			var u1 := peeled_u*float(column+1)/float(columns)
-			var wobble0 := (0.5-_signal(column+row*11,89))*_label_height*0.035
-			var wobble1 := (0.5-_signal(column+1+row*11,97))*_label_height*0.035
-			var half0 := _label_height*(0.012+0.010*_adhesive_trace_amount+0.006*_signal(column,101+row))
-			var half1 := _label_height*(0.012+0.010*_adhesive_trace_amount+0.006*_signal(column+1,107+row))
+			var wobble_scale := 0.016 if coated else 0.035
+			var wobble0 := (0.5-_signal(column+row*11,89))*_label_height*wobble_scale
+			var wobble1 := (0.5-_signal(column+1+row*11,97))*_label_height*wobble_scale
+			var base_half := 0.006 if coated else 0.012
+			var trace_half := 0.005 if coated else 0.010
+			var signal_half := 0.003 if coated else 0.006
+			var half0 := _label_height*(base_half+trace_half*_adhesive_trace_amount+signal_half*_signal(column,101+row))
+			var half1 := _label_height*(base_half+trace_half*_adhesive_trace_amount+signal_half*_signal(column+1,107+row))
 			_emit_patch(u0,u1,row_center+wobble0+half0,row_center+wobble0-half0,row_center+wobble1+half1,row_center+wobble1-half1,0.0162)
 
 func _draw_fiber_layer() -> void:
