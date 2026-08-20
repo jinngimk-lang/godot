@@ -8,6 +8,9 @@ uniform float grain_scale : hint_range(5.0, 180.0) = 72.0;
 uniform float stone_mode : hint_range(0.0, 1.0) = 0.0;
 uniform float grain_bump_strength : hint_range(0.0, 0.12) = 0.04;
 uniform float surface_alpha : hint_range(0.15, 1.0) = 0.48;
+uniform float plank_count : hint_range(1.0, 14.0) = 6.0;
+uniform float plank_contrast : hint_range(0.0, 0.25) = 0.10;
+uniform float specular_variation : hint_range(0.0, 0.20) = 0.08;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -27,10 +30,12 @@ float value_noise(vec2 p) {
 }
 
 float wood_signal(vec2 uv) {
-	float wood_wave = sin(uv.y * grain_scale + sin(uv.x * 18.0) * 2.8);
+	float long_warp = sin(uv.x * 13.0 + sin(uv.y * 5.0) * 1.7);
+	float wood_wave = sin(uv.y * grain_scale + long_warp * 3.2);
 	float fine = sin(uv.y * grain_scale * 3.1 + uv.x * 17.0) * 0.5 + 0.5;
+	float pores = value_noise(uv * vec2(18.0, 190.0));
 	float wood = 0.5 + 0.5 * wood_wave;
-	return mix(wood, fine, 0.24);
+	return mix(mix(wood, fine, 0.24), pores, 0.12);
 }
 
 float stone_signal(vec2 uv) {
@@ -47,7 +52,18 @@ void fragment() {
 	float wood = wood_signal(UV);
 	float stone_noise = stone_signal(UV);
 	float stone = mix(0.965, 1.035, stone_noise);
-	float variation = mix(0.82 + wood * grain_strength * 1.7, stone, stone_mode);
+
+	float safe_planks = max(plank_count, 1.0);
+	float plank_u = UV.x * safe_planks;
+	float plank_id = floor(plank_u);
+	float plank_local = fract(plank_u);
+	float plank_random = hash21(vec2(plank_id, 17.37));
+	float plank_edge_distance = min(plank_local, 1.0 - plank_local);
+	float plank_seam = 1.0 - smoothstep(0.0, 0.018, plank_edge_distance);
+	float plank_tone = (plank_random - 0.5) * 2.0 * plank_contrast - plank_seam * plank_contrast * 0.72;
+
+	float wood_value = 0.82 + wood * grain_strength * 1.7 + plank_tone;
+	float variation = mix(wood_value, stone, stone_mode);
 	ALBEDO = base_color * variation;
 
 	float micro = surface_signal(UV);
@@ -58,10 +74,11 @@ void fragment() {
 	NORMAL_MAP = vec3(packed_xy, 1.0);
 	NORMAL_MAP_DEPTH = grain_bump_strength;
 
-	float wood_roughness = (wood - 0.5) * 0.08;
+	float wood_roughness = (wood - 0.5) * specular_variation + (plank_random - 0.5) * specular_variation * 0.70 + plank_seam * 0.035;
 	float stone_roughness = (micro - 0.5) * 0.040;
 	ROUGHNESS = clamp(roughness_value + mix(wood_roughness, stone_roughness, stone_mode), 0.04, 1.0);
 	METALLIC = 0.0;
-	SPECULAR = mix(0.60, 0.40, stone_mode);
+	float wood_specular = clamp(0.56 - wood_roughness * 1.4, 0.30, 0.72);
+	SPECULAR = mix(wood_specular, 0.40, stone_mode);
 	ALPHA = surface_alpha;
 }
