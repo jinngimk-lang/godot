@@ -19,6 +19,8 @@ func run() -> Array[String]:
 		failures.append("TABLE_DEPTH_RED: wood target needs readable plank-to-plank value breakup, not one flat brown slab")
 	if "specular_variation" not in code:
 		failures.append("TABLE_DEPTH_RED: foreground surface needs directional roughness/specular variation")
+	if "varying vec3 local_pos" not in code or "local_pos = VERTEX" not in code:
+		failures.append("TABLE_PROJECTION_RED: table grain must use object-space projection so BoxMesh UVs cannot collapse the visible wood target")
 
 	var presentation = load("res://scripts/presentation/table_surface_presentation.gd").new()
 	if not presentation.has_method("profile_parameters"):
