@@ -45,9 +45,6 @@ func feed_drag(relative: Vector2, delta: float) -> void:
 	_last_drag_sign = sign_now if sign_now != 0.0 else _last_drag_sign
 	var shake_gain := float(_profile.get("shake_gain",0.0015))
 	var limit := float(_profile.get("shake_limit",0.08))
-	# A fast swipe must read on the same frame as user input. Angle impulse gives
-	# immediate tactile readability; velocity carries the object onward as a
-	# damped inertial follow-through. Direction reversals get a small boost.
 	_shake_angle = clampf(_shake_angle+relative.x*shake_gain*0.18*reversal_boost,-limit,limit)
 	_shake_velocity += horizontal_speed*shake_gain*0.010*reversal_boost
 	_shake_velocity = clampf(_shake_velocity,-1.8,1.8)
@@ -69,7 +66,6 @@ func tick(delta: float) -> void:
 	_shake_angle += _shake_velocity*dt
 	var limit := float(_profile.get("shake_limit",0.08))
 	_shake_angle = clampf(_shake_angle,-limit,limit)
-	# Damped spring: responsive during drag, calm recovery after release.
 	_shake_velocity += (-_shake_angle*42.0)*dt
 	_shake_velocity *= exp(-7.0*dt)
 	if not _active:
@@ -77,9 +73,14 @@ func tick(delta: float) -> void:
 	var liquid_gain := float(_profile.get("liquid_gain",0.0))
 	_liquid_tilt = clampf(-_shake_angle*liquid_gain-_shake_velocity*0.018*liquid_gain,-0.16,0.16)
 
+func get_squeeze_amount() -> float:
+	return clampf(_squeeze,0.0,float(_profile.get("max_squeeze",0.0)))
+
 func get_squeeze_scale() -> Vector3:
-	var amount := clampf(_squeeze,0.0,float(_profile.get("max_squeeze",0.0)))
-	return Vector3(1.0-amount,1.0+amount*0.34,1.0+amount*0.16)
+	var amount := get_squeeze_amount()
+	# Pinching narrows the cross-section and pushes material into depth. It must
+	# not look like a game-engine scale gizmo stretching the whole object taller.
+	return Vector3(1.0-amount,1.0-amount*0.03,1.0+amount*0.28)
 
 func get_shake_angle() -> float:
 	return _shake_angle
