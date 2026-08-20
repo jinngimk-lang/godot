@@ -95,16 +95,19 @@ func _recompute_semantics() -> void:
 		return
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
 	_adhesive_trace_amount = clampf(_adhesive_trace_profile*reveal + _residue_amount*0.30,0.0,0.68)
-	# The coated commercial Yuzu label does not leave dry paper backing islands
-	# at normal damage levels. On clear glass those opaque islands read as broken
-	# geometry, so this substrate uses adhesive haze/tack streaks only.
 	if _substrate == "coated_citrus":
 		_fiber_strength = 0.0
 		return
-	if _residue_amount <= 0.002 and _integrity >= 0.998:
+	# Small residue values still mean adhesive transfer, not a second paper label.
+	# Gate the dry backing islands behind combined residue + integrity damage so
+	# normal completed peels expose the bare container while truly torn peels can
+	# still leave broad fibrous pieces.
+	var damage_score := _residue_amount*0.45+(1.0-_integrity)*0.75
+	const FIBER_DAMAGE_GATE := 0.24
+	if damage_score <= FIBER_DAMAGE_GATE:
 		_fiber_strength = 0.0
 	else:
-		_fiber_strength = clampf((_residue_amount*0.45+(1.0-_integrity)*0.75)*_fiber_gain,0.0,1.0)
+		_fiber_strength = clampf((damage_score-FIBER_DAMAGE_GATE)*2.10*_fiber_gain,0.0,1.0)
 
 func get_residue_amount() -> float:
 	return _residue_amount
