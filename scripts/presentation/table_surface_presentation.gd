@@ -18,7 +18,10 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"grain_scale": 25.0,
 				"stone_mode": 1.0,
 				"grain_bump_strength": 0.018,
-				"surface_alpha": 1.0
+				"surface_alpha": 1.0,
+				"plank_count": 1.0,
+				"plank_contrast": 0.0,
+				"specular_variation": 0.025
 			}
 		"pantry_tin":
 			# Neutral brushed/stone grocery worktop gives the tin a manufactured,
@@ -30,7 +33,10 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"grain_scale": 34.0,
 				"stone_mode": 1.0,
 				"grain_bump_strength": 0.018,
-				"surface_alpha": 1.0
+				"surface_alpha": 1.0,
+				"plank_count": 1.0,
+				"plank_contrast": 0.0,
+				"specular_variation": 0.030
 			}
 		"market_coldcase":
 			return {
@@ -40,28 +46,39 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"grain_scale": 18.0,
 				"stone_mode": 1.0,
 				"grain_bump_strength": 0.018,
-				"surface_alpha": 1.0
+				"surface_alpha": 1.0,
+				"plank_count": 1.0,
+				"plank_contrast": 0.0,
+				"specular_variation": 0.028
 			}
 		"market_can":
 			return {
 				"base_color": Vector3(0.20,0.25,0.24),
 				"roughness_value": 0.28,
-				"grain_strength": 0.060,
-				"grain_scale": 51.0,
+				"grain_strength": 0.075,
+				"grain_scale": 54.0,
 				"stone_mode": 0.0,
-				"grain_bump_strength": 0.024,
-				"surface_alpha": 1.0
+				"grain_bump_strength": 0.028,
+				"surface_alpha": 1.0,
+				"plank_count": 5.0,
+				"plank_contrast": 0.070,
+				"specular_variation": 0.085
 			}
 		_:
-			# Coffee target: continuous rich walnut plane across the lower frame.
+			# Coffee target: rich walnut with broad plank separation, long grain and
+			# highlight breakup. This must read as real foreground wood rather than
+			# a flat brown mask over the photographic café plate.
 			return {
-				"base_color": Vector3(0.30,0.125,0.040),
-				"roughness_value": 0.31,
-				"grain_strength": 0.24,
-				"grain_scale": 66.0,
+				"base_color": Vector3(0.31,0.128,0.041),
+				"roughness_value": 0.29,
+				"grain_strength": 0.29,
+				"grain_scale": 72.0,
 				"stone_mode": 0.0,
-				"grain_bump_strength": 0.046,
-				"surface_alpha": 1.0
+				"grain_bump_strength": 0.055,
+				"surface_alpha": 1.0,
+				"plank_count": 6.0,
+				"plank_contrast": 0.13,
+				"specular_variation": 0.11
 			}
 
 func _process(_delta: float) -> void:
