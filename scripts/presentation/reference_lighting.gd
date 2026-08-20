@@ -24,13 +24,14 @@ func lighting_contract_for_venue(venue_id: String) -> Dictionary:
 				"ambient_color":Color(0.76,0.84,0.90),"ambient_energy":0.60
 			}
 		"market_can":
-			# Warm convenience-counter practicals. The former cold blue lighting
-			# overrode VenuePresentation and repainted neutral aluminum cyan.
+			# Preserve silver aluminum with a nearly neutral frontal key. Warmth now
+			# lives in the ambient/rim and environment plate instead of tinting the
+			# can itself brown; this keeps the convenience scene warm but metallic.
 			return {
-				"key_color":Color(1.0,0.91,0.79),"key_energy":0.84,
-				"fill_color":Color(0.95,0.86,0.74),"fill_energy":0.58,
-				"rim_color":Color(1.0,0.68,0.38),"rim_energy":0.58,
-				"ambient_color":Color(0.48,0.36,0.26),"ambient_energy":0.46
+				"key_color":Color(1.0,0.985,0.955),"key_energy":0.88,
+				"fill_color":Color(0.965,0.970,0.990),"fill_energy":0.62,
+				"rim_color":Color(1.0,0.72,0.43),"rim_energy":0.50,
+				"ambient_color":Color(0.47,0.39,0.32),"ambient_energy":0.40
 			}
 		"pantry_jar":
 			return {
@@ -41,10 +42,10 @@ func lighting_contract_for_venue(venue_id: String) -> Dictionary:
 			}
 		"pantry_tin":
 			return {
-				"key_color":Color(0.96,0.91,0.82),"key_energy":0.86,
-				"fill_color":Color(0.82,0.84,0.83),"fill_energy":0.68,
-				"rim_color":Color(0.93,0.72,0.48),"rim_energy":0.40,
-				"ambient_color":Color(0.49,0.47,0.43),"ambient_energy":0.50
+				"key_color":Color(0.985,0.965,0.925),"key_energy":0.92,
+				"fill_color":Color(0.92,0.925,0.915),"fill_energy":0.72,
+				"rim_color":Color(0.98,0.83,0.62),"rim_energy":0.42,
+				"ambient_color":Color(0.52,0.50,0.47),"ambient_energy":0.52
 			}
 		_:
 			return {
