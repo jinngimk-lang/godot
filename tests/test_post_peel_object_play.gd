@@ -36,9 +36,13 @@ func run() -> Array[String]:
 	model.call("set_active",true)
 	model.call("feed_drag",Vector2(18.0,12.0),0.10)
 	model.call("tick",0.016)
+	if not model.has_method("get_squeeze_amount"):
+		failures.append("POST_PEEL_PLAY_RED: presentation needs explicit squeeze amount for localized material deformation")
 	var scale: Vector3 = model.call("get_squeeze_scale")
-	if scale.x >= 0.998 or scale.y <= 1.001:
-		failures.append("POST_PEEL_PLAY_RED: cup drag should create bounded pinch deformation")
+	if scale.x >= 0.998 or scale.z <= 1.001:
+		failures.append("POST_PEEL_PLAY_RED: cup pinch should compress width and bulge depth")
+	if scale.y > 1.005:
+		failures.append("POST_PEEL_PLAY_RED: squeeze must not fake flex by stretching the whole container taller")
 	model.call("set_active",false)
 	for _i in range(90): model.call("tick",0.016)
 	var recovered: Vector3 = model.call("get_squeeze_scale")
