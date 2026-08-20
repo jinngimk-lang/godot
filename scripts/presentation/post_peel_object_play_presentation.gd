@@ -65,7 +65,8 @@ func get_runtime_contract() -> Dictionary:
 		"inspect":"RMB drag",
 		"finish":"Continue",
 		"hands":false,
-		"paper_squeeze":"localized_vertex_band"
+		"paper_squeeze":"localized_vertex_band",
+		"visible_liquid_lag":true
 	}
 
 func debug_stage_resolved(kind: String) -> void:
@@ -139,8 +140,6 @@ func _apply_visuals(resolved: bool) -> void:
 		_activate_paper_cup_material()
 		if _paper_play_material != null:
 			_paper_play_material.set_shader_parameter("squeeze_amount",squeeze_amount)
-		# Cup mouth/base/lid stay dimensionally stable; the shader dents the wall
-		# locally around the waist. Do not multiply the whole coffee hero by scale.
 		for node in [_cup,_lid,_product,_hero_detail,_bottle_polish]:
 			if node != null:
 				node.scale = Vector3.ONE
@@ -190,6 +189,11 @@ func _apply_liquid_lag(tilt: float) -> void:
 			liquid.rotation.z = tilt
 	if _hero_detail != null:
 		_apply_liquid_lag_recursive(_hero_detail,tilt)
+	# BottleHeroPolish owns the visible Yuzu liquid, meniscus and free surface.
+	# Route the same inertia into those meshes; otherwise only the hidden base
+	# liquid moves and the user sees a rigid yellow plug during bottle shake.
+	if _bottle_polish != null:
+		_apply_liquid_lag_recursive(_bottle_polish,tilt)
 
 func _apply_liquid_lag_recursive(node: Node, tilt: float) -> void:
 	for child in node.get_children():
