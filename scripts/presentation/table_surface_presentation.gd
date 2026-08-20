@@ -13,9 +13,6 @@ func _exit_tree() -> void:
 	release_table_resources()
 
 func release_table_resources() -> void:
-	# Runtime venue switching creates per-profile ShaderMaterials. Detach the
-	# renderer-owned resource explicitly before scene shutdown so the final table
-	# material cannot survive the five-scene capture process exit.
 	if is_instance_valid(_table):
 		_table.material_override = null
 	_active_material = null
@@ -52,22 +49,23 @@ func profile_parameters(profile_id: String) -> Dictionary:
 				"specular_variation": 0.030
 			}
 		"market_coldcase":
+			# Target is a bright refrigerated service counter: almost clean neutral
+			# stone, with only enough micro variation to keep the foreground grounded.
+			# Heavy mottling competes with the transparent bottle and makes glass read
+			# muddy, so keep both normal and specular breakup deliberately restrained.
 			return {
-				"base_color": Vector3(0.79,0.80,0.77),
-				"roughness_value": 0.30,
-				"grain_strength": 0.016,
-				"grain_scale": 18.0,
+				"base_color": Vector3(0.88,0.895,0.885),
+				"roughness_value": 0.27,
+				"grain_strength": 0.007,
+				"grain_scale": 22.0,
 				"stone_mode": 1.0,
-				"grain_bump_strength": 0.018,
+				"grain_bump_strength": 0.007,
 				"surface_alpha": 1.0,
 				"plank_count": 1.0,
 				"plank_contrast": 0.0,
-				"specular_variation": 0.028
+				"specular_variation": 0.012
 			}
 		"market_can":
-			# Direct Can target uses a warm, slightly polished stone/concrete service
-			# counter under the cold silver can. Keep it distinct from both Coffee
-			# walnut and Supermarket's pale refrigerated counter.
 			return {
 				"base_color": Vector3(0.43,0.35,0.27),
 				"roughness_value": 0.32,
