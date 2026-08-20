@@ -32,5 +32,15 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_HERO_RED: Yuzu liquid needs a shouldered bottle-following volume, not a floating cylinder")
 		if float(contract.get("target_focus_y",0.0)) < 0.24:
 			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
+	# Dynamic ArrayMesh/material resources used by the target-shaped liquid must
+	# have an explicit teardown path before a scene switch or process exit. The
+	# full five-scene capture is the integration gate; this unit contract keeps
+	# the lifecycle requirement local and falsifiable.
+	if not polish.has_method("release_preview_resources"):
+		failures.append("BOTTLE_RESOURCE_RED: bottle hero needs explicit preview resource teardown")
+	else:
+		polish.call("release_preview_resources")
+		if polish.get_child_count() != 0:
+			failures.append("BOTTLE_RESOURCE_RED: resource teardown must remove all preview children")
 	polish.free()
 	return failures
