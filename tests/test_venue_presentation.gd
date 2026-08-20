@@ -22,6 +22,28 @@ func run() -> Array[String]:
 		failures.append("VENUE_RED: unknown venue ids should fall back to cafe_window")
 	venue.free()
 
+	var lighting_path := "res://scripts/presentation/reference_lighting.gd"
+	if not ResourceLoader.exists(lighting_path):
+		failures.append("VENUE_LIGHT_RED: missing ReferenceLighting")
+	else:
+		var lighting = load(lighting_path).new()
+		if not lighting.has_method("lighting_contract_for_venue"):
+			failures.append("VENUE_LIGHT_RED: lighting needs a pure per-venue contract so color-direction regressions are testable")
+		else:
+			var cold: Dictionary = lighting.call("lighting_contract_for_venue","market_coldcase")
+			var can: Dictionary = lighting.call("lighting_contract_for_venue","market_can")
+			var cold_key: Color = cold.get("key_color",Color.WHITE)
+			var can_key: Color = can.get("key_color",Color.WHITE)
+			var can_fill: Color = can.get("fill_color",Color.WHITE)
+			var can_ambient: Color = can.get("ambient_color",Color.WHITE)
+			if cold_key.b <= cold_key.r:
+				failures.append("VENUE_LIGHT_RED: Yuzu supermarket should retain cool refrigerated key light")
+			if can_key.b > can_key.r or can_fill.b > can_fill.r:
+				failures.append("VENUE_LIGHT_RED: Can convenience scene must not repaint bare aluminum cyan")
+			if can_ambient.b > can_ambient.r:
+				failures.append("VENUE_LIGHT_RED: Can ambient must stay warm-neutral and distinct from supermarket coldcase")
+		lighting.free()
+
 	var backdrop_path := "res://scripts/presentation/reference_backdrop.gd"
 	if not ResourceLoader.exists(backdrop_path):
 		failures.append("VENUE_RED: reference backdrop presentation must exist")
