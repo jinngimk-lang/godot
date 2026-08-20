@@ -31,10 +31,18 @@ func run() -> Array[String]:
 		var stone_mode: float = stone_value if typeof(stone_value) in [TYPE_FLOAT,TYPE_INT] else 0.0
 		if stone_mode < 0.75:
 			failures.append("RED: market counter must use stone/speckle mode instead of wood-wave mode")
+		var base := market.get("base_color",Vector3.ZERO) as Vector3
+		if base.x < 0.84 or base.y < 0.85 or base.z < 0.84:
+			failures.append("MARKET_COUNTER_RED: Yuzu target needs a bright clean refrigerated counter")
+		var grain := float(market.get("grain_strength",1.0))
+		if grain > 0.010:
+			failures.append("MARKET_COUNTER_RED: supermarket counter is too mottled/noisy; grain %.3f" % grain)
 		var bump_value = market.get("grain_bump_strength",0.0)
 		var bump: float = bump_value if typeof(bump_value) in [TYPE_FLOAT,TYPE_INT] else 0.0
-		if bump < 0.015 or bump > 0.12:
-			failures.append("RED: market micro-bump must stay subtle but nonzero; got %.3f" % bump)
+		if bump < 0.003 or bump > 0.012:
+			failures.append("MARKET_COUNTER_RED: supermarket micro-bump should be restrained; got %.3f" % bump)
+		if float(market.get("specular_variation",1.0)) > 0.020:
+			failures.append("MARKET_COUNTER_RED: supermarket counter should read clean, not patchy")
 		var cafe: Dictionary = presentation.call("profile_parameters","cafe_window")
 		var bar: Dictionary = presentation.call("profile_parameters","night_bar")
 		var cafe_stone_value = cafe.get("stone_mode",1.0)
