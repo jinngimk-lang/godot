@@ -54,7 +54,8 @@ func material_contract_for_kind(kind: String) -> Dictionary:
 				"roughness":0.21,
 				"rim_value":0.81,
 				"highlight_count":3,
-				"brush_band_count":7
+				"brush_band_count":7,
+				"brush_band_geometry":"open_shell"
 			}
 		"soda_can":
 			return {
@@ -111,7 +112,6 @@ func _build_jar() -> void:
 		Vector2(0.632,0.318),Vector2(0.695,0.318)
 	]
 	_add_lathe("JarHeroShell",glass_profile,_glass_material(Color(0.97,0.992,0.995),float(contract["glass_alpha"]),0.020),false,false)
-
 	var sauce_profile: Array[Vector2] = [
 		Vector2(-0.600,0.300),Vector2(-0.565,0.338),Vector2(-0.515,0.350),
 		Vector2(0.350,0.350),Vector2(0.405,0.344),Vector2(0.455,0.326),
@@ -125,17 +125,14 @@ func _build_jar() -> void:
 	_add_lathe("JarSauceVolume",sauce_profile,sauce,true,true)
 	var sauce_surface := _add_cylinder("JarSauceSurface",Vector3(0,0.488,0),0.296,0.296,0.008,_mat(Color(0.69,0.105,0.040),0.28),96)
 	sauce_surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
 	_add_ring("JarGlassBase",-0.653,0.408,float(contract["base_thickness"]),Color(0.97,0.995,1.0,0.28),0.035,true,0.0)
 	_add_ring("JarGlassFoot",-0.625,0.388,0.016,Color(0.95,0.985,0.99,0.16),0.040,true,0.0)
 	_add_ring("JarNeckGlass",0.654,0.322,0.022,Color(0.98,0.997,1.0,0.17),0.028,true,0.0)
-
 	var lid_color := Color(0.64,0.53,0.37)
 	_add_cylinder("JarHeroLid",Vector3(0,0.744,0),0.339,0.342,0.112,_metal_material(lid_color,0.25,0.16),112)
 	_add_cylinder("JarLidTop",Vector3(0,0.804,0),0.326,0.326,0.010,_metal_material(Color(0.72,0.62,0.46),0.21,0.17),112)
 	_add_lid_flutes(int(contract["lid_flute_count"]),0.346,0.744,0.086,Color(0.77,0.67,0.50))
 	_add_ring("JarLidLowerSkirt",0.691,0.347,0.012,Color(0.50,0.40,0.28),0.29,false,0.14)
-
 	_add_glass_highlight("JarHighlightLeft",Vector3(-0.270,0.005,0.326),Vector2(0.018,1.04),0.16)
 	_add_glass_highlight("JarHighlightRight",Vector3(0.286,-0.040,0.311),Vector2(0.011,0.74),0.075)
 	_add_glass_highlight("JarShoulderGlint",Vector3(-0.155,0.545,0.344),Vector2(0.080,0.018),0.11)
@@ -179,14 +176,13 @@ func _add_tin_brush_bands(count: int) -> void:
 		var t := float(i+1)/float(safe_count+1)
 		var y := lerpf(-0.53,0.53,t)
 		var v := 0.900+0.024*float(i%2)
-		_add_ring(
+		_add_shell_band(
 			"TinBrushBand%d" % i,
 			y,
 			0.403,
 			0.0035,
 			Color(v,v+0.004,v+0.008),
 			0.22+0.015*float(i%3),
-			false,
 			0.035
 		)
 
@@ -200,7 +196,7 @@ func _build_soda_can() -> void:
 	_add_lathe("SodaHeroBody",body_profile,_metal_material(contract["body_color"],float(contract["roughness"]),float(contract["metallic"])),true,true)
 	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.915,0.918,0.912),0.15,false,0.09)
 	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.825,0.830,0.822),0.20,false,0.07)
-	_add_ring("SodaShoulderGlint",0.607,0.394,0.006,Color(0.940,0.936,0.925),0.15,false,0.05)
+	_add_shell_band("SodaShoulderGlint",0.607,0.394,0.006,Color(0.940,0.936,0.925),0.15,0.05)
 	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.905,0.908,0.902),0.17,0.09),112)
 	_add_cylinder("SodaHeroTopInset",Vector3(0,0.705,0),0.286,0.286,0.004,_metal_material(Color(0.805,0.810,0.805),0.23,0.06),96)
 	_add_pull_tab()
@@ -357,6 +353,22 @@ func _add_ring(node_name: String, y: float, radius: float, height: float, color:
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.albedo_color.a = color.a
 	_add_cylinder(node_name,Vector3(0,y,0),radius,radius,height,mat,112)
+
+func _add_shell_band(node_name: String, y: float, radius: float, height: float, color: Color, roughness: float, metallic: float) -> void:
+	var band := MeshInstance3D.new()
+	band.name = node_name
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	mesh.radial_segments = 112
+	mesh.cap_top = false
+	mesh.cap_bottom = false
+	band.mesh = mesh
+	band.position.y = y
+	band.material_override = _metal_material(color,roughness,metallic)
+	band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_detail_root.add_child(band)
 
 func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
