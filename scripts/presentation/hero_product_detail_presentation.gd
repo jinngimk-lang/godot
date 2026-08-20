@@ -49,10 +49,10 @@ func material_contract_for_kind(kind: String) -> Dictionary:
 		"tin_can":
 			return {
 				"finish":"brushed_tin",
-				"body_value":0.965,
-				"metallic":0.04,
-				"roughness":0.21,
-				"rim_value":0.81,
+				"body_value":0.985,
+				"metallic":0.02,
+				"roughness":0.17,
+				"rim_value":0.82,
 				"highlight_count":3,
 				"brush_band_count":7,
 				"brush_band_geometry":"open_shell"
@@ -60,9 +60,9 @@ func material_contract_for_kind(kind: String) -> Dictionary:
 		"soda_can":
 			return {
 				"finish":"bare_aluminum",
-				"body_color":Color(0.965,0.958,0.945),
-				"metallic":0.09,
-				"roughness":0.16,
+				"body_color":Color(0.978,0.974,0.966),
+				"metallic":0.04,
+				"roughness":0.15,
 				"condensation":true,
 				"highlight_count":3,
 				"top_structure":true
@@ -153,7 +153,7 @@ func _add_lid_flutes(count: int, radius: float, y: float, height: float, color: 
 func _build_tin_can() -> void:
 	var contract := material_contract_for_kind("tin_can")
 	var body_value := float(contract["body_value"])
-	var body_color := Color(body_value,body_value+0.008,body_value+0.015)
+	var body_color := Color(body_value,minf(body_value+0.006,1.0),minf(body_value+0.010,1.0))
 	var rim_value := float(contract["rim_value"])
 	var body_profile: Array[Vector2] = [
 		Vector2(-0.655,0.385),Vector2(-0.628,0.398),Vector2(-0.585,0.402),
@@ -161,29 +161,29 @@ func _build_tin_can() -> void:
 	]
 	_add_lathe("TinHeroBody",body_profile,_metal_material(body_color,float(contract["roughness"]),float(contract["metallic"])),true,true)
 	var rim_color := Color(rim_value,rim_value+0.012,rim_value+0.020)
-	_add_ring("TinHeroTopRoll",0.665,0.414,0.026,rim_color,0.21,false,0.07)
-	_add_ring("TinHeroBottomRoll",-0.665,0.414,0.026,rim_color.darkened(0.035),0.23,false,0.06)
-	_add_cylinder("TinHeroTopDisk",Vector3(0,0.680,0),0.380,0.380,0.009,_metal_material(Color(0.885,0.895,0.900),0.23,0.06),112)
-	_add_cylinder("TinHeroTopInset",Vector3(0,0.687,0),0.310,0.310,0.005,_metal_material(Color(0.765,0.775,0.780),0.29,0.04),96)
+	_add_ring("TinHeroTopRoll",0.665,0.414,0.026,rim_color,0.18,false,0.05)
+	_add_ring("TinHeroBottomRoll",-0.665,0.414,0.026,rim_color.darkened(0.025),0.20,false,0.04)
+	_add_cylinder("TinHeroTopDisk",Vector3(0,0.680,0),0.380,0.380,0.009,_metal_material(Color(0.925,0.932,0.936),0.19,0.04),112)
+	_add_cylinder("TinHeroTopInset",Vector3(0,0.687,0),0.310,0.310,0.005,_metal_material(Color(0.805,0.812,0.816),0.25,0.03),96)
 	_add_tin_brush_bands(int(contract["brush_band_count"]))
-	_add_vertical_specular("TinSpecularLeft",-0.280,0.015,0.96,0.052,0.22)
-	_add_vertical_specular("TinSpecularRight",0.278,-0.025,0.78,0.030,0.105)
-	_add_vertical_specular("TinSpecularCenter",0.045,-0.055,0.58,0.016,0.055)
+	_add_vertical_specular("TinSpecularLeft",-0.280,0.015,0.98,0.055,0.255)
+	_add_vertical_specular("TinSpecularRight",0.278,-0.025,0.80,0.030,0.125)
+	_add_vertical_specular("TinSpecularCenter",0.045,-0.055,0.60,0.016,0.065)
 
 func _add_tin_brush_bands(count: int) -> void:
 	var safe_count := maxi(count,1)
 	for i in range(safe_count):
 		var t := float(i+1)/float(safe_count+1)
 		var y := lerpf(-0.53,0.53,t)
-		var v := 0.900+0.024*float(i%2)
+		var v := 0.935+0.014*float(i%2)
 		_add_shell_band(
 			"TinBrushBand%d" % i,
 			y,
-			0.403,
-			0.0035,
-			Color(v,v+0.004,v+0.008),
-			0.22+0.015*float(i%3),
-			0.035
+			0.4015,
+			0.0022,
+			Color(v,v+0.003,v+0.006),
+			0.19+0.012*float(i%3),
+			0.02
 		)
 
 func _build_soda_can() -> void:
@@ -194,16 +194,16 @@ func _build_soda_can() -> void:
 		Vector2(0.660,0.344),Vector2(0.682,0.332)
 	]
 	_add_lathe("SodaHeroBody",body_profile,_metal_material(contract["body_color"],float(contract["roughness"]),float(contract["metallic"])),true,true)
-	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.915,0.918,0.912),0.15,false,0.09)
-	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.825,0.830,0.822),0.20,false,0.07)
-	_add_shell_band("SodaShoulderGlint",0.607,0.394,0.006,Color(0.940,0.936,0.925),0.15,0.05)
-	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.905,0.908,0.902),0.17,0.09),112)
-	_add_cylinder("SodaHeroTopInset",Vector3(0,0.705,0),0.286,0.286,0.004,_metal_material(Color(0.805,0.810,0.805),0.23,0.06),96)
+	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.930,0.932,0.928),0.14,false,0.06)
+	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.845,0.848,0.842),0.18,false,0.05)
+	_add_shell_band("SodaShoulderGlint",0.607,0.394,0.005,Color(0.958,0.956,0.948),0.13,0.03)
+	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.930,0.932,0.928),0.15,0.06),112)
+	_add_cylinder("SodaHeroTopInset",Vector3(0,0.705,0),0.286,0.286,0.004,_metal_material(Color(0.830,0.834,0.830),0.21,0.04),96)
 	_add_pull_tab()
 	_add_condensation(0.405,-0.50,0.54,34)
-	_add_vertical_specular("SodaMetalHighlightLeft",-0.282,0.005,0.96,0.050,0.21)
-	_add_vertical_specular("SodaMetalHighlightRight",0.270,-0.020,0.78,0.028,0.095)
-	_add_vertical_specular("SodaMetalHighlightCenter",0.055,-0.060,0.60,0.016,0.050)
+	_add_vertical_specular("SodaMetalHighlightLeft",-0.282,0.005,0.98,0.052,0.245)
+	_add_vertical_specular("SodaMetalHighlightRight",0.270,-0.020,0.80,0.030,0.115)
+	_add_vertical_specular("SodaMetalHighlightCenter",0.055,-0.060,0.62,0.016,0.060)
 
 func _add_pull_tab() -> void:
 	var tab := MeshInstance3D.new()
@@ -213,7 +213,7 @@ func _add_pull_tab() -> void:
 	tab.mesh = mesh
 	tab.position = Vector3(0.0,0.710,0.035)
 	tab.rotation_degrees.y = 8.0
-	tab.material_override = _metal_material(Color(0.855,0.858,0.852),0.20,0.08)
+	tab.material_override = _metal_material(Color(0.875,0.878,0.872),0.18,0.05)
 	_detail_root.add_child(tab)
 	var opening := MeshInstance3D.new()
 	opening.name = "SodaOpening"
@@ -240,7 +240,7 @@ func _add_condensation(radius: float, y_min: float, y_max: float, count: int) ->
 		sm.rings = 6
 		bead.mesh = sm
 		bead.position = Vector3(cos(angle)*(radius+0.004),y,sin(angle)*(radius+0.004))
-		bead.material_override = _glass_material(Color(0.96,0.99,1.0),0.20,0.012)
+		bead.material_override = _glass_material(Color(0.98,0.99,1.0),0.16,0.012)
 		_detail_root.add_child(bead)
 
 func _add_glass_highlight(node_name: String, at: Vector3, size: Vector2, alpha: float) -> void:
@@ -379,7 +379,7 @@ func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 func _metal_material(color: Color, roughness: float, metallic: float) -> StandardMaterial3D:
 	var material := _mat(color,roughness)
 	material.metallic = metallic
-	material.metallic_specular = 0.82
+	material.metallic_specular = 0.88
 	return material
 
 func _glass_material(color: Color, alpha: float, roughness: float) -> StandardMaterial3D:
