@@ -1,84 +1,95 @@
-# Current Handoff — 2026-08-18
+# Current Handoff — 2026-08-20
 
 ## Start here
 
 Repository: `jinngimk-lang/godot`
 
-Start from current `main`, not from old merged feature branches. Baseline before this handoff skill commit was:
+Active long-running visual/completion branch:
 
-`963ed7e582327f22dd7857efef40f5e5a65254ba`
+`feat/completion-lifecycle-and-visual-pass-v7`
 
-The owner wants autonomous continuation. Do not ask for normal reversible implementation decisions. Inspect the repo, create a fresh branch, make evidence-backed changes, run exact-head Godot verification, inspect captures, and continue on the next visible/tactile defect.
+Active PR: `#163` — keep it open/draft until the owner-level visual bar is met. Do not merge merely because CI is green.
+
+The owner wants autonomous continuation. Do not ask for normal reversible implementation decisions. Inspect the repo, make evidence-backed changes, run exact-head Godot verification, inspect captures, and continue on the next visible/tactile defect.
+
+Before meaningful continuation reread:
+
+1. `.agents/PROJECT_NORTH_STAR.md`
+2. `.agents/skills/peel-calm-reference-realism/SKILL.md`
+3. this handoff
+4. newest checkpoint(s), especially `docs/superpowers/checkpoints/2026-08-20-post-peel-object-play.md`
+5. current PR head, CI and runtime captures
 
 ## Owner feedback translated into non-negotiable product requirements
 
-The label previously felt too soft, too eager to fall away, and too much like loose tape. The target is a relaxing paper-label peel with resistance: load first, break adhesive locally, progress only with new outward work, then fully detach at 100%.
+- Object-only direction stays locked: no visible hands/arms and no full-screen still/video gameplay overlay.
+- Label must feel like bonded paper, not soft tape: pointer work -> load -> breakaway -> local release.
+- Five showcase scenes must read as five places/products, not one room with swapped props.
+- `100%` means all printed paper is off the product; the released sheet then settles/resolves out of the hero view.
+- The interaction does **not** end when the label disappears. After resolution the bare object gets a short tactile play phase before Continue: squeeze compliant containers, shake products/liquid, RMB inspect, then continue to the next scene.
+- Project completion order remains: scene quality -> model quality -> label material -> post-peel handling -> complete interaction flow.
+- Visual work uses image-first convergence: practical target -> Godot implementation -> runtime capture -> explicit comparison -> iterate largest mismatch. CI green is necessary but not sufficient.
 
-The five showcase scenes also previously felt like one room with different objects. They must read as five places/products without relying on HUD labels.
+## Current implemented work on PR #163
 
-Current approved presentation direction is object-only. **No visible hands/arms and no full-screen still/video gameplay overlay.** Older hand-oriented notes in repository history are not authority for this workstream.
+### Paper / peel
 
-## What is already merged
+- Static hold no longer creeps peel progress.
+- Initial breakaway and bounded stick-slip resistance are modeled.
+- Per-substrate profiles remain distinct: Jar > Tin/Coffee > Yuzu > Soda Can.
+- `CornerPeelPresentation` uses a left-origin localized paper flap rather than the old full-width ribbon/tape silhouette.
+- Printed front, opaque fibrous backing, paper thickness, adhesive trace and residue are distinct.
+- Fully released paper enters lifecycle settle/resolution and no longer floats forever over the product.
 
-### Paper resistance / complete release
+### Product / visual passes
 
-- Static pointer hold no longer consumes adhesive bond every frame.
-- Peel progress requires new outward pointer displacement.
-- Initial breakaway peak + deterministic micro-resistance are modeled.
-- `CornerPeelPresentation` confines most bend to a narrow front and drives the detached area toward a stiff tangent sheet.
-- Printed front and opaque matte backing are separate surfaces with thickness.
-- 100% gameplay progress produces complete visual release.
-- CI captures attached / mid / 100%-released states for all five products.
+- Coffee, Jar, Tin, Yuzu bottle and Soda Can have separate hero-detail paths.
+- Tin has been rebuilt toward readable brushed/rolled metal rather than dark plastic.
+- Yuzu path includes dedicated bottle polish, clear-glass cues, liquid separation and cap treatment.
+- Completion UI/presentation exists but must remain secondary to the hero product.
 
-Primary checkpoint:
-`docs/superpowers/checkpoints/2026-08-18-paper-resistance-and-scene-separation.md`
+### Post-peel object play — new owner requirement
 
-### Substrate-specific feel
+Checkpoint: `docs/superpowers/checkpoints/2026-08-20-post-peel-object-play.md`
 
-Merged PR #158 introduced per-variant `peel_feel` profiles and runtime binding into controller + paper renderer.
+Runtime files:
 
-Current relative order:
-- Jar: heaviest / most resistant (`4.10 px`, `1.34x`, bend `0.09`, backing `0.0052`)
-- Tin: resistant (`3.55 px`, `1.22x`, bend `0.11`, backing `0.0042`)
-- Coffee: medium (`3.25 px`, `1.24x`, bend `0.12`, backing `0.0034`)
-- Yuzu: cleaner/easier (`2.75 px`, `1.12x`, bend `0.15`, backing `0.0028`)
-- Thin soda wrap: lightest/most compliant (`2.40 px`, `1.08x`, bend `0.19`, backing `0.0022`)
+- `scripts/interaction/post_peel_object_play.gd`
+- `scripts/presentation/post_peel_object_play_presentation.gd`
+- scene node `PostPeelObjectPlayPresentation`
+- deterministic contract `tests/test_post_peel_object_play.gd`
 
-Exact-head run for the integrated v4 branch: `32117131925` passed import, default launch, deterministic tests, interaction smokes, and five scene triplet captures.
+Approved behavior:
 
-Checkpoint:
-`docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
+`PEEL -> FULL RELEASE -> LABEL LEAVES -> BARE OBJECT PLAY -> INSPECT/CONTINUE -> NEXT SCENE`
 
-### Paper surface
+After `LabelLifecycle.is_resolved()`:
 
-Merged PR #159 added `art/shaders/peeled_paper.gdshader` and moved the printed paper face onto a real-time fibrous shader with micro albedo/roughness/normal response while keeping the backing separate and opaque.
+- LMB drag becomes object play instead of peel;
+- slow/medium drag produces bounded squeeze on compliant paper/aluminum containers;
+- fast alternating horizontal drag produces damped shake;
+- glass jar/bottle are effectively rigid under squeeze;
+- bottle/jar liquid gets lag/tilt inertia during shake;
+- RMB still rotates/inspects;
+- Continue advances to the next product;
+- releasing input lets deformation/shake recover calmly.
 
-Exact-head run `32117685152` passed all Godot 4.7.1 checks and scene triplet captures. Artifact id: `9317316615`.
+## Verification status at this handoff update
 
-### Pre-release tactile audio
+The first post-peel object-play RED correctly failed because shake amplitude was too weak. The implementation was strengthened with immediate angular input impulse plus damped follow-through; deterministic tests then passed through unit/smoke stages.
 
-Merged PR #160 added restrained audible paper/adhesive loading during real controller `EDGE_LIFT` / `PINCHED`, before actual release. Existing quiet adhesive loops and foreground `paper_flex` / `micro_release` / `final_release` events remain.
+A separate historical CI issue remains in the GL/Xvfb capture harness: after all 15 captures print `PASS`, Godot/llvmpipe can emit a late `resources still in use at exit` diagnostic. The workflow has been tightened to require the explicit capture PASS and all expected image files, while treating only that known post-success renderer teardown line as non-fatal. Any other script/runtime/capture ERROR remains fatal. Do not generalize this exception.
 
-Exact-head run `32118119865` passed. `main` then advanced to `963ed7e582327f22dd7857efef40f5e5a65254ba`.
-
-## What is still not proven by automation
-
-Subjective hand-feel/ASMR satisfaction remains experiential. CI can prove no static creep, correct state transitions, full release, parameters, and rendered frames; it cannot prove the owner will judge the mouse motion as sufficiently resistant or satisfying.
-
-Do not claim that subjective feel is solved merely because CI is green.
+Re-run exact-head CI after every subsequent visual/gameplay change and inspect artifacts. Do not claim exact-head green until the latest commit's run is actually complete.
 
 ## Highest-value next work
 
-Continue in this order unless current runtime evidence shows a larger defect:
+Continue without changing direction:
 
-1. **Product material realism** — glass thickness/refraction cues, metal edge/rim structure and reflection breakup, cup paper/pulp detail, believable contact shadows.
-2. **Paper edge realism** — improve exposed paper thickness, torn/fibrous edge response, underside variation and adhesive boundary without making the sheet look fuzzy or dirty.
-3. **Five genuinely different environments** — unique environment assets/geometry where reuse still reads as the same room; strengthen Jar pantry/kitchen, Tin grocery/cold-case, Supermarket refrigerated commercial space, Can beverage/convenience counter, Coffee warm café.
-4. **Resistance tuning from visual mechanics** — preserve static stall and substrate ordering; if increasing resistance, require more deliberate pointer work rather than adding time-based delay.
-5. **Tactile audio polish** — emphasize load → micro-release → final release rhythm while keeping continuous adhesive noise quiet.
+1. Capture/verify the new **resolved object-play state**, not only attached/mid/done states. Add practical visual evidence for at least Coffee squeeze, Yuzu shake/liquid lag and Soda Can squeeze/shake.
+2. Continue scene realism: Coffee warm café, Jar pantry/kitchen food prep, Tin grocery/cold-case, Yuzu bright refrigerated supermarket, Can convenience/beverage counter. They must remain distinguishable with HUD hidden.
+3. Continue hero model realism: glass thickness/highlight breakup, believable metal rims/top seams, paper cup pulp/kraft detail, can shoulder/top structure and contact shadows.
+4. Continue paper realism: narrower realistic bend front, exposed fibrous edge, underside variation, adhesive boundary; never regress into ribbon/tape behavior.
+5. Finish interaction completeness and feedback: post-peel object play must feel optional, calm and tactile; Continue remains obvious and no state can dead-end.
 
-For visible changes, always inspect the newest attached/mid/100% captures. A technically correct change that looks worse should be reverted or replaced, not defended.
-
-## Verification rule for the next agent
-
-Use a fresh branch from current `main`. Before merge, verify the exact proposed head with Godot 4.7.1 and inspect generated images. If merged-main CI is not separately observed after merge, say only that the pre-merge exact head was verified; do not silently upgrade that evidence into a post-merge-main claim.
+For visible changes, make/refresh a practical target first, then inspect the newest Godot capture against it. Reject technically-green visual regressions rather than defending them.
