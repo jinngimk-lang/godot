@@ -5,14 +5,14 @@ const FOV_BY_KIND := {
 	"paper_cup":35.5,
 	"sauce_jar":36.5,
 	"tin_can":36.5,
-	"clear_bottle":39.5,
+	"clear_bottle":48.0,
 	"soda_can":36.5
 }
 const FOCUS_Y_BY_KIND := {
 	"paper_cup":0.06,
 	"sauce_jar":0.02,
 	"tin_can":0.02,
-	"clear_bottle":0.18,
+	"clear_bottle":0.26,
 	"soda_can":0.03
 }
 

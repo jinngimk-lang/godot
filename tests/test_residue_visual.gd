@@ -7,7 +7,7 @@ func run() -> Array[String]:
 		failures.append("RED: missing ResidueVisual")
 		return failures
 	var residue = load(path).new()
-	if not residue.has_method("apply_profile") or not residue.has_method("has_adhesive_trace") or not residue.has_method("get_adhesive_trace_amount"):
+	if not residue.has_method("apply_profile") or not residue.has_method("has_adhesive_trace") or not residue.has_method("get_adhesive_trace_amount") or not residue.has_method("set_cleanup_progress"):
 		failures.append("ADHESIVE_RED: residue presentation needs profile-driven clean adhesive trace semantics")
 		residue.free()
 		return failures
@@ -53,6 +53,8 @@ func run() -> Array[String]:
 			failures.append("RED: residue adhesive layer must be a translucent StandardMaterial3D")
 		elif adhesive.albedo_color.a < 0.10 or adhesive.albedo_color.a > 0.58:
 			failures.append("RED: residue adhesive film needs bounded translucent alpha; got %.3f" % adhesive.albedo_color.a)
+		elif not adhesive.emission_enabled or adhesive.emission_energy_multiplier < 0.08:
+			failures.append("RESIDUE_READABILITY_RED: glue film needs restrained bounce so it does not become a dark band in the dim café")
 		if fibers == null:
 			failures.append("RED: residue fiber layer must expose its own StandardMaterial3D")
 		else:
@@ -60,8 +62,18 @@ func run() -> Array[String]:
 				failures.append("RED: torn backing fibers should stay dry/matte; roughness=%.3f" % fibers.roughness)
 			if fibers.albedo_color.a < adhesive.albedo_color.a + 0.18:
 				failures.append("RED: fibrous backing should read more opaque than the glue film")
+			if not fibers.emission_enabled or fibers.emission_energy_multiplier < 0.08:
+				failures.append("RESIDUE_READABILITY_RED: pale paper fibers need restrained bounce across all five venue light rigs")
 	if not residue.has_layered_residue():
 		failures.append("RED: damaged residue state should report layered adhesive + fiber presentation")
+	var dirty_trace: float = float(residue.get_adhesive_trace_amount())
+	residue.set_cleanup_progress(0.65)
+	if float(residue.get_adhesive_trace_amount()) >= dirty_trace*0.55:
+		failures.append("SCRUB_VISUAL_RED: rubbing must visibly fade adhesive and paper fibers")
+	residue.set_cleanup_progress(1.0)
+	if residue.has_adhesive_trace() or residue.mesh.get_surface_count() != 0:
+		failures.append("SCRUB_VISUAL_RED: fully rubbed residue must clear from the hero surface")
+	residue.set_cleanup_progress(0.0)
 
 	# Torn backing must read as a few broad irregular islands, not a row of tiny
 	# square cells. The drawing path consumes these exact deterministic spans.

@@ -30,8 +30,8 @@ func set_state(scene_index: int, phase_name: String, _post_action: String, peel_
 	_active_scene_index = clampi(scene_index,0,SCENE_NAMES.size()-1)
 	var progress := clampf(peel_progress if is_finite(peel_progress) else 0.0,0.0,1.0)
 	var phase := phase_name.to_upper()
-	if detached or phase in ["DETACHING","HELD","PEEL_SETTLE","RITUAL_COMPLETE"]:
-		_action_text = "LABEL OFF  •  INSPECT RESIDUE  •  CONTINUE"
+	if detached or phase in ["DETACHING","HELD","SETTLING","RESOLVED","PEEL_SETTLE","RITUAL_COMPLETE"]:
+		_action_text = "LABEL OFF  •  HOLD LMB + RUB RESIDUE"
 	elif progress>0.001:
 		_action_text = "PEEL THE LABEL  •  %d%%" % int(round(progress*100.0))
 	else:
@@ -65,6 +65,10 @@ func _pull_runtime_state() -> void:
 	var detached_value = lab.get("_detach_reward_recorded")
 	var detached := bool(detached_value) if detached_value != null else false
 	set_state(index,phase,String(variant.get("post_peel_action","inspect")),progress,detached)
+	var scrub = lab.get("_scrub_model")
+	if phase == "RESOLVED" and scrub != null and scrub.has_method("get_progress"):
+		var clean_progress := float(scrub.get_progress())
+		_action_text = "RESIDUE CLEAN  •  %d%%  •  %s" % [int(round(clean_progress*100.0)),"CONTINUE" if scrub.is_complete() else "RUB ↔"]
 
 func _connect_parent_navigation() -> void:
 	if _parent_connected:
@@ -92,14 +96,8 @@ func _ensure_ui() -> void:
 
 	_rail = Panel.new()
 	_rail.name = "JourneyRail"
-	_rail.anchor_left = 0.5
-	_rail.anchor_top = 1.0
-	_rail.anchor_right = 0.5
-	_rail.anchor_bottom = 1.0
-	_rail.offset_left = -500.0
-	_rail.offset_top = -70.0
-	_rail.offset_right = 500.0
-	_rail.offset_bottom = -14.0
+	_rail.position = Vector2(36,650)
+	_rail.size = Vector2(1208,56)
 	_rail.mouse_filter = Control.MOUSE_FILTER_PASS
 	_rail.add_theme_stylebox_override("panel",_panel_style(Color(0.014,0.013,0.012,0.72),Color(1.0,0.80,0.45,0.13),9))
 	layer.add_child(_rail)
@@ -108,8 +106,8 @@ func _ensure_ui() -> void:
 		var button := Button.new()
 		button.name = "Scene%d" % i
 		button.text = "%d   %s" % [i+1,SCENE_NAMES[i]]
-		button.position = Vector2(8.0+float(i)*198.0,8.0)
-		button.size = Vector2(190.0,40.0)
+		button.position = Vector2(8.0+float(i)*240.0,8.0)
+		button.size = Vector2(232.0,40.0)
 		button.focus_mode = Control.FOCUS_NONE
 		button.toggle_mode = true
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

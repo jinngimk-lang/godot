@@ -95,6 +95,12 @@ jobs:
           set -euo pipefail
           ./godot --headless --path . --script res://tests/smoke_scene.gd
 
+      - name: Complete peel and residue-rub flow smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --script res://tests/smoke_object_only_complete_flow.gd
+
       - name: Reference scene smoke
         shell: bash
         run: |
@@ -131,7 +137,7 @@ jobs:
           set -euo pipefail
           ./godot --headless --path . --script res://tests/smoke_reset_input_isolation.gd
 
-      - name: Capture five object-only scene triplets
+      - name: Capture five object-only seven-state lifecycle sets
         shell: bash
         run: |
           set -euo pipefail
@@ -141,7 +147,12 @@ jobs:
           fi
           mkdir -p artifacts/reference_frames
           xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_reference_frames.gd 2>&1 | tee godot-capture.log
-          for name in coffee coffee_peel38 coffee_done jar jar_peel49 jar_done tin tin_peel41 tin_done market market_peel45 market_done can can_peel33 can_done; do
+          for name in \
+            coffee coffee_peel38 coffee_release_hold coffee_settling coffee_done coffee_scrub55 coffee_clean \
+            jar jar_peel49 jar_release_hold jar_settling jar_done jar_scrub55 jar_clean \
+            tin tin_peel41 tin_release_hold tin_settling tin_done tin_scrub55 tin_clean \
+            market market_peel45 market_release_hold market_settling market_done market_scrub55 market_clean \
+            can can_peel33 can_release_hold can_settling can_done can_scrub55 can_clean; do
             test -s "artifacts/reference_frames/${name}.png"
           done
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-capture.log; then

@@ -2,6 +2,7 @@ extends Node3D
 
 const CURSOR_PATH := "res://assets/ui/peel_cursor.svg"
 const SCENE_NAMES := ["Coffee Shop","Jar","Tin Can","Supermarket","Can"]
+const ResidueScrubModelScript = preload("res://scripts/peel/residue_scrub_model.gd")
 
 var _camera: Camera3D
 var _cup: MeshInstance3D
@@ -22,9 +23,12 @@ var _venue: VenuePresentation
 var _product: ProductPresentation
 var _residue: ResidueVisual
 var _inspection: InspectionController
+var _corner_peel: CornerPeelPresentation
+var _scrub_model
 var _release_count := 0
 var _completed_this_frame := false
 var _detach_reward_recorded := false
+var _cleanup_reward_recorded := false
 var _paused := false
 var _rmb_rotating := false
 var _zoom_fov_offset := 0.0
@@ -32,6 +36,7 @@ var _zoom_fov_offset := 0.0
 func get_control_contract() -> Dictionary:
 	return {
 		"peel":"LMB",
+		"rub_residue":"LMB",
 		"rotate":"RMB",
 		"zoom":"Wheel",
 		"reset":"R",
@@ -49,11 +54,13 @@ func get_visual_interaction_contract() -> Dictionary:
 func _ready() -> void:
 	_build_world()
 	_venue = get_node_or_null("VenuePresentation") as VenuePresentation
+	_corner_peel = get_node_or_null("CornerPeelPresentation") as CornerPeelPresentation
 	_disable_legacy_cafe_stage()
 	_install_cursor()
 	_session = SessionModel.new()
 	_ritual = RitualFlow.new()
 	_lifecycle = LabelLifecycle.new(0.16)
+	_scrub_model = ResidueScrubModelScript.new({"required_travel":340.0,"reversal_bonus":0.45})
 	_inspection = InspectionController.new({"sensitivity":0.006,"follow_rate":18.0})
 	_apply_current_variant()
 	_reset_session()
@@ -89,6 +96,8 @@ func _process(delta: float) -> void:
 	var phase_name := _lifecycle.get_phase_name()
 	_label.set_phase(phase_name)
 	_label.set_detach_alpha(_lifecycle.get_detach_alpha())
+	if _corner_peel != null:
+		_corner_peel.set_release_settle(_lifecycle.get_settle_alpha(),_session.get_variant_index())
 	var detached_now := _lifecycle.consume_detach_event()
 
 	# Object-only interaction authority: the controller's live pointer position is
@@ -107,6 +116,11 @@ func _process(delta: float) -> void:
 	var integrity := float(result.get("integrity",1.0))
 	var residue := float(result.get("residue",0.0))
 	_residue.set_residue(progress,residue,integrity)
+	if _lifecycle.is_resolved() and _scrub_model != null:
+		_scrub_model.update(state.pressed,state.position,state.relative,_project_label_region(),delta)
+		_residue.set_cleanup_progress(_scrub_model.get_progress())
+		if _scrub_model.consume_completed_event():
+			_handle_residue_cleaned()
 
 	var tension := pointer_screen.distance_to(edge_screen)*0.65
 	var speed := state.velocity.length()/100.0
@@ -264,7 +278,11 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 		_hud.text = "%s  •  PAUSED\nEsc Resume  •  R Reset  •  1/2/3/4/5 Scene" % venue_name
 		return
 	if phase_name == "DETACHING": hint = "last adhesive fibers releasing…"
-	elif phase_name == "HELD": hint = "label released • rotate/zoom to inspect or Continue"
+	elif phase_name == "HELD": hint = "label released • inspect the fibers and residue"
+	elif phase_name == "SETTLING": hint = "paper settling clear of the object…"
+	elif phase_name == "RESOLVED" and _scrub_model != null and not _scrub_model.is_complete():
+		hint = "hold LMB over the residue and rub back and forth • clean %d%%" % int(round(_scrub_model.get_progress()*100.0))
+	elif phase_name == "RESOLVED": hint = "residue cleared • rotate/zoom or continue"
 	elif state_name == "PEELING": hint = "steady pull • ease off if the paper starts to tear"
 	elif state_name == "RELEASED": hint = "re-grab anywhere on the visible label"
 	_hud.text = "%s  •  %s\nPeel %d%%  •  Quality %s  •  residue %d%%\n%s\nLMB Peel  •  RMB Rotate  •  Wheel Zoom  •  R Reset  •  1/2/3/4/5 Scene  •  Esc Pause" % [
@@ -285,9 +303,18 @@ func _handle_detached_label() -> void:
 	if _detach_reward_recorded:
 		return
 	_detach_reward_recorded = true
-	var progress_result := _session.record_ritual_complete()
 	var grade := _quality_grade(_controller.get_integrity(),_controller.get_residue())
 	var reward_text := "CLEAN RELEASE" if grade in ["A","B"] else "TEXTURED RELEASE"
+	reward_text += "\nlabel settling • then hold LMB and rub the residue"
+	_reward.text = reward_text
+	_pointer.quarantine_current_press()
+
+func _handle_residue_cleaned() -> void:
+	if _cleanup_reward_recorded:
+		return
+	_cleanup_reward_recorded = true
+	var progress_result := _session.record_ritual_complete()
+	var reward_text := "RESIDUE CLEARED"
 	if bool(progress_result.get("unlocked_new",false)):
 		reward_text += "\nnext scene unlocked"
 	reward_text += "\nRMB rotate • Wheel zoom • Continue when ready"
@@ -304,7 +331,7 @@ func _show_continue_button() -> void:
 	_continue_button.visible = true
 
 func _on_continue_pressed() -> void:
-	if _paused or not _detach_reward_recorded or _session == null:
+	if _paused or not _cleanup_reward_recorded or _session == null:
 		return
 	if _inspection != null:
 		_inspection.end()
@@ -425,11 +452,17 @@ func _reset_session() -> void:
 	_release_count = 0
 	_completed_this_frame = false
 	_detach_reward_recorded = false
+	_cleanup_reward_recorded = false
+	if _scrub_model != null: _scrub_model.reset()
 	if _reward != null: _reward.text = ""
 	if _continue_button != null:
 		_continue_button.visible = false
 		_continue_button.disabled = false
-	if _residue != null: _residue.set_residue(0.0,0.0,1.0)
+	if _corner_peel != null and _session != null:
+		_corner_peel.set_release_settle(0.0,_session.get_variant_index())
+	if _residue != null:
+		_residue.set_cleanup_progress(0.0)
+		_residue.set_residue(0.0,0.0,1.0)
 	if _label != null:
 		_label.set_phase("ATTACHED")
 		_label.set_detach_alpha(0.0)

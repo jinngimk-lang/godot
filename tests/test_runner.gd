@@ -19,6 +19,7 @@ func _init() -> void:
 		"res://tests/test_paper_resistance_contract.gd",
 		"res://tests/test_substrate_peel_feel.gd",
 		"res://tests/test_paper_surface_shader.gd",
+		"res://tests/test_corner_peel_mesh_continuity.gd",
 		"res://tests/test_label_visual_geometry.gd",
 		"res://tests/test_label_lifecycle.gd",
 		"res://tests/test_label_visual_v2.gd",
@@ -36,8 +37,10 @@ func _init() -> void:
 		"res://tests/test_inspection_controller.gd",
 		"res://tests/test_venue_presentation.gd",
 		"res://tests/test_product_presentation.gd",
+		"res://tests/test_hero_product_detail_presentation.gd",
 		"res://tests/test_cafe_hero_product.gd",
 		"res://tests/test_residue_visual.gd",
+		"res://tests/test_residue_scrub_model.gd",
 		"res://tests/test_table_surface_material.gd",
 		"res://tests/test_hud_chrome_presentation.gd",
 		"res://tests/test_guided_journey_presentation.gd"

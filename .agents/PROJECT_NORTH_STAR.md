@@ -17,7 +17,7 @@ Then inspect current `main`, current production code/tests, the active handoff/c
 
 If a verified owner-level direction, major architecture decision, acceptance rule, merged milestone, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
 
-## Owner-locked completion order
+## Owner-locked completion stack
 
 Do not lose or reorder these five product priorities without new owner feedback or strong runtime evidence:
 
@@ -27,7 +27,17 @@ Do not lose or reorder these five product priorities without new owner feedback 
 4. **Optimize post-peel label handling** — after 100% release the label must enter an intentional completion lifecycle; it must not remain indefinitely floating over the product as if still being peeled.
 5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, receive calm completion feedback, and continue to the next product/scene without dead ends.
 
-The project is not complete merely because any one item is green. Treat these five as a whole-game completion stack.
+The 2026-08-20 reference-fidelity integration established a machine-verified baseline for all five items. Treat them as permanent regression contracts, not finished areas that may be removed or simplified.
+
+## Current delivered baseline — 2026-08-20
+
+- Five directly selectable, materially distinct scene/product bundles: Coffee Shop, Jar, Tin Can, Supermarket, and Can.
+- Approved object-only 1280×720 composition: large centered hero, compact left progress/controls, four-step right tutorial, and persistent five-scene bottom rail.
+- Continuous localized corner-peel paper mesh with readable attached copy, bounded cell stretch, fibrous front/back/edge response, adhesive trace, full-sheet release curl, and authored hold/settle/clear lifecycle.
+- Persistent vessel-bound glue/fiber residue after paper release.
+- Required second interaction pass: once the paper settles, the small hand cursor displays `RUB ↔`; held LMB back-and-forth movement inside the old label footprint fades residue; Continue stays gated until 100% clean.
+- Deterministic full-flow verification covers grab → load → peel → detach → settle → rub → clean → next scene, plus pause/reset quarantine and all five scene bundles.
+- Canonical visual evidence now contains seven states per scene: attached, representative peel, release hold, settling, dirty residue, partial scrub, and clean (35 frames total).
 
 ## Product identity
 
@@ -58,7 +68,7 @@ Additional cups, bottles, tins, cans, jars, cartons, tubs, or similar label-bear
 
 The intended interaction language is direct and simple:
 
-- LMB: grab/peel label.
+- LMB: grab/peel label; after paper release, rub residue clean.
 - RMB drag: rotate/inspect product.
 - Wheel: zoom.
 - R: reset.
@@ -98,9 +108,9 @@ Do not collapse all products to one generic feel profile without new evidence.
 
 A fully removed label must not remain forever as an unexplained floating object. Completion should have an authored calm resolution, for example:
 
-`ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> DISPOSED_OR_COLLECTED -> NEXT_READY`
+`ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> RESIDUE_RUB -> CLEAN -> NEXT_READY`
 
-The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. Preferred behavior is a brief 0.4–1.2 second completion hold/settle so the user sees success, followed by one of: settle onto a tray/table area, slide/fall to an unobtrusive discard area, or collapse into a small collected-label UI stack. It should then stop blocking the hero object. The next action must be obvious.
+The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. The released label briefly holds and settles clear of the hero. The user then performs a fresh LMB rub gesture over the remaining adhesive footprint. Hover, stationary hold, and movement outside the footprint do not clean. The next action appears only when cleaning reaches 100%.
 
 ## Five-scene identity rule
 
@@ -150,7 +160,7 @@ For meaningful gameplay/visual work:
 3. Implement the smallest coherent change.
 4. Run Godot 4.7.1 import/parser guard and configured default launch.
 5. Run deterministic unit/input/scene smokes.
-6. Capture every affected product at attached, representative mid-peel, and fully released states.
+6. Capture every affected product at attached, representative mid-peel, fully released, dirty-residue, partial-scrub, and clean states.
 7. Inspect captures manually against the target/template image.
 8. If the image is worse or still visibly off, reject the direction and continue.
 9. Merge only exact-head verified work.
@@ -179,8 +189,14 @@ After this file, read:
 
 1. `.agents/skills/peel-calm-reference-realism/SKILL.md`
 2. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
-3. `docs/superpowers/checkpoints/2026-08-18-paper-resistance-and-scene-separation.md`
-4. `docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
+3. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
+4. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
 5. current `main` production code/tests/workflows and newest runtime captures.
 
-As of the checkpoint that created this document, the project is already on the no-hands/object-only architecture with displacement-gated paper peel, complete 100% release, per-substrate feel profiles, fibrous paper rendering, and pre-release tactile-loading audio. Highest-value remaining work follows the owner-locked order above: scene quality, model quality, label material, post-peel label lifecycle, then complete interaction-flow polish.
+Highest-value future work, in order:
+
+1. Owner playtest tuning for breakaway force, per-substrate pointer travel, scrub duration, cursor feedback, and Foley balance.
+2. Spatial/local residue cleaning so the exact rubbed region clears first, with restrained glue-roll/paper-crumb visuals and corresponding sound.
+3. Further realtime product/environment realism: stronger silhouettes, glass and metal edge response, contact shadows, paper microdetail, and backdrop/live-surface integration.
+4. More irregular tear/release silhouettes without reintroducing print distortion, elastic stretch, or full-height ribbon behavior.
+5. Settings/accessibility, touch-device validation, and performance profiling after the PC mouse loop is stable.

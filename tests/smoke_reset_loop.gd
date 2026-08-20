@@ -60,10 +60,10 @@ func _run() -> void:
 	scene.call("debug_select_variant",1)
 	await process_frame
 	var before_clean := int(session.get_clean_peels())
-	scene.call("_handle_detached_label")
-	scene.call("_handle_detached_label")
+	scene.call("_handle_residue_cleaned")
+	scene.call("_handle_residue_cleaned")
 	if int(session.get_clean_peels())!=before_clean+1:
-		_fail("duplicate detach must record exactly one completed label",scene); return
+		_fail("duplicate scrub completion must record exactly one cleaned label",scene); return
 
 	var escape := InputEventKey.new(); escape.pressed=true; escape.keycode=KEY_ESCAPE
 	scene.call("_unhandled_key_input",escape)
@@ -87,7 +87,7 @@ func _run() -> void:
 	if reset_visual==null or reset_visual.mesh==null or not reset_visual.visible:
 		_fail("R must restore localized visible label",scene); return
 
-	print("PASS: five object bundles + corner label + exact-once detach + Esc pause + R reset")
+	print("PASS: five object bundles + corner label + exact-once residue cleanup + Esc pause + R reset")
 	scene.queue_free()
 	await process_frame
 	quit(0)

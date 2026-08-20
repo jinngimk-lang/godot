@@ -72,6 +72,10 @@ func _build_jar() -> void:
 		Vector2(0.59,0.345),Vector2(0.62,0.315),Vector2(0.70,0.315)
 	]
 	_add_lathe("JarHeroShell",glass_profile,_glass_material(Color(0.88,0.95,0.97),0.095,0.032),false,false)
+	var inner_profile: Array[Vector2] = []
+	for sample in glass_profile:
+		inner_profile.append(Vector2(sample.x,maxf(sample.y-0.026,0.04)))
+	_add_lathe("JarInnerWall",inner_profile,_glass_material(Color(0.95,0.98,1.0),0.045,0.018),false,false)
 
 	# Keep a clear glass border around the sauce. The previous almost-full-radius
 	# red cylinder made the jar read as opaque plastic rather than glass.
@@ -82,8 +86,10 @@ func _build_jar() -> void:
 	var sauce := _mat(Color(0.50,0.045,0.020),0.52)
 	sauce.metallic_specular = 0.16
 	_add_lathe("JarSauceVolume",sauce_profile,sauce,true,true)
+	_add_cylinder("JarSauceMeniscus",Vector3(0,0.397,0),0.296,0.306,0.010,_glass_material(Color(0.72,0.12,0.055),0.48,0.045),96)
 
-	_add_cylinder("JarHeroLid",Vector3(0,0.735,0),0.338,0.338,0.125,_metal_material(Color(0.36,0.18,0.075),0.34,0.42),112)
+	_add_cylinder("JarHeroLid",Vector3(0,0.735,0),0.365,0.367,0.125,_metal_material(Color(0.36,0.18,0.075),0.34,0.42),112)
+	_add_cylinder("JarLidTopDisk",Vector3(0,0.803,0),0.354,0.360,0.014,_metal_material(Color(0.42,0.22,0.09),0.30,0.44),112)
 	_add_ring("JarThreadBand0",0.680,0.345,0.014,Color(0.46,0.24,0.10),0.34,false,0.38)
 	_add_ring("JarThreadBand1",0.713,0.347,0.012,Color(0.52,0.28,0.12),0.31,false,0.38)
 	_add_ring("JarThreadBand2",0.746,0.345,0.011,Color(0.44,0.21,0.09),0.34,false,0.38)
@@ -100,6 +106,8 @@ func _build_tin_can() -> void:
 	_add_lathe("TinHeroBody",body_profile,_metal_material(Color(0.80,0.82,0.84),0.30,0.34),true,true)
 	_add_ring("TinHeroTopRoll",0.665,0.418,0.030,Color(0.88,0.89,0.90),0.23,false,0.36)
 	_add_ring("TinHeroBottomRoll",-0.665,0.418,0.030,Color(0.76,0.78,0.80),0.27,false,0.34)
+	_add_ring("TinUpperChime",0.585,0.405,0.012,Color(0.86,0.87,0.88),0.28,false,0.34)
+	_add_ring("TinLowerChime",-0.585,0.405,0.012,Color(0.74,0.76,0.78),0.31,false,0.32)
 	_add_cylinder("TinHeroTopDisk",Vector3(0,0.681,0),0.382,0.382,0.010,_metal_material(Color(0.84,0.85,0.86),0.34,0.35),112)
 	_add_cylinder("TinHeroTopInset",Vector3(0,0.688,0),0.315,0.315,0.006,_metal_material(Color(0.72,0.74,0.76),0.42,0.30),96)
 
@@ -112,7 +120,9 @@ func _build_soda_can() -> void:
 	_add_lathe("SodaHeroBody",body_profile,_metal_material(Color(0.84,0.86,0.88),0.24,0.32),true,true)
 	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.91,0.92,0.93),0.18,false,0.35)
 	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.78,0.80,0.82),0.24,false,0.34)
+	_add_ring("SodaShoulderRing",0.625,0.378,0.010,Color(0.87,0.89,0.91),0.22,false,0.34)
 	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.86,0.87,0.88),0.24,0.34),112)
+	_add_ring("SodaTopInsetRing",0.705,0.272,0.006,Color(0.74,0.76,0.78),0.34,false,0.30)
 	_add_pull_tab()
 	_add_condensation(0.405,-0.50,0.54,30)
 

@@ -14,11 +14,13 @@ func run() -> Array[String]:
 	var method_names: Array[String] = []
 	for method in lifecycle_script.get_script_method_list():
 		method_names.append(String(method.get("name", "")))
-	if not method_names.has("get_detach_alpha"):
-		failures.append("RED: label lifecycle missing progressive detach alpha")
+	for method_name in ["get_detach_alpha", "get_settle_alpha", "is_resolved", "is_next_ready"]:
+		if not method_names.has(method_name):
+			failures.append("RED: label lifecycle missing %s" % method_name)
+	if not failures.is_empty():
 		return failures
 
-	var lifecycle = lifecycle_script.new(0.16)
+	var lifecycle = lifecycle_script.new(0.16, 0.40, 0.60)
 	lifecycle.reset()
 	if lifecycle.get_phase_name() != "ATTACHED":
 		failures.append("reset lifecycle should be ATTACHED")
@@ -26,6 +28,8 @@ func run() -> Array[String]:
 		failures.append("reset lifecycle must not be detached")
 	if lifecycle.get_detach_alpha() != 0.0:
 		failures.append("reset lifecycle detach alpha should be zero")
+	if lifecycle.get_settle_alpha() != 0.0:
+		failures.append("reset lifecycle settle alpha should be zero")
 
 	lifecycle.update(0.45, false, 0.016)
 	if lifecycle.get_phase_name() != "PEELING":
@@ -58,14 +62,39 @@ func run() -> Array[String]:
 	if lifecycle.consume_detach_event():
 		failures.append("detach event must be consumable exactly once")
 
-	lifecycle.update(0.20, false, 0.016)
+	lifecycle.update(1.0, false, 0.20)
 	if lifecycle.get_phase_name() != "HELD":
-		failures.append("completed label must not reattach before reset")
+		failures.append("released label should remain held during the completion beat")
 	if not lifecycle.is_detached():
 		failures.append("completed label must stay detached before reset")
+
+	lifecycle.update(1.0, false, 0.21)
+	if lifecycle.get_phase_name() != "SETTLING":
+		failures.append("released label should enter SETTLING after the completion hold")
+	if lifecycle.get_settle_alpha() != 0.0:
+		failures.append("SETTLING should begin at zero blend")
+
+	lifecycle.update(1.0, false, 0.30)
+	var settle_midpoint: float = lifecycle.get_settle_alpha()
+	if settle_midpoint < 0.45 or settle_midpoint > 0.55:
+		failures.append("half settle duration should produce about half blend")
+
+	lifecycle.update(1.0, false, 0.31)
+	if lifecycle.get_phase_name() != "RESOLVED":
+		failures.append("released label should resolve after the settle duration")
+	if not lifecycle.is_resolved():
+		failures.append("resolved lifecycle should report resolved")
+	if not lifecycle.is_next_ready():
+		failures.append("resolved lifecycle should make the next interaction ready")
+	if lifecycle.get_settle_alpha() != 1.0:
+		failures.append("resolved lifecycle settle alpha should be one")
+	if not lifecycle.is_detached():
+		failures.append("resolved label must remain detached")
 
 	lifecycle.reset()
 	if lifecycle.get_phase_name() != "ATTACHED" or lifecycle.is_detached():
 		failures.append("reset should restore ATTACHED and clear detached state")
+	if lifecycle.get_settle_alpha() != 0.0:
+		failures.append("reset should clear released-label settle progress")
 
 	return failures

@@ -28,6 +28,8 @@ func run() -> Array[String]:
 		failures.append("GUIDE_RED: HUD must expose JourneyRail")
 		root.free()
 		return failures
+	if rail.position.y < 640.0 or rail.size.x < 1200.0:
+		failures.append("GUIDE_RED: scene rail should span the lower 1280x720 frame like the approved mockup")
 	var expected_names := ["COFFEE SHOP", "JAR", "TIN CAN", "SUPERMARKET", "CAN"]
 	for i in range(5):
 		var button := layer.get_node_or_null("JourneyRail/Scene%d" % i) as Button
@@ -35,6 +37,8 @@ func run() -> Array[String]:
 			failures.append("GUIDE_RED: journey rail missing scene button %d" % (i+1))
 		elif not button.text.to_upper().contains(expected_names[i]):
 			failures.append("GUIDE_RED: scene button %d must identify %s" % [i+1,expected_names[i]])
+		elif absf(button.size.x-232.0) > 6.0:
+			failures.append("GUIDE_RED: scene tabs should have equal reference-width geometry")
 
 	guide.set_state(0, "PEEL", "inspect", 0.38, false)
 	if guide.get_active_scene_index() != 0:

@@ -14,9 +14,9 @@ func run() -> Array[String]:
 	root.add_child(hero)
 
 	var cases := [
-		[{"kind":"sauce_jar"},["JarHeroShell","JarSauceVolume","JarHeroLid","JarThreadBand0"]],
-		[{"kind":"tin_can"},["TinHeroBody","TinHeroTopRoll","TinHeroBottomRoll","TinHeroTopDisk"]],
-		[{"kind":"soda_can"},["SodaHeroBody","SodaHeroTopRoll","SodaHeroBottomRoll","SodaHeroTopDisk","SodaPullTab"]]
+		[{"kind":"sauce_jar"},["JarHeroShell","JarInnerWall","JarSauceVolume","JarSauceMeniscus","JarHeroLid","JarLidTopDisk","JarThreadBand0"]],
+		[{"kind":"tin_can"},["TinHeroBody","TinHeroTopRoll","TinHeroBottomRoll","TinHeroTopDisk","TinHeroTopInset","TinUpperChime","TinLowerChime"]],
+		[{"kind":"soda_can"},["SodaHeroBody","SodaHeroTopRoll","SodaHeroBottomRoll","SodaHeroTopDisk","SodaTopInsetRing","SodaShoulderRing","SodaPullTab","SodaOpening"]]
 	]
 	for pair in cases:
 		var profile: Dictionary = pair[0]
@@ -35,6 +35,9 @@ func run() -> Array[String]:
 			var base := product.get_node_or_null("JarGlass") as VisualInstance3D
 			if base == null or base.visible:
 				failures.append("HERO_DETAIL_RED: primitive JarGlass must be hidden behind the lathed hero jar")
+			var lid := detail_root.get_node_or_null("JarHeroLid") as MeshInstance3D
+			if lid != null and lid.mesh is CylinderMesh and (lid.mesh as CylinderMesh).top_radius < 0.36:
+				failures.append("HERO_DETAIL_RED: jar lid must overhang the threaded neck and read as a real closure")
 		if String(profile.kind) == "tin_can":
 			var base := product.get_node_or_null("TinCanBody") as VisualInstance3D
 			if base == null or base.visible:

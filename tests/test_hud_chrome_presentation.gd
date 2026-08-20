@@ -22,6 +22,9 @@ func run() -> Array[String]:
 	for node_name in ["ProgressPanel","ControlsPanel","HowToPanel"]:
 		if layer.get_node_or_null(node_name) == null:
 			failures.append("HUD_RED: object-only HUD missing %s" % node_name)
+	_assert_rect(layer.get_node_or_null("ProgressPanel") as Control,Rect2(52,36,262,96),failures,"ProgressPanel")
+	_assert_rect(layer.get_node_or_null("ControlsPanel") as Control,Rect2(52,205,170,318),failures,"ControlsPanel")
+	_assert_rect(layer.get_node_or_null("HowToPanel") as Control,Rect2(970,44,278,524),failures,"HowToPanel")
 	if layer.get_node_or_null("ProgressPanel/ProgressBar") == null:
 		failures.append("HUD_RED: upper-left reference HUD needs a visible horizontal progress bar")
 
@@ -34,7 +37,7 @@ func run() -> Array[String]:
 	var how_to := layer.get_node_or_null("HowToPanel") as Control
 	if how_to != null:
 		var copy := _collect_text(how_to).to_upper()
-		for required in ["HOW TO PLAY","GRAB EDGE","PEEL GENTLY","INSPECT","CLEAN PEEL"]:
+		for required in ["HOW TO PLAY","GRAB EDGE","PEEL GENTLY","INSPECT","RUB RESIDUE"]:
 			if not copy.contains(required):
 				failures.append("HUD_RED: how-to panel missing %s" % required)
 		if copy.contains("YOUR HAND") or copy.contains("HAND MODEL"):
@@ -48,9 +51,26 @@ func run() -> Array[String]:
 				failures.append("HUD_RED: control legend missing %s" % required)
 		if control_copy.contains("T Reset") or control_copy.contains("R Inspect"):
 			failures.append("HUD_RED: obsolete hand-era R Inspect / T Reset mapping is still visible")
+		for row_index in range(6):
+			if controls.get_node_or_null("ControlRow%d/Key" % row_index) == null:
+				failures.append("HUD_RED: control legend row %d needs a compact keycap" % row_index)
+
+	if how_to != null:
+		for step_index in range(1,5):
+			var badge := how_to.get_node_or_null("Step%d/Number" % step_index) as Label
+			if badge == null or badge.text != str(step_index):
+				failures.append("HUD_RED: tutorial step %d needs a gold numbered badge" % step_index)
+			if how_to.get_node_or_null("Step%d/Preview" % step_index) == null:
+				failures.append("HUD_RED: tutorial step %d needs a compact visual peel-state preview" % step_index)
 
 	root.free()
 	return failures
+
+func _assert_rect(control: Control, expected: Rect2, failures: Array[String], node_name: String) -> void:
+	if control == null:
+		return
+	if control.position.distance_to(expected.position) > 6.0 or control.size.distance_to(expected.size) > 6.0:
+		failures.append("HUD_RED: %s rect should match the approved 1280x720 composition" % node_name)
 
 func _collect_text(node: Node) -> String:
 	var output := ""

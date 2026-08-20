@@ -34,8 +34,10 @@ func run() -> Array[String]:
 			failures.append("PROFILE_RED: variant %d label must remain a large tactile hero patch" % i)
 		if composition != null:
 			var fov := float(composition.target_fov_for_kind(expected_kinds[i]))
-			if fov < 34.0 or fov > 42.0:
-				failures.append("PROFILE_RED: %s hero framing must stay within close 34-42 degree reference range, got %.2f" % [expected_kinds[i],fov])
+			if fov < 34.0 or fov > 48.0:
+				failures.append("PROFILE_RED: %s hero framing must stay within close 34-48 degree reference range, got %.2f" % [expected_kinds[i],fov])
+			if expected_kinds[i] == "clear_bottle" and fov < 47.5:
+				failures.append("PROFILE_RED: tall clear bottle must fit cap and base inside the 720p frame; got %.2f degree FOV" % fov)
 
 	for i in range(5):
 		model.select_variant(i)

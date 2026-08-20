@@ -22,6 +22,7 @@ var _fiber_tint: Color = Color(0.92,0.87,0.78)
 var _fiber_gain: float = 1.0
 var _substrate := "thermal_paper"
 var _profile_signature := ""
+var _cleanup_progress := 0.0
 
 func _ready() -> void:
 	mesh = _immediate
@@ -88,17 +89,26 @@ func set_residue(progress: float, residue: float, integrity: float) -> void:
 	_recompute_semantics()
 	_rebuild()
 
+func set_cleanup_progress(progress: float) -> void:
+	_cleanup_progress = clampf(progress if is_finite(progress) else 0.0,0.0,1.0)
+	_recompute_semantics()
+	_rebuild()
+
+func get_cleanup_progress() -> float:
+	return _cleanup_progress
+
 func _recompute_semantics() -> void:
 	if _progress <= 0.002:
 		_adhesive_trace_amount = 0.0
 		_fiber_strength = 0.0
 		return
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
-	_adhesive_trace_amount = clampf(_adhesive_trace_profile*reveal + _residue_amount*0.30,0.0,0.68)
+	var remaining := pow(1.0-_cleanup_progress,1.18)
+	_adhesive_trace_amount = clampf((_adhesive_trace_profile*reveal + _residue_amount*0.30)*remaining,0.0,0.68)
 	if _residue_amount <= 0.002 and _integrity >= 0.998:
 		_fiber_strength = 0.0
 	else:
-		_fiber_strength = clampf((_residue_amount*0.45+(1.0-_integrity)*0.75)*_fiber_gain,0.0,1.0)
+		_fiber_strength = clampf((_residue_amount*0.45+(1.0-_integrity)*0.75)*_fiber_gain*remaining,0.0,1.0)
 
 func get_residue_amount() -> float:
 	return _residue_amount
@@ -145,6 +155,9 @@ func _ensure_materials() -> void:
 	_adhesive_material.roughness = 0.18
 	_adhesive_material.metallic = 0.0
 	_adhesive_material.metallic_specular = 0.78
+	_adhesive_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_adhesive_material.emission_enabled = true
+	_adhesive_material.emission_energy_multiplier = 0.40
 	_adhesive_material.render_priority = 2
 
 	_fiber_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -152,6 +165,8 @@ func _ensure_materials() -> void:
 	_fiber_material.roughness = 0.98
 	_fiber_material.metallic = 0.0
 	_fiber_material.metallic_specular = 0.12
+	_fiber_material.emission_enabled = true
+	_fiber_material.emission_energy_multiplier = 0.72
 	_fiber_material.render_priority = 3
 
 func _rebuild() -> void:
@@ -164,10 +179,12 @@ func _rebuild() -> void:
 
 	var adhesive_alpha := clampf(0.16+_adhesive_trace_amount*0.78+_residue_amount*0.14,0.16,0.62)
 	_adhesive_material.albedo_color = Color(_adhesive_tint.r,_adhesive_tint.g,_adhesive_tint.b,adhesive_alpha)
+	_adhesive_material.emission = _adhesive_tint.lightened(0.16)
 	var fiber_alpha := clampf(0.88+_fiber_strength*0.10,0.88,0.98)
 	var white_mix := 0.38 if _substrate == "uncoated_fiber" else 0.20
 	var readable_fiber := _fiber_tint.lerp(Color.WHITE,white_mix)
 	_fiber_material.albedo_color = Color(readable_fiber.r,readable_fiber.g,readable_fiber.b,fiber_alpha)
+	_fiber_material.emission = readable_fiber.lightened(0.10)
 
 	_draw_adhesive_layer()
 	if _fiber_strength > 0.02:
@@ -189,8 +206,8 @@ func _draw_adhesive_layer() -> void:
 		if not started:
 			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
 			started = true
-		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.12+0.08*_residue_amount)
-		var half_height := _label_height*(0.075+0.095*(1.0-signal_value)+0.065*_adhesive_trace_amount+0.035*_residue_amount)
+		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.24+0.12*_residue_amount)
+		var half_height := _label_height*(0.050+0.070*(1.0-signal_value)+0.040*_adhesive_trace_amount+0.025*_residue_amount)
 		var y0_top := _label_y+center_offset+half_height
 		var y0_bottom := _label_y+center_offset-half_height
 		var next_offset := sin(float(i+1)*1.43+0.25)*_label_height*(0.12+0.08*_residue_amount)
@@ -205,19 +222,20 @@ func _draw_adhesive_layer() -> void:
 func _draw_tack_streaks(peeled_u: float) -> void:
 	if peeled_u <= 0.12:
 		return
-	var columns := 5
-	for row in range(3):
-		var row_center := _label_y+(float(row)-1.0)*_label_height*0.19
-		for column in range(columns):
-			if _signal(column+row*7,83) > 0.78:
-				continue
-			var u0 := peeled_u*float(column)/float(columns)
-			var u1 := peeled_u*float(column+1)/float(columns)
-			var wobble0 := (0.5-_signal(column+row*11,89))*_label_height*0.035
-			var wobble1 := (0.5-_signal(column+1+row*11,97))*_label_height*0.035
-			var half0 := _label_height*(0.012+0.010*_adhesive_trace_amount+0.006*_signal(column,101+row))
-			var half1 := _label_height*(0.012+0.010*_adhesive_trace_amount+0.006*_signal(column+1,107+row))
-			_emit_patch(u0,u1,row_center+wobble0+half0,row_center+wobble0-half0,row_center+wobble1+half1,row_center+wobble1-half1,0.0162)
+	# A few offset tack streaks read as smeared glue. A fixed row/column grid
+	# looked like a printed cage once the label was gone.
+	for streak_index in range(9):
+		if _signal(streak_index,83) > 0.74:
+			continue
+		var center_u := peeled_u*(0.08+0.84*_signal(streak_index,89))
+		var half_span := peeled_u*(0.025+0.050*_signal(streak_index,97))
+		var u0 := maxf(0.0,center_u-half_span)
+		var u1 := minf(peeled_u,center_u+half_span)
+		var center0 := _label_y+(0.5-_signal(streak_index,101))*_label_height*0.70
+		var center1 := center0+(0.5-_signal(streak_index,107))*_label_height*0.08
+		var half0 := _label_height*(0.010+0.010*_adhesive_trace_amount+0.005*_signal(streak_index,109))
+		var half1 := half0*(0.65+0.35*_signal(streak_index,113))
+		_emit_patch(u0,u1,center0+half0,center0-half0,center1+half1,center1-half1,0.0162)
 
 func _draw_fiber_layer() -> void:
 	var islands := get_fiber_island_spans(_progress)
@@ -226,22 +244,23 @@ func _draw_fiber_layer() -> void:
 	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_fiber_material)
 	for island_index in range(islands.size()):
 		var island := islands[island_index]
-		var subdivisions := 4
+		var subdivisions := 5
 		for j in range(subdivisions):
+			var seed := island_index*17+j
+			if j != island_index%subdivisions and _signal(seed,71) > 0.40+_fiber_strength*0.28:
+				continue
 			var t0 := float(j)/float(subdivisions)
 			var t1 := float(j+1)/float(subdivisions)
 			var u0 := lerpf(island.x,island.y,t0)
 			var u1 := lerpf(island.x,island.y,t1)
-			var seed0 := island_index*13+j
-			var seed1 := island_index*13+j+1
-			var center0 := _label_y+(0.5-_signal(seed0,31))*_label_height*0.28
-			var center1 := _label_y+(0.5-_signal(seed1,37))*_label_height*0.28
-			var half0 := _label_height*(0.075+0.085*_fiber_strength+0.022*_signal(seed0,23))
-			var half1 := _label_height*(0.075+0.085*_fiber_strength+0.022*_signal(seed1,29))
-			var rag_top0 := (0.5-_signal(seed0,41))*_label_height*0.035
-			var rag_top1 := (0.5-_signal(seed1,43))*_label_height*0.035
-			var rag_bottom0 := (0.5-_signal(seed0,47))*_label_height*0.030
-			var rag_bottom1 := (0.5-_signal(seed1,53))*_label_height*0.030
+			var center0 := _label_y+(0.5-_signal(seed,31))*_label_height*0.70
+			var center1 := center0+(0.5-_signal(seed,37))*_label_height*0.18
+			var half0 := _label_height*(0.035+0.050*_fiber_strength+0.020*_signal(seed,23))
+			var half1 := _label_height*(0.035+0.050*_fiber_strength+0.020*_signal(seed,29))
+			var rag_top0 := (0.5-_signal(seed,41))*_label_height*0.050
+			var rag_top1 := (0.5-_signal(seed,43))*_label_height*0.050
+			var rag_bottom0 := (0.5-_signal(seed,47))*_label_height*0.045
+			var rag_bottom1 := (0.5-_signal(seed,53))*_label_height*0.045
 			_emit_patch(
 				u0,u1,
 				center0+half0+rag_top0,

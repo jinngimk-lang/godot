@@ -6,32 +6,32 @@ const BASE_POSITION := Vector3(0.0,0.72,-1.43)
 const PROFILES := {
 	"cafe_window":{
 		"texture":"res://art/reference_backdrops/cafe_backdrop.jpg",
-		"world_width":TARGET_WORLD_WIDTH,
-		"offset":Vector2(0.0,0.0),
+		"world_width":10.40,
+		"offset":Vector2(0.0,-0.45),
 		"modulate":Color(0.94,0.92,0.89,1.0)
 	},
 	"pantry_jar":{
 		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
-		"world_width":7.45,
-		"offset":Vector2(-0.38,0.14),
+		"world_width":10.40,
+		"offset":Vector2(-0.38,-0.45),
 		"modulate":Color(1.00,0.82,0.67,1.0)
 	},
 	"pantry_tin":{
 		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":7.05,
-		"offset":Vector2(0.66,-0.04),
+		"world_width":10.40,
+		"offset":Vector2(0.66,-0.45),
 		"modulate":Color(0.82,0.77,0.67,1.0)
 	},
 	"market_coldcase":{
 		"texture":"res://art/reference_backdrops/market_backdrop.jpg",
-		"world_width":TARGET_WORLD_WIDTH,
-		"offset":Vector2(0.0,0.02),
+		"world_width":10.40,
+		"offset":Vector2(0.0,-0.45),
 		"modulate":Color(0.98,0.985,0.99,1.0)
 	},
 	"market_can":{
 		"texture":"res://art/reference_backdrops/bar_backdrop.jpg",
-		"world_width":6.45,
-		"offset":Vector2(-0.72,0.18),
+		"world_width":10.40,
+		"offset":Vector2(-0.72,-0.45),
 		"modulate":Color(0.72,0.90,0.96,1.0)
 	}
 }

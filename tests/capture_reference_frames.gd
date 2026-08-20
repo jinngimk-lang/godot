@@ -40,7 +40,20 @@ func _run() -> void:
 		_align_cursor_to_corner(scene,true)
 		await _settle_frames(1)
 		if not _assert_full_release(scene,capture_case): return
+		if not await _capture("%s_release_hold" % String(capture_case["base"])): return
+		if not _stage_release_settle(scene,capture_case,0.5,"SETTLING"): return
+		await _settle_frames(2)
+		if not await _capture("%s_settling" % String(capture_case["base"])): return
+		if not _stage_release_settle(scene,capture_case,1.0,"RESOLVED"): return
+		await _settle_frames(2)
+		if not _assert_resolved_release(scene,capture_case): return
 		if not await _capture(String(capture_case["done"])): return
+		if not _stage_scrub(scene,0.55): return
+		await _settle_frames(2)
+		if not await _capture("%s_scrub55" % String(capture_case["base"])): return
+		if not _stage_scrub(scene,1.0): return
+		await _settle_frames(2)
+		if not await _capture("%s_clean" % String(capture_case["base"])): return
 		_resume_scene(scene)
 		await _settle_frames(2)
 	Input.set_custom_mouse_cursor(null,Input.CURSOR_POINTING_HAND)
@@ -49,7 +62,7 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 	await RenderingServer.frame_post_draw
-	print("PASS: captured five paper-release triplets")
+	print("PASS: captured five attached/peel/release/settle/resolved/scrub/clean lifecycle sets")
 	quit(0)
 
 func _assert_object_only_scene(scene: Node) -> bool:
@@ -108,11 +121,58 @@ func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	var grip_local := label.get_effective_grip(1.0,desired_grip_local)
 	label.set_peel(1.0,grip_local)
 	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
+	var lifecycle = scene.get("_lifecycle")
+	if lifecycle != null:
+		lifecycle.update(1.0,true,0.0)
+		lifecycle.update(1.0,false,0.17)
 	scene.set_process(false)
 	if guide != null:
 		guide.set_process(false)
 		guide.set_state(int(capture_case["index"]),"COMPLETE","inspect",1.0,true)
 	scene.call("_update_hud","COMPLETE","HELD",1.0)
+	return true
+
+func _stage_release_settle(scene: Node, capture_case: Dictionary, alpha: float, phase_name: String) -> bool:
+	var corner := scene.get_node_or_null("CornerPeelPresentation") as CornerPeelPresentation
+	var guide := scene.get_node_or_null("GuidedJourneyPresentation") as GuidedJourneyPresentation
+	if corner == null:
+		push_error("CAPTURE_RED: released-label settle presentation disappeared")
+		quit(1); return false
+	corner.set_release_settle(alpha,int(capture_case["index"]))
+	var lifecycle = scene.get("_lifecycle")
+	if lifecycle != null:
+		if phase_name == "SETTLING":
+			lifecycle.update(1.0,false,0.41)
+			lifecycle.update(1.0,false,0.30)
+		elif phase_name == "RESOLVED":
+			lifecycle.update(1.0,false,0.31)
+	if guide != null:
+		guide.set_state(int(capture_case["index"]),phase_name,"inspect",1.0,true)
+	scene.call("_update_hud","COMPLETE",phase_name,1.0)
+	return true
+
+func _stage_scrub(scene: Node, target: float) -> bool:
+	var scrub = scene.get("_scrub_model")
+	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
+	var cursor := scene.get_node_or_null("CursorPresentation") as CursorPresentation
+	if scrub == null or residue == null or cursor == null:
+		push_error("CAPTURE_RED: residue scrub staging is incomplete")
+		quit(1); return false
+	var region: Rect2 = scene.call("_project_label_region")
+	var pointer := region.get_center()
+	for stroke_index in range(120):
+		if scrub.get_progress() >= target:
+			break
+		var relative := Vector2(16 if stroke_index % 2 == 0 else -16,2 if stroke_index % 4 < 2 else -2)
+		pointer += relative
+		scrub.update(true,pointer,relative,region,1.0/60.0)
+	residue.set_cleanup_progress(scrub.get_progress())
+	cursor.set_debug_position(pointer)
+	cursor.call("_process",1.0/60.0)
+	scene.call("_update_hud","CLEANING","RESOLVED",1.0)
+	if scrub.get_progress()+0.001 < target:
+		push_error("CAPTURE_RED: scrub staging did not reach %.2f" % target)
+		quit(1); return false
 	return true
 
 func _align_cursor_to_corner(scene: Node, peeled: bool) -> void:
@@ -163,6 +223,18 @@ func _assert_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	if hud == null or not hud.text.contains("Peel 100%"):
 		push_error("CAPTURE_RED: %s does not expose 100%% completion in HUD" % String(capture_case["done"]))
 		quit(1); return false
+	return true
+
+func _assert_resolved_release(scene: Node, capture_case: Dictionary) -> bool:
+	var corner := scene.get_node_or_null("CornerPeelPresentation") as CornerPeelPresentation
+	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
+	if corner == null or residue == null:
+		push_error("CAPTURE_RED: %s lost resolved presentation nodes" % String(capture_case["done"])); quit(1); return false
+	var visual := corner.get_node_or_null("CornerPeelLabel") as MeshInstance3D
+	if visual == null or visual.visible:
+		push_error("CAPTURE_RED: %s resolved sheet still blocks the hero" % String(capture_case["done"])); quit(1); return false
+	if not residue.has_adhesive_trace():
+		push_error("CAPTURE_RED: %s resolved hero lost vessel-bound adhesive residue" % String(capture_case["done"])); quit(1); return false
 	return true
 
 func _resume_scene(scene: Node) -> void:

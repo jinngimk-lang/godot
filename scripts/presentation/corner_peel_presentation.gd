@@ -1,10 +1,9 @@
 extends Node3D
 class_name CornerPeelPresentation
 
-const U_SEGMENTS := 40
-const V_SEGMENTS := 28
+const U_SEGMENTS := 56
+const V_SEGMENTS := 40
 const SURFACE_OFFSET := 0.025
-const VISUAL_AREA_SCALE := 0.62
 const COMPLETE_RAMP_START := 0.84
 const DEFAULT_BEND_BAND_RATIO := 0.14
 const DEFAULT_BACKING_THICKNESS := 0.0036
@@ -24,6 +23,8 @@ var _last_size := Vector2.ZERO
 var _visual_grip_local := Vector3.ZERO
 var _bend_band_ratio := DEFAULT_BEND_BAND_RATIO
 var _backing_thickness := DEFAULT_BACKING_THICKNESS
+var _release_settle_alpha := 0.0
+var _release_variant_index := 0
 
 func _ready() -> void:
 	call_deferred("_bind")
@@ -54,11 +55,19 @@ func set_paper_profile(profile: Dictionary) -> void:
 	_last_progress = -1.0
 	_last_drag = Vector3(INF,INF,INF)
 
+func set_release_settle(alpha: float, variant_index: int) -> void:
+	_release_settle_alpha = clampf(alpha if is_finite(alpha) else 0.0,0.0,1.0)
+	_release_variant_index = maxi(variant_index,0)
+	_apply_release_settle()
+
 func get_paper_surface_shader_path() -> String:
 	return PAPER_SHADER_PATH
 
 func get_visual_grip_world_position() -> Vector3:
-	return to_global(_visual_grip_local)
+	var local_point := _visual.transform*_visual_grip_local if _visual != null else _visual_grip_local
+	if is_inside_tree():
+		return to_global(local_point)
+	return transform*local_point
 
 func get_start_edge_world_position() -> Vector3:
 	if _label == null or _cup == null or not (_cup.mesh is CylinderMesh):
@@ -73,8 +82,12 @@ func visual_progress_for_gameplay(progress: float) -> float:
 	if p >= 0.999:
 		return 1.0
 	if p <= COMPLETE_RAMP_START:
-		return p*VISUAL_AREA_SCALE
-	var start_visible := COMPLETE_RAMP_START*VISUAL_AREA_SCALE
+		# Progress measures accumulated bond release, not the literal percentage
+		# of printed paper that should already be airborne. A quadratic mapping
+		# keeps the order copy readable during the reference 38% corner peel while
+		# still opening into the broad rolled sheet shown around 72%.
+		return p*p
+	var start_visible := COMPLETE_RAMP_START*COMPLETE_RAMP_START
 	var t := clampf((p-COMPLETE_RAMP_START)/(1.0-COMPLETE_RAMP_START),0.0,1.0)
 	var eased := t*t*(3.0-2.0*t)
 	return lerpf(start_visible,1.0,eased)
@@ -131,6 +144,7 @@ func _bind() -> void:
 		_adhesive_material.render_priority = 2
 	_sync_texture()
 	_rebuild(0.0,Vector3.ZERO)
+	_apply_release_settle()
 
 func _sync_texture() -> void:
 	if _front_material != null and _print != null:
@@ -144,7 +158,7 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	var threshold := _area_threshold(visual_progress)
 	var full_release := progress >= 0.999
 	var safe_drag := drag_delta
-	var max_drag := maxf(_label.label_width*0.24,0.10)
+	var max_drag := maxf(_label.label_width*0.16,0.09)
 	if safe_drag.length()>max_drag:
 		safe_drag = safe_drag.normalized()*max_drag
 	if progress<=0.001 and safe_drag.length_squared()<0.000001:
@@ -161,11 +175,9 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	var free_normal := corner_normal
 	var lift_distance := 0.020+progress*0.070
 
-	var base_positions := PackedVector3Array()
 	var flap_positions := PackedVector3Array()
 	var back_positions := PackedVector3Array()
 	var adhesive_positions := PackedVector3Array()
-	var base_normals := PackedVector3Array()
 	var flap_normals := PackedVector3Array()
 	var back_normals := PackedVector3Array()
 	var adhesive_normals := PackedVector3Array()
@@ -178,28 +190,48 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var u := float(u_index)/float(U_SEGMENTS)
 			var attached := CupSurface.attached_point_on_frustum(u,_label.label_width,y,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height,_cup.position.y,SURFACE_OFFSET)
 			var outward := CupSurface.frustum_surface_normal(attached,cup_mesh.bottom_radius,cup_mesh.top_radius,cup_mesh.height)
-			var edge_variation := 0.018*sin(v*17.0+u*5.0)+0.009*sin(v*41.0)
-			var d := (1.0-u)+(1.0-v)+edge_variation
+			# The bend field stays low-frequency so adjacent paper cells cannot
+			# jump from fully attached to fully free. Jaggedness is applied only
+			# to the backing/adhesive release boundary below.
+			var d := (1.0-u)+(1.0-v)
 			var depth := clampf((threshold-d)/maxf(threshold,0.001),0.0,1.0)
-			var band_t := clampf(depth/_bend_band_ratio,0.0,1.0)
+			# The substrate ratio is the concentrated paper hinge, while the
+			# surrounding compliance shoulder keeps the triangulated print face
+			# near-inextensible at this mesh resolution.
+			var geometry_bend_band := _bend_band_ratio+0.24
+			var band_t := clampf(depth/geometry_bend_band,0.0,1.0)
 			var rigid_weight := band_t*band_t*(3.0-2.0*band_t)
 			if full_release:
 				rigid_weight = 1.0
 			var flat_reference := corner_attached+tangent_axis*((u-1.0)*_label.label_width)+Vector3.UP*((v-1.0)*_label.label_height)
-			var free_target := flat_reference+safe_drag+free_normal*lift_distance+Vector3.UP*(progress*0.010)
-			var moved := attached.lerp(free_target,rigid_weight)
+			var moved: Vector3
+			if full_release:
+				# Preserve paper arc length while curling the released sheet. This
+				# gives the completion hold a stiff rolled-paper silhouette instead
+				# of a floating rectangular card.
+				var curl_span := 1.05
+				var curl_angle := (1.0-u)*curl_span
+				var curl_radius := _label.label_width/curl_span
+				var curled_reference := corner_attached-tangent_axis*(curl_radius*sin(curl_angle))+Vector3.UP*((v-1.0)*_label.label_height)
+				var release_curl := free_normal*(curl_radius*(1.0-cos(curl_angle)))+Vector3.DOWN*(0.035*pow(1.0-v,2.0))
+				moved = curled_reference+safe_drag+free_normal*lift_distance+release_curl
+			else:
+				# Keep the printed sheet close to inextensible during the live peel.
+				# Translating the released patch from its own vessel position avoids
+				# the long bridge triangles produced by blending toward a remote plane.
+				var pull_offset := safe_drag+free_normal*lift_distance+Vector3.UP*(progress*0.010)
+				var crease_rounding := free_normal*sin(rigid_weight*PI)*(0.032+progress*0.045)
+				moved = attached+pull_offset*rigid_weight+crease_rounding
 			var flap_normal := outward.lerp(free_normal,rigid_weight).normalized()
-			base_positions.append(attached)
 			flap_positions.append(moved)
 			back_positions.append(moved-flap_normal*_backing_thickness)
 			adhesive_positions.append(attached+outward*0.0015)
-			base_normals.append(outward)
 			flap_normals.append(flap_normal)
 			back_normals.append(-flap_normal)
 			adhesive_normals.append(outward)
 			uvs.append(Vector2(u,1.0-v))
 
-	var base_indices := PackedInt32Array()
+	var front_indices := PackedInt32Array()
 	var flap_indices := PackedInt32Array()
 	var row := U_SEGMENTS+1
 	for v_index in range(V_SEGMENTS):
@@ -208,21 +240,20 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 			var center_u := (float(u_index)+0.5)/float(U_SEGMENTS)
 			var edge_variation := 0.018*sin(center_v*17.0+center_u*5.0)+0.009*sin(center_v*41.0)
 			var center_d := (1.0-center_u)+(1.0-center_v)+edge_variation
-			var target := flap_indices if full_release or center_d<threshold else base_indices
 			var a := v_index*row+u_index
 			var b := a+1
 			var d := (v_index+1)*row+u_index
 			var c := d+1
-			target.append(a); target.append(d); target.append(c)
-			target.append(a); target.append(c); target.append(b)
+			front_indices.append(a); front_indices.append(d); front_indices.append(c)
+			front_indices.append(a); front_indices.append(c); front_indices.append(b)
+			if full_release or center_d<threshold:
+				flap_indices.append(a); flap_indices.append(d); flap_indices.append(c)
+				flap_indices.append(a); flap_indices.append(c); flap_indices.append(b)
 
 	var mesh := ArrayMesh.new()
-	if not base_indices.is_empty():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(base_positions,base_normals,uvs,base_indices))
-		mesh.surface_set_material(mesh.get_surface_count()-1,_front_material)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(flap_positions,flap_normals,uvs,front_indices))
+	mesh.surface_set_material(mesh.get_surface_count()-1,_front_material)
 	if not flap_indices.is_empty():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(flap_positions,flap_normals,uvs,flap_indices))
-		mesh.surface_set_material(mesh.get_surface_count()-1,_front_material)
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(back_positions,back_normals,uvs,_reversed_indices(flap_indices)))
 		mesh.surface_set_material(mesh.get_surface_count()-1,_back_material)
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,_arrays(adhesive_positions,adhesive_normals,uvs,flap_indices))
@@ -230,6 +261,19 @@ func _rebuild(progress: float, drag_delta: Vector3) -> void:
 	_visual.mesh = mesh
 	var corner_index := V_SEGMENTS*(U_SEGMENTS+1)+U_SEGMENTS
 	_visual_grip_local = flap_positions[corner_index]
+	_apply_release_settle()
+
+func _apply_release_settle() -> void:
+	if _visual == null:
+		return
+	var t := _release_settle_alpha
+	var eased := t*t*(3.0-2.0*t)
+	var direction := -1.0 if _release_variant_index % 2 == 0 else 1.0
+	_visual.position = Vector3(direction*0.62*eased,-0.46*eased-0.12*eased*eased,0.20*eased)
+	_visual.rotation_degrees = Vector3(10.0*eased,-direction*16.0*eased,direction*30.0*eased)
+	var settle_scale := lerpf(1.0,0.76,eased)
+	_visual.scale = Vector3.ONE*settle_scale
+	_visual.visible = t < 0.999
 
 func _reversed_indices(source: PackedInt32Array) -> PackedInt32Array:
 	var reversed := PackedInt32Array()

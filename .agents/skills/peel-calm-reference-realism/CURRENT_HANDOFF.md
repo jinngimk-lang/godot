@@ -1,84 +1,90 @@
-# Current Handoff — 2026-08-18
+# Current Handoff — 2026-08-20 Reference Fidelity + Residue Rub
 
 ## Start here
 
 Repository: `jinngimk-lang/godot`
 
-Start from current `main`, not from old merged feature branches. Baseline before this handoff skill commit was:
+Start from current `main`. Do not revive old hand/forearm/crumple branches or treat their screenshots/tests as current product authority.
 
-`963ed7e582327f22dd7857efef40f5e5a65254ba`
+Read in this order:
 
-The owner wants autonomous continuation. Do not ask for normal reversible implementation decisions. Inspect the repo, create a fresh branch, make evidence-backed changes, run exact-head Godot verification, inspect captures, and continue on the next visible/tactile defect.
+1. `.agents/PROJECT_NORTH_STAR.md`
+2. this handoff
+3. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
+4. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
+5. current production code, tests, `Godot Check`, and newest capture artifact
 
-## Owner feedback translated into non-negotiable product requirements
+## Owner direction now locked
 
-The label previously felt too soft, too eager to fall away, and too much like loose tape. The target is a relaxing paper-label peel with resistance: load first, break adhesive locally, progress only with new outward work, then fully detach at 100%.
+- Object-only interaction. No visible hand or arm model.
+- The small hand-shaped mouse cursor directly grabs paper and later rubs residue.
+- No full-screen still/video layer may replace realtime Godot gameplay.
+- Target composition remains the supplied Coffee Shop mockup: large centered product, warm defocused environment, left controls/progress, four-step right tutorial, persistent five-scene rail.
+- Paper must feel resistant and fibrous, not like loose tape or elastic film.
+- The loop does not end at detach. Paper release must settle clear, expose residue, require a fresh LMB rubbing pass, and unlock Continue only after cleaning.
 
-The five showcase scenes also previously felt like one room with different objects. They must read as five places/products without relying on HUD labels.
+## Current production baseline
 
-Current approved presentation direction is object-only. **No visible hands/arms and no full-screen still/video gameplay overlay.** Older hand-oriented notes in repository history are not authority for this workstream.
+### Five realtime scene bundles
 
-## What is already merged
+- Coffee Shop — kraft paper cup, molded black lid, thermal order label, warm café window.
+- Jar — glass/sauce/meniscus/lid details, rustic paper, warm pantry/kitchen.
+- Tin Can — metal body/chimes/top details, grocery wrap, cooler merchandising scene.
+- Supermarket — clear bottle/liquid/punt/cap, coated paper, refrigerated retail scene.
+- Can — aluminum shoulder/top/opening details, thin wrap, beverage/convenience scene.
 
-### Paper resistance / complete release
+### Paper and peel
 
-- Static pointer hold no longer consumes adhesive bond every frame.
-- Peel progress requires new outward pointer displacement.
-- Initial breakaway peak + deterministic micro-resistance are modeled.
-- `CornerPeelPresentation` confines most bend to a narrow front and drives the detached area toward a stiff tangent sheet.
-- Printed front and opaque matte backing are separate surfaces with thickness.
-- 100% gameplay progress produces complete visual release.
-- CI captures attached / mid / 100%-released states for all five products.
+- `CornerPeelPresentation` is final visible label authority; the old simulation ribbon remains hidden.
+- The printed face is one continuous 56×40 segmented mesh with bounded cell stretch.
+- Gameplay progress is visually compressed at early/mid stages so the 38% reference state keeps most print readable and lifts only the upper-right region.
+- Printed face, fibrous backing, paper thickness, adhesive release surface, and vessel residue are separate material semantics.
+- 100% produces a stiff arc-length-preserving curl, then lifecycle hold/settle and removal from the hero.
 
-Primary checkpoint:
-`docs/superpowers/checkpoints/2026-08-18-paper-resistance-and-scene-separation.md`
+### Post-peel residue rubbing
 
-### Substrate-specific feel
+- `ResidueScrubModel` accepts only pressed movement inside the projected former-label region.
+- Hover, stationary hold, and movement outside the region produce no cleaning.
+- Short back-and-forth reversals receive extra tactile weight; a one-frame fling is capped.
+- `ResidueVisual.set_cleanup_progress()` fades adhesive and paper-fiber layers to zero.
+- The software hand cursor animates and displays `RUB ↔` during the cleaning stage.
+- The upper-left HUD switches to `Residue Clean N%`.
+- Continue and the exact-once completion record remain gated until residue reaches 100% clean.
+- Input is quarantined at detach and cleanup completion, requiring a fresh press across boundaries.
 
-Merged PR #158 introduced per-variant `peel_feel` profiles and runtime binding into controller + paper renderer.
+## Latest evidence
 
-Current relative order:
-- Jar: heaviest / most resistant (`4.10 px`, `1.34x`, bend `0.09`, backing `0.0052`)
-- Tin: resistant (`3.55 px`, `1.22x`, bend `0.11`, backing `0.0042`)
-- Coffee: medium (`3.25 px`, `1.24x`, bend `0.12`, backing `0.0034`)
-- Yuzu: cleaner/easier (`2.75 px`, `1.12x`, bend `0.15`, backing `0.0028`)
-- Thin soda wrap: lightest/most compliant (`2.40 px`, `1.08x`, bend `0.19`, backing `0.0022`)
+Local Godot: `4.7.1.stable.official.a13da4feb`.
 
-Exact-head run for the integrated v4 branch: `32117131925` passed import, default launch, deterministic tests, interaction smokes, and five scene triplet captures.
+The integration candidate passed:
 
-Checkpoint:
-`docs/superpowers/checkpoints/2026-08-18-substrate-peel-feel-v4.md`
+- deterministic object-only test runner;
+- complete real pointer flow: grab → load → peel → settle → rub → clean → next scene;
+- configured default project launch;
+- five-scene reference, product-surface, café presentation, reset-loop, pause-isolation, and reset-isolation smokes;
+- `git diff --check`;
+- 35 runtime captures: attached / peel / release hold / settling / dirty residue / partial scrub / clean for every scene.
 
-### Paper surface
+Exact detailed checkpoint:
+`docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
 
-Merged PR #159 added `art/shaders/peeled_paper.gdshader` and moved the printed paper face onto a real-time fibrous shader with micro albedo/roughness/normal response while keeping the backing separate and opaque.
-
-Exact-head run `32117685152` passed all Godot 4.7.1 checks and scene triplet captures. Artifact id: `9317316615`.
-
-### Pre-release tactile audio
-
-Merged PR #160 added restrained audible paper/adhesive loading during real controller `EDGE_LIFT` / `PINCHED`, before actual release. Existing quiet adhesive loops and foreground `paper_flex` / `micro_release` / `final_release` events remain.
-
-Exact-head run `32118119865` passed. `main` then advanced to `963ed7e582327f22dd7857efef40f5e5a65254ba`.
-
-## What is still not proven by automation
-
-Subjective hand-feel/ASMR satisfaction remains experiential. CI can prove no static creep, correct state transitions, full release, parameters, and rendered frames; it cannot prove the owner will judge the mouse motion as sufficiently resistant or satisfying.
-
-Do not claim that subjective feel is solved merely because CI is green.
+After this branch lands, use the merged `main` workflow result as the only merged-main CI claim. Local/pre-merge evidence must not be upgraded into a remote post-merge claim.
 
 ## Highest-value next work
 
-Continue in this order unless current runtime evidence shows a larger defect:
+1. **Owner feel pass** — tune breakaway peak, travel per release, substrate contrast, scrub duration, cursor oscillation, and Foley levels from local playtest feedback.
+2. **Spatial cleaning** — replace uniform whole-footprint fading with a local coverage/mask model so the exact rubbed area clears first. Add restrained adhesive rolls/paper crumbs without turning the effect into dirt or foam.
+3. **Cleaning Foley** — add low, dry friction and intermittent tack-release events driven by real scrub motion/reversals; stationary holds must stay silent.
+4. **Realtime realism** — continue improving hero silhouettes, glass/metal edge response, paper microstructure, contact shadows, reflections, and environment/live-surface integration.
+5. **Release edge polish** — increase irregular tear silhouette and substrate differentiation while preserving print readability and bounded paper stretch.
+6. **Settings/touch/performance** — only after PC mouse feel is stable; preserve the same fresh-press and boundary quarantine invariants.
 
-1. **Product material realism** — glass thickness/refraction cues, metal edge/rim structure and reflection breakup, cup paper/pulp detail, believable contact shadows.
-2. **Paper edge realism** — improve exposed paper thickness, torn/fibrous edge response, underside variation and adhesive boundary without making the sheet look fuzzy or dirty.
-3. **Five genuinely different environments** — unique environment assets/geometry where reuse still reads as the same room; strengthen Jar pantry/kitchen, Tin grocery/cold-case, Supermarket refrigerated commercial space, Can beverage/convenience counter, Coffee warm café.
-4. **Resistance tuning from visual mechanics** — preserve static stall and substrate ordering; if increasing resistance, require more deliberate pointer work rather than adding time-based delay.
-5. **Tactile audio polish** — emphasize load → micro-release → final release rhythm while keeping continuous adhesive noise quiet.
+## Do not regress
 
-For visible changes, always inspect the newest attached/mid/100% captures. A technically correct change that looks worse should be reverted or replaced, not defended.
-
-## Verification rule for the next agent
-
-Use a fresh branch from current `main`. Before merge, verify the exact proposed head with Godot 4.7.1 and inspect generated images. If merged-main CI is not separately observed after merge, say only that the pre-merge exact head was verified; do not silently upgrade that evidence into a post-merge-main claim.
+- No rendered hands/arms.
+- No fake still/video gameplay.
+- No full-height ribbon peel or stretched printed text.
+- No time-based progress from a stationary pointer.
+- No immediate Continue at paper detach; residue cleaning is now part of the core completion loop.
+- No timer pressure, failure grind, or large meta/economy system before tactile quality is owner-approved.
+- Do not claim subjective feel solved from CI alone.

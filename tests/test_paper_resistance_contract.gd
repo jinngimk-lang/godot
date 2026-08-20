@@ -48,8 +48,8 @@ func run() -> Array[String]:
 		else:
 			var mid: float = float(corner.call("visual_progress_for_gameplay",0.38))
 			var full: float = float(corner.call("visual_progress_for_gameplay",1.0))
-			if mid >= 0.38:
-				failures.append("mid peel should remain visually compressed enough to keep print readable")
+			if mid >= 0.20:
+				failures.append("PAPER_PROGRESS_RED: the 38% gameplay state should remain a readable corner peel, not expose most of the print")
 			if full < 0.999:
 				failures.append("PAPER_COMPLETION_RED: 100% gameplay progress must detach the full visible label")
 		if not corner.has_method("paper_bend_band_ratio"):

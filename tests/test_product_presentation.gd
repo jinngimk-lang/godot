@@ -35,6 +35,8 @@ func run() -> Array[String]:
 		if kind == "clear_bottle":
 			if product.get_node_or_null("BottleInnerGlass") == null or product.get_node_or_null("BottleLiquid") == null:
 				failures.append("PRODUCT_RED: market bottle needs layered glass and liquid")
+			if product.get_node_or_null("BottleLiquidMeniscus") == null or product.get_node_or_null("BottleBottomPunt") == null:
+				failures.append("PRODUCT_RED: market bottle needs a readable liquid meniscus and thick punt/base detail")
 		if kind == "soda_can":
 			if product.get_node_or_null("SodaCanTopRim") == null or product.get_node_or_null("SodaCanBottomRim") == null:
 				failures.append("PRODUCT_RED: soda can needs rolled aluminum rims")

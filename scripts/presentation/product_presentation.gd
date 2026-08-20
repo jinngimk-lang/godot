@@ -11,11 +11,15 @@ float paper_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.
 void fragment() {
 	vec2 fiber_cell = floor(UV * vec2(420.0, 860.0));
 	float fleck = (paper_hash(fiber_cell) - 0.5) * 2.0;
+	float coarse = (paper_hash(floor(UV * vec2(52.0, 118.0))) - 0.5) * 2.0;
+	float pore = (paper_hash(floor(UV * vec2(180.0, 360.0))) - 0.5) * 2.0;
 	float strand = sin((UV.y + sin(UV.x * 31.0) * 0.004) * 920.0) * 0.5;
-	float fiber = (fleck * 0.64 + strand * 0.36) * fiber_strength;
+	float fiber = (fleck * 0.50 + strand * 0.28 + pore * 0.22) * fiber_strength + coarse * 0.018;
 	ALBEDO = clamp(paper_color.rgb + vec3(fiber), vec3(0.0), vec3(1.0));
 	ROUGHNESS = clamp(paper_roughness + abs(fiber) * 0.55, 0.90, 1.0);
 	SPECULAR = 0.18;
+	NORMAL_MAP = vec3(0.5 + fleck * 0.016, 0.5 + pore * 0.012, 1.0);
+	NORMAL_MAP_DEPTH = 0.14;
 }
 """
 const GLASS_EDGE_SHADER := """shader_type spatial;
@@ -76,11 +80,7 @@ func apply_to_base(body: MeshInstance3D, lid: MeshInstance3D, profile: Dictionar
 	if lid != null:
 		lid.visible = paper
 		if paper:
-			var lid_mat := StandardMaterial3D.new()
-			lid_mat.albedo_color = Color(profile.get("lid_color",Color(0.025,0.024,0.022)))
-			lid_mat.roughness = 0.30
-			lid_mat.metallic_specular = 0.54
-			lid.material_override = lid_mat
+			lid.material_override = _molded_lid_material(Color(profile.get("lid_color",Color(0.025,0.024,0.022))))
 
 func set_inspection_yaw(yaw: float) -> void:
 	rotation.y = yaw if is_finite(yaw) else 0.0
@@ -90,11 +90,11 @@ func _build_contact_shadow(kind: String) -> void:
 	shadow.name = "ProductContactShadow"
 	var quad := QuadMesh.new()
 	var sizes := {
-		"paper_cup":Vector2(0.98,0.48),
-		"sauce_jar":Vector2(0.88,0.42),
-		"tin_can":Vector2(0.86,0.40),
-		"clear_bottle":Vector2(0.76,0.39),
-		"soda_can":Vector2(0.84,0.40)
+		"paper_cup":Vector2(1.16,0.54),
+		"sauce_jar":Vector2(1.02,0.48),
+		"tin_can":Vector2(0.98,0.46),
+		"clear_bottle":Vector2(0.88,0.43),
+		"soda_can":Vector2(0.96,0.45)
 	}
 	quad.size = sizes.get(kind,Vector2(0.86,0.40))
 	shadow.mesh = quad
@@ -105,9 +105,9 @@ func _build_contact_shadow(kind: String) -> void:
 	shader.code = CONTACT_SHADOW_SHADER
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	var tone := Color(0.035,0.024,0.018,0.24)
+	var tone := Color(0.035,0.024,0.018,0.34)
 	if kind in ["tin_can","soda_can","clear_bottle"]:
-		tone = Color(0.035,0.045,0.050,0.20)
+		tone = Color(0.035,0.045,0.050,0.28)
 	material.set_shader_parameter("shadow_color",tone)
 	material.render_priority = -2
 	shadow.material_override = material
@@ -273,7 +273,20 @@ func _build_bottle(profile: Dictionary) -> void:
 	liquid.material_override = liquid_mat
 	liquid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(liquid)
+	_add_ring(self,"BottleLiquidMeniscus",Vector3(0,0.584,0),0.277,0.010,Color(0.93,0.95,0.68),0.045,0.40)
 	_add_ring(self,"BottleBaseRing",Vector3(0,-0.655,0),0.322,0.020,body_color,0.040,0.18)
+	var punt := MeshInstance3D.new()
+	punt.name = "BottleBottomPunt"
+	var punt_mesh := SphereMesh.new()
+	punt_mesh.radius = 0.105
+	punt_mesh.height = 0.062
+	punt_mesh.radial_segments = 48
+	punt_mesh.rings = 12
+	punt.mesh = punt_mesh
+	punt.position = Vector3(0,-0.610,0)
+	punt.material_override = _glass_mat(body_color.lightened(0.10),0.20,0.025)
+	punt.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(punt)
 	_add_bottle_mouth_rim(body_color,neck_radius,source_alpha,roughness)
 	_add_market_green_cap(neck_radius)
 	_add_condensation_for_radius(0.334,-0.44,0.72)
@@ -293,6 +306,12 @@ func _molded_lid_material(color: Color) -> StandardMaterial3D:
 	material.albedo_color = color
 	material.roughness = 0.30
 	material.metallic_specular = 0.56
+	material.rim_enabled = true
+	material.rim = 0.34
+	material.rim_tint = 0.72
+	material.clearcoat_enabled = true
+	material.clearcoat = 0.48
+	material.clearcoat_roughness = 0.12
 	return material
 
 func _add_lid_layer(node_name: String, y: float, top_radius: float, bottom_radius: float, height: float, material: Material) -> void:

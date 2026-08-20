@@ -191,7 +191,7 @@ func set_phase(phase_name: String) -> void:
 		if phase_name == "ATTACHED":
 			visible = true
 		return
-	if phase_name in ["DETACHING","HELD"] and not (_phase_name in ["DETACHING","HELD"]):
+	if phase_name in ["DETACHING","HELD","SETTLING","RESOLVED"] and not (_phase_name in ["DETACHING","HELD","SETTLING","RESOLVED"]):
 		var front := get_front_position(1.0)
 		var direction := front-_last_grip
 		_held_direction = direction.normalized() if direction.length_squared()>0.000001 else Vector3.LEFT
@@ -199,27 +199,27 @@ func set_phase(phase_name: String) -> void:
 	if _phase_name == "ATTACHED":
 		visible = true
 		_detach_alpha = 0.0
-	elif _phase_name == "HELD":
+	elif _phase_name in ["HELD","SETTLING","RESOLVED"]:
 		_detach_alpha = 1.0
 
 func set_detach_alpha(alpha: float) -> void:
 	_detach_alpha = clampf(alpha if is_finite(alpha) else 0.0,0.0,1.0)
 
 func is_detached() -> bool:
-	return _phase_name == "HELD"
+	return _phase_name in ["HELD","SETTLING","RESOLVED"]
 
 func set_print_texture(texture: Texture2D) -> void:
 	_material.albedo_texture = texture
 
 func get_effective_grip(progress: float, desired_grip: Vector3) -> Vector3:
-	if _phase_name == "HELD":
+	if _phase_name in ["HELD","SETTLING","RESOLVED"]:
 		return desired_grip
 	return LabelGeometry.resolve_grip(progress,desired_grip,label_width,get_center_cup_radius(),label_y,surface_offset)
 
 func get_sample_points(progress: float, desired_grip: Vector3) -> PackedVector3Array:
 	var p := clampf(progress,0.0,1.0)
 	var center_radius := get_center_cup_radius()
-	if _phase_name == "HELD":
+	if _phase_name in ["HELD","SETTLING","RESOLVED"]:
 		return LabelGeometry.held_points(desired_grip,_held_direction,label_width,segments)
 	if _phase_name == "DETACHING":
 		var peeling := LabelGeometry.peeling_points(1.0,desired_grip,label_width,center_radius,label_y,surface_offset,segments)

@@ -59,7 +59,7 @@ func _run() -> void:
 		if not control_copy.contains(required):
 			_fail("approved HUD missing control affordance: %s" % required,scene); return
 	var how_to_copy := _collect_text(scene.get_node("HUD/HowToPanel")).to_upper()
-	for required in ["GRAB EDGE","PEEL GENTLY","INSPECT","CLEAN PEEL"]:
+	for required in ["GRAB EDGE","PEEL GENTLY","INSPECT","RUB RESIDUE"]:
 		if not how_to_copy.contains(required):
 			_fail("approved HUD missing interaction step: %s" % required,scene); return
 

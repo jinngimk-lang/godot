@@ -1,107 +1,93 @@
 # Peel Calm
 
-Peel Calm is a PC-first, touch-ready Godot relaxation game built around a repeatable café tactile ritual: peel a production label, linger after the release, optionally squeeze/crumple the cup, then move to the next tactile object when you feel ready.
+Peel Calm is a PC-first, touch-ready Godot 4.7.1 tactile/ASMR game about peeling real-time paper labels from everyday containers, inspecting the adhesive imprint, and rubbing the remaining glue and fibers clean with the mouse.
 
-The current V5 candidate deliberately avoids timers, failure pressure and score-chasing. The goal is a comfortable loop that can be repeated for many minutes while cup, label and adhesive feel gradually vary.
-
-## Engine
-
-- Godot **4.7.1 stable**
-- GDScript
-- No required third-party Godot plugins
-- No runtime AI service, private secret, Blender install, or external asset download required
+The current approved presentation is object-only. The product remains the visual authority; there are no rendered hands or arms and no still-image/video layer pretending to be gameplay.
 
 ## Run locally
 
-1. Clone this repository or use **Download ZIP** on GitHub.
-2. Open Godot 4.7.1 Project Manager.
-3. Import/select the repository's `project.godot`.
-4. Press **F5** (or the Run Project button).
+1. Install Godot **4.7.1 stable**.
+2. Clone the repository or download its ZIP.
+3. Import `project.godot` in Godot Project Manager.
+4. Press **F5**.
 
-The repository is the complete runnable project. A fresh clone/ZIP is intended to run without manual path repair.
+No third-party Godot plugin, runtime AI service, private secret, Blender installation, or external asset download is required to play.
 
-## The V5 relaxation ritual
+## Current playable loop
 
-1. Move the pointer to the small warm/gold peel-edge dot.
-2. Hold the **left mouse button** and pull gently away from the cup.
-3. Pull tension must overcome the current label's adhesive resistance before the peel advances. Releasing early preserves peel progress; re-grab the current gold edge to continue.
-4. At 100%, the final adhesive bond releases through the existing short `DETACHING -> HELD` transition. The printed order remains on the free label in the right hand.
-5. The game does **not** automatically replace the cup. After a short calm settle, the cup becomes squeeze-ready and can remain there indefinitely.
-6. To crumple it, make a fresh press and drag inward toward the cup center. Several deliberate squeezes accumulate bounded deformation and paper-crumple Foley. You may linger, squeeze again, or skip the crumple entirely.
-7. Press **R** whenever you want the next cup. A new item never arrives because a countdown expired.
-
-The crumple phase is optional sensory play, not a pass/fail requirement. Completing the label release earns the ritual progression; extra cup squeezing provides descriptive/visual/audio feedback without becoming a second score-farming event.
+1. Move the small hand cursor to the raised label corner.
+2. Hold **LMB** and apply outward movement. The paper loads against the adhesive before the initial breakaway.
+3. Continue pulling. Progress only comes from new outward pointer work; holding still cannot create free peel progress.
+4. At 100%, the complete paper sheet curls, holds briefly, and settles away from the hero product.
+5. The HUD switches from `Peel Progress` to `Residue Clean`. Hold **LMB** over the old label footprint and rub back and forth.
+6. Adhesive traces and torn fibers fade as the residue-cleaning pass advances.
+7. At 100% clean, Continue unlocks and the next product can be selected.
 
 ## Controls
 
-- **Esc** — pause / resume. Pause freezes the current ritual phase.
-- **R while peeling** — reset only the current label; run progression is preserved.
-- **R after a clean release** — move deliberately to the next unlocked tactile cup. This also works during the short settle, so the calm beat is never a forced lockout.
-- **Shift+R** — restart the whole run, including Ritual count, unlocks and any pending cup deformation.
-- Close the game window normally when finished.
+- **LMB drag** — peel label; after release, rub residue clean.
+- **RMB drag** — rotate/inspect the product.
+- **Mouse wheel** — zoom.
+- **R** — reset the current scene and interaction.
+- **1 / 2 / 3 / 4 / 5** — switch directly between showcase scenes.
+- **Esc** — pause/resume.
 
-Mouse is the current primary control. The input boundary also accepts touch event shapes. Mobile export and phone haptics remain deferred until the PC tactile experience is validated.
+Held input is quarantined across pause, reset, detach, cleanup completion, and scene changes. A fresh press is required after each boundary.
 
-## Soft tactile progression
+## Five showcase scenes
 
-The primary HUD now emphasizes **Rituals** and **Tactile set** rather than public Score/Feels counters. There is no timer bonus, combo break, failed peel rank or punishment for slow re-grabs.
+1. **Coffee Shop** — kraft takeaway cup, molded black lid, thermal order label, warm café window.
+2. **Jar** — glass food jar, sauce volume and meniscus, rustic paper, warm pantry/kitchen mood.
+3. **Tin Can** — manufactured metal body and chimes, grocery wrap, cooler merchandising environment.
+4. **Supermarket** — clear bottle, liquid volume and punt, coated commercial label, refrigerated retail lighting.
+5. **Can** — aluminum beverage can, shoulder/top details, thin compliant wrap, convenience/drink-display mood.
 
-The run begins with one profile and unlocks two more through completed label-release rituals:
+Each scene has its own product silhouette, material response, environment plate, lighting profile, label dimensions, adhesive parameters, bend stiffness, backing thickness, and residue behavior.
 
-- **Warm Paper** — balanced adhesive, medium label and a softer paper-cup squeeze; available immediately.
-- **Silky Long** — longer label, lighter adhesive and a more yielding cup; unlocks after **2 Rituals**.
-- **Crisp Seal** — shorter label, firmer adhesive catch and a stiffer/crisper cup; unlocks after **5 Rituals**.
+## Current implementation baseline
 
-These are not text-only variants. The profiles carry different peel resistance/release response, label size, cup dimensions, cup color and crumple rigidity/compression behavior.
-
-Every profile also has an explicit `contents_profile`. The current V5 runtime uses `type = "none"`; this is an architectural extension point for later cold/clear cups with ice, clink/rattle Foley and content motion. Visible ice simulation is **not** part of the current build yet.
-
-## V5 tactile presentation baseline
-
-- **True detach:** the label fully leaves the cup instead of stretching into an infinite ribbon.
-- **Tapered cup contact:** attached label positions and surface normals follow the real tapered paper cup; detached/free portions no longer depend on the cup surface.
-- **Print stays on the paper:** order/drink graphics leave the cup with the label.
-- **Safer authored hands:** normal runtime uses repository-local rigged CC0 hand GLBs. The dynamic hand now stays inside verified pinch-pose families (`Pinch Up` -> `Pinch Tight`) instead of switching from a fully open pose; the support hand uses a neutral authored pose instead of the earlier over-curled cup pose. Procedural five-finger geometry remains fallback-only.
-- **Support-hand crumple staging:** cup deformation moves the existing support-hand root a small bounded amount toward the cup center while leaving its authored skeleton/pose untouched; next cup/reset returns the exact baseline position.
-- **Bounded cup crumple:** a deterministic paper-cup model requires several intentional inward squeezes, accumulates deformation without springing fully back, keeps dimensions finite and follows cup shortening with the lid.
-- **Visible generated shell:** crumple rendering uses a continuous repository-local `ArrayMesh`; front-face winding, deformation bounds and reset behavior are permanent CI contracts.
-- **Real Foley direction preserved:** repository-local CC0-derived adhesive/paper WAVs still drive peeling. Real inward cup deformation reuses the audited paper-flex Foley at a lower/softer character; stationary holds do not retrigger it.
-- **Café presentation:** warm background/light, paper-cup seam/base/lip details and compact continuous forearms remain presentation-only layers.
-
-Hand-model provenance and license material are stored under `assets/models/hands/`. Audio source/license provenance is recorded in `assets/audio/ATTRIBUTION.md`.
+- Large centered real-time hero composition with compact left progress/controls, four-step right tutorial, and persistent five-scene rail.
+- One continuous high-density printed-paper mesh with localized upper-corner peel, bounded stretch, rounded hinge, opaque fibrous backing, and visible thickness.
+- Paper material with coarse/fine fiber breakup, pore normal response, high roughness, and scene-specific backing/adhesive colors.
+- Lifecycle: `ATTACHED -> PEELING -> DETACHING -> HELD -> SETTLING -> RESOLVED -> RUB_RESIDUE -> CLEAN -> NEXT_READY`.
+- Deterministic post-peel rubbing model: pressed movement inside the residue footprint advances cleaning, reversal motion receives tactile weighting, hovering/holding still/outside motion does not clean.
+- Persistent irregular glue streaks and paper islands that remain on the vessel after peel and disappear only through the cleaning pass.
+- Repository-local peel Foley and hand-shaped software cursor.
 
 ## Verification
 
-GitHub Actions uses the official Godot 4.7.1 Linux x86_64 release and verifies its checksum. The canonical gate covers:
+The canonical `Godot Check` workflow uses the official Godot 4.7.1 Linux build and verifies:
 
-- fresh headless import plus parser/load guard;
-- the configured **default F5/project entrypoint**, not only test-script scene overrides;
-- deterministic peel/input/score-compatibility/lifecycle/geometry/hand/Foley tests;
-- deterministic `RitualFlow` state transitions, including no timer-driven next item and stale skip-vs-crumple reward rejection;
-- deterministic `CupCrumpleModel` ownership, inward-direction, bounded progress/compression and exact-once crumple event tests;
-- real tapered-label position + normal smoke;
-- café / paper-cup structural presentation smoke;
-- generated cup-crumple shell visibility, clockwise front faces, bounded waist deformation, lid-follow and reset smoke;
-- compact forearm presentation smoke;
-- real ritual-loop smoke covering peel completion -> pointer quarantine -> optional crumple -> crumple Foley -> calm HUD -> deliberate R next;
-- repeated five-Ritual unlock progression with no automatic elapsed-time transition;
-- pause isolation and reset/restart input quarantine.
+- fresh import and script parse/load;
+- configured default F5 entrypoint;
+- deterministic peel, input, lifecycle, paper, material, residue, and scrub tests;
+- real object-only grab → load → peel → settle → rub → clean → next-scene flow;
+- all five product/environment bundles;
+- pause/reset input isolation;
+- attached, peel, release, settle, dirty residue, partial scrub, and clean captures for every scene.
 
-Visible V5 changes were additionally exercised through real 1280x720 X11/OpenGL capture branches. The first crumple render was rejected because triangle winding hid the front of the cup; that defect became a permanent regression test before the candidate continued. The combined candidate was also visually checked with the independently reviewed safer hand poses and support-hand staging.
+Automation proves deterministic behavior and machine-observable rendering contracts. It cannot prove that resistance, rubbing duration, Foley balance, or visual taste feels ideal to the owner; those remain local playtest gates.
 
-A green CI run proves project/script/resource contracts and machine-observable behavior. It does **not** prove that the squeeze resistance feels ideal, that the hand anatomy is natural enough on your display, that the paper deformation is visually perfect, that Foley balance is relaxing on your headphones, or that the loop stays comfortable over a long session. Those remain owner playtest gates.
+## Repository guidance for agents
 
-## Current boundary and next sensory extensions
+Every new local or cloud agent must start with:
 
-The current playable loop is **peel -> linger -> optional cup crumple -> deliberate next cup**.
+1. `.agents/PROJECT_NORTH_STAR.md`
+2. `.agents/PROJECT_KNOWLEDGE.md`
+3. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
+4. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
+5. current `main`, tests, workflow results, and newest runtime captures
 
-Prepared but intentionally not claimed as implemented yet:
+Historical hand/forearm/crumple documents and tests are not authority for the current object-only direction.
 
-- clear/cold plastic cup shells;
-- visible ice pieces and clink/rattle response;
-- cup contents motion;
-- lid removal/drinking;
-- full soft-body destruction;
-- shop/currency/meta-pressure systems.
+## Next direction
 
-Future content should add new sensory experiences without turning Peel Calm into a failure-driven or score-grinding game.
+Future work should improve the current loop without replacing or regressing it:
+
+1. Owner playtest and tune breakaway force, per-substrate drag distance, scrub duration, and cursor feedback.
+2. Add spatial/local cleaning so the exact rubbed area clears first, with restrained glue-roll/paper-crumb feedback and matching Foley.
+3. Continue product realism: higher-quality silhouettes, glass/metal edge response, contact shadows, paper microdetail, and better backdrop/live-surface integration.
+4. Improve tear-edge variation and release curl while preserving printed-copy readability and bounded paper stretch.
+5. Add settings/accessibility and touch-device validation only after the PC mouse loop is stable.
+
+Do not reintroduce visible hands/arms, fake full-screen gameplay playback, timer pressure, or score grinding without explicit owner direction.
