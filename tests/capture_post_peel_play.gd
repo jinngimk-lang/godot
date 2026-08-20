@@ -3,6 +3,8 @@ extends SceneTree
 const OUTPUT_DIR := "res://artifacts/reference_frames"
 const CASES := [
 	{"index":0,"name":"coffee_play","kind":"paper_cup","mode":"squeeze"},
+	{"index":1,"name":"jar_play","kind":"sauce_jar","mode":"shake"},
+	{"index":2,"name":"tin_play","kind":"tin_can","mode":"squeeze_shake"},
 	{"index":3,"name":"market_play","kind":"clear_bottle","mode":"shake"},
 	{"index":4,"name":"can_play","kind":"soda_can","mode":"squeeze_shake"}
 ]
@@ -105,8 +107,9 @@ func _assert_play_state(scene: Node, play: PostPeelObjectPlayPresentation, captu
 	if mode.contains("shake") and absf(model.get_shake_angle()) < 0.004:
 		push_error("POST_PLAY_CAPTURE_RED: %s has no visible shake" % String(capture_case["name"]))
 		quit(1); return false
-	if String(capture_case["kind"]) == "clear_bottle" and absf(model.get_liquid_tilt()) < 0.004:
-		push_error("POST_PLAY_CAPTURE_RED: Yuzu shake lost liquid inertia")
+	var kind := String(capture_case["kind"])
+	if kind in ["clear_bottle","sauce_jar"] and absf(model.get_liquid_tilt()) < 0.004:
+		push_error("POST_PLAY_CAPTURE_RED: %s shake lost contents inertia" % kind)
 		quit(1); return false
 	var prompt := scene.get_node_or_null("HUD/PostPeelObjectPlayHint") as Label
 	if prompt == null or not prompt.visible or not prompt.text.contains("LMB drag"):
