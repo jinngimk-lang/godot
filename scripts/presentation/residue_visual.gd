@@ -98,10 +98,6 @@ func _recompute_semantics() -> void:
 	if _substrate == "coated_citrus":
 		_fiber_strength = 0.0
 		return
-	# Small residue values still mean adhesive transfer, not a second paper label.
-	# Gate the dry backing islands behind combined residue + integrity damage so
-	# normal completed peels expose the bare container while truly torn peels can
-	# still leave broad fibrous pieces.
 	var damage_score := _residue_amount*0.45+(1.0-_integrity)*0.75
 	const FIBER_DAMAGE_GATE := 0.24
 	if damage_score <= FIBER_DAMAGE_GATE:
@@ -117,6 +113,17 @@ func get_adhesive_trace_amount() -> float:
 
 func get_fiber_strength() -> float:
 	return _fiber_strength
+
+func get_trace_mode() -> String:
+	if _progress >= 0.985:
+		if _fiber_strength > 0.02:
+			return "damaged_fibers"
+		if _substrate == "coated_citrus":
+			return "completion_haze"
+		return "completion_streaks"
+	if _fiber_strength > 0.02:
+		return "damaged_fibers"
+	return "peel_contact"
 
 func has_adhesive_trace() -> bool:
 	return _adhesive_trace_amount > 0.02 and _progress > 0.002 and _immediate.get_surface_count() >= 1
@@ -170,9 +177,13 @@ func _rebuild() -> void:
 	if _adhesive_trace_amount <= 0.02 or _progress <= 0.002:
 		return
 	_ensure_materials()
-
+	var mode := get_trace_mode()
 	var adhesive_alpha: float
-	if _substrate == "coated_citrus":
+	if mode == "completion_haze":
+		adhesive_alpha = clampf(0.07+_adhesive_trace_amount*0.38+_residue_amount*0.05,0.07,0.22)
+	elif mode == "completion_streaks":
+		adhesive_alpha = clampf(0.09+_adhesive_trace_amount*0.44+_residue_amount*0.06,0.09,0.27)
+	elif _substrate == "coated_citrus":
 		adhesive_alpha = clampf(0.085+_adhesive_trace_amount*0.48+_residue_amount*0.08,0.08,0.30)
 	else:
 		adhesive_alpha = clampf(0.16+_adhesive_trace_amount*0.78+_residue_amount*0.14,0.16,0.62)
@@ -182,9 +193,32 @@ func _rebuild() -> void:
 	var readable_fiber := _fiber_tint.lerp(Color.WHITE,white_mix)
 	_fiber_material.albedo_color = Color(readable_fiber.r,readable_fiber.g,readable_fiber.b,fiber_alpha)
 
-	_draw_adhesive_layer()
+	if mode in ["completion_streaks","completion_haze"]:
+		_draw_completion_marks(mode)
+	else:
+		_draw_adhesive_layer()
 	if _fiber_strength > 0.02:
 		_draw_fiber_layer()
+
+func _draw_completion_marks(mode: String) -> void:
+	var count := 10 if mode == "completion_haze" else 8
+	var width_scale := 0.020 if mode == "completion_haze" else 0.028
+	var height_scale := 0.0045 if mode == "completion_haze" else 0.0075
+	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
+	for i in range(count):
+		# Sparse deterministic marks: separated in U and vertically staggered so
+		# completion never redraws a label-width grid over the bare product.
+		if _signal(i,211) > (0.76 if mode == "completion_haze" else 0.84):
+			continue
+		var center_u := (float(i)+0.42+0.16*_signal(i,223))/float(count)
+		var half_u := width_scale*(0.62+0.58*_signal(i,227))
+		var u0 := clampf(center_u-half_u,0.0,1.0)
+		var u1 := clampf(center_u+half_u,0.0,1.0)
+		var y_center := _label_y+(0.5-_signal(i,229))*_label_height*(0.24 if mode == "completion_haze" else 0.32)
+		var half_y := _label_height*height_scale*(0.75+0.65*_signal(i,233))
+		var tilt_y := (0.5-_signal(i,239))*_label_height*0.018
+		_emit_patch(u0,u1,y_center+half_y,y_center-half_y,y_center+tilt_y+half_y*0.82,y_center+tilt_y-half_y*0.82,0.0158)
+	_immediate.surface_end()
 
 func _draw_adhesive_layer() -> void:
 	var segments := 40
