@@ -14,6 +14,9 @@ var _product: ProductPresentation
 func _ready() -> void:
 	call_deferred("_bind")
 
+func _exit_tree() -> void:
+	release_preview_resources()
+
 func _process(_delta: float) -> void:
 	if _product == null:
 		_bind()
@@ -44,8 +47,7 @@ func get_visual_contract() -> Dictionary:
 
 func build_preview_for_kind(kind: String) -> void:
 	_active_kind = kind
-	for child in get_children():
-		child.free()
+	release_preview_resources()
 	if kind != "clear_bottle":
 		return
 	_build_liquid_hero()
@@ -54,6 +56,17 @@ func build_preview_for_kind(kind: String) -> void:
 	_build_highlight("BottleHighlightLeft",-0.222,0.27,0.92,HIGHLIGHT_ALPHA)
 	_build_highlight("BottleHighlightRight",0.235,0.20,0.70,HIGHLIGHT_ALPHA*0.52)
 	_tune_base_bottle()
+
+func release_preview_resources() -> void:
+	# The Yuzu hero uses runtime-created meshes/materials. Clear those resource
+	# references before freeing their nodes so GL compatibility cannot keep the
+	# final ArrayMesh/material alive through process shutdown or a scene switch.
+	for child in get_children():
+		if child is MeshInstance3D:
+			var visual := child as MeshInstance3D
+			visual.material_override = null
+			visual.mesh = null
+		child.free()
 
 func _bind() -> void:
 	var root := get_parent()
