@@ -24,7 +24,7 @@ func _run() -> void:
 		scene.set_process(true)
 		scene.call("debug_select_variant",int(capture_case["index"]))
 		await _settle_frames(7)
-		if not _stage_resolved(scene): return
+		if not await _stage_resolved(scene): return
 		var play := scene.get_node_or_null("PostPeelObjectPlayPresentation") as PostPeelObjectPlayPresentation
 		if play == null:
 			push_error("POST_PLAY_CAPTURE_RED: runtime play presentation missing")
