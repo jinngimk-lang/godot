@@ -8,6 +8,7 @@ var _progress_copy: Label
 var _progress_bar: ProgressBar
 var _controls_copy: Label
 var _how_to_copy: Label
+var _last_object_play := false
 
 func _process(_delta: float) -> void:
 	var root := get_parent()
@@ -19,7 +20,22 @@ func _process(_delta: float) -> void:
 		return
 	if not _applied:
 		_build_ui(layer,legacy)
-	_refresh_status(root,legacy.text)
+	var object_play := _is_object_play(root)
+	if object_play != _last_object_play:
+		_last_object_play = object_play
+		_apply_mode_copy(object_play)
+	_refresh_status(root,legacy.text,object_play)
+
+func copy_for_mode(object_play: bool) -> Dictionary:
+	if object_play:
+		return {
+			"controls":"LMB     Squeeze / Shake\n\nRMB     Rotate / Inspect\n\nWheel   Zoom\n\nR       Reset\n\n1 2 3 4 5   Change Scene\n\nEsc     Pause / Menu",
+			"how_to":"OBJECT PLAY\n\n1   SQUEEZE\nPress LMB and drag slowly. Paper cups and aluminum cans flex; glass stays rigid.\n\n2   SHAKE\nUse short alternating swipes. Bottles and jars carry a damped liquid-lag response.\n\n3   INSPECT\nRMB drag to rotate the bare product. Use Wheel to inspect residue and material detail.\n\n4   CONTINUE\nPlay as long as you like, then Continue to the next object."
+		}
+	return {
+		"controls":"LMB     Peel\n\nRMB     Rotate\n\nWheel   Zoom\n\nR       Reset\n\n1 2 3 4 5   Change Scene\n\nEsc     Pause / Menu",
+		"how_to":"HOW TO PLAY\n\n1   GRAB EDGE\nMove the cursor to a corner or edge of the label.\n\n2   PEEL GENTLY\nClick and drag slowly. The real label follows the cursor.\n\n3   INSPECT\nRMB drag to rotate. Use Wheel to zoom and inspect residue.\n\n4   CLEAN PEEL\nRemove the label with minimal residue and tearing."
+	}
 
 func _build_ui(layer: CanvasLayer, legacy: Label) -> void:
 	legacy.visible = false
@@ -45,18 +61,28 @@ func _build_ui(layer: CanvasLayer, legacy: Label) -> void:
 	var controls_panel := _panel("ControlsPanel",Vector2(24,158),Vector2(268,278))
 	layer.add_child(controls_panel)
 	_controls_copy = _label("ControlsCopy",Vector2(16,14),Vector2(236,248),16)
-	_controls_copy.text = "LMB     Peel\n\nRMB     Rotate\n\nWheel   Zoom\n\nR       Reset\n\n1 2 3 4 5   Change Scene\n\nEsc     Pause / Menu"
 	controls_panel.add_child(_controls_copy)
 
 	var how_to_panel := _panel("HowToPanel",Vector2(982,22),Vector2(274,520))
 	layer.add_child(how_to_panel)
 	_how_to_copy = _label("HowToCopy",Vector2(16,14),Vector2(242,490),15)
-	_how_to_copy.text = "HOW TO PLAY\n\n1   GRAB EDGE\nMove the cursor to a corner or edge of the label.\n\n2   PEEL GENTLY\nClick and drag slowly. The real label follows the cursor.\n\n3   INSPECT\nRMB drag to rotate. Use Wheel to zoom and inspect residue.\n\n4   CLEAN PEEL\nRemove the label with minimal residue and tearing."
 	_how_to_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	how_to_panel.add_child(_how_to_copy)
 	_applied = true
+	_apply_mode_copy(false)
 
-func _refresh_status(root: Node, fallback_text: String) -> void:
+func _apply_mode_copy(object_play: bool) -> void:
+	var copy := copy_for_mode(object_play)
+	if _controls_copy != null:
+		_controls_copy.text = String(copy.get("controls",""))
+	if _how_to_copy != null:
+		_how_to_copy.text = String(copy.get("how_to",""))
+
+func _is_object_play(root: Node) -> bool:
+	var lifecycle = root.get("_lifecycle")
+	return lifecycle != null and lifecycle.has_method("is_resolved") and bool(lifecycle.call("is_resolved"))
+
+func _refresh_status(root: Node, fallback_text: String, object_play: bool = false) -> void:
 	if _progress_copy == null:
 		return
 	var session = root.get("_session")
@@ -73,9 +99,11 @@ func _refresh_status(root: Node, fallback_text: String) -> void:
 	else:
 		progress = _parse_legacy_progress(fallback_text)
 	var percent := int(round(progress*100.0))
-	_progress_copy.text = "SCENE: %s\n%s" % [scene_name,"PAUSED" if paused else "Peel Progress %d%%" % percent]
+	var status := "PAUSED" if paused else ("LABEL REMOVED • OBJECT PLAY" if object_play else "Peel Progress %d%%" % percent)
+	_progress_copy.text = "SCENE: %s\n%s" % [scene_name,status]
 	if _progress_bar != null:
 		_progress_bar.value = float(percent)
+		_progress_bar.modulate.a = 0.42 if object_play else 1.0
 
 func _parse_legacy_progress(text: String) -> float:
 	var marker := "Peel "
