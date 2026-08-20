@@ -9,9 +9,27 @@ const LIQUID_ALPHA := 1.0
 const LIQUID_TOP_Y := 0.72
 const TARGET_FOCUS_Y := 0.42
 const LATHE_SEGMENTS := 96
+const CLEAR_EDGE_SHADER := """shader_type spatial;
+render_mode blend_mix, cull_disabled, depth_draw_never;
+uniform vec4 edge_color : source_color = vec4(0.985, 1.0, 1.0, 1.0);
+uniform float edge_alpha = 0.19;
+uniform float fresnel_power = 4.25;
+void fragment() {
+	float facing = abs(dot(normalize(NORMAL), normalize(VIEW)));
+	float grazing = clamp(1.0 - facing, 0.0, 1.0);
+	float fresnel = pow(grazing, fresnel_power);
+	ALBEDO = edge_color.rgb;
+	ALPHA = edge_alpha * fresnel;
+	ROUGHNESS = mix(0.065, 0.018, fresnel);
+	SPECULAR = 0.96;
+	CLEARCOAT = 0.96;
+	CLEARCOAT_ROUGHNESS = 0.035;
+}
+"""
 
 var _active_kind := ""
 var _product: ProductPresentation
+var _clear_edge_material: ShaderMaterial
 
 func _ready() -> void:
 	call_deferred("_bind")
@@ -41,6 +59,7 @@ func get_visual_contract() -> Dictionary:
 		"outer_glass_alpha":OUTER_GLASS_ALPHA,
 		"edge_alpha":EDGE_ALPHA,
 		"fresnel_power":FRESNEL_POWER,
+		"orientation_safe_fresnel":true,
 		"liquid_alpha":LIQUID_ALPHA,
 		"liquid_top_y":LIQUID_TOP_Y,
 		"liquid_shape":"shouldered",
@@ -65,6 +84,11 @@ func release_preview_resources() -> void:
 	# The Yuzu hero uses runtime-created meshes/materials. Clear those resource
 	# references before freeing their nodes so GL compatibility cannot keep the
 	# final ArrayMesh/material alive through process shutdown or a scene switch.
+	if is_instance_valid(_product) and _clear_edge_material != null:
+		var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
+		if edge != null and edge.material_override == _clear_edge_material:
+			edge.material_override = null
+	_clear_edge_material = null
 	for child in get_children():
 		if child is MeshInstance3D:
 			var visual := child as MeshInstance3D
@@ -93,16 +117,10 @@ func _tune_base_bottle() -> void:
 	if old_liquid != null:
 		old_liquid.visible = false
 	var edge := _product.get_node_or_null("BottleEdgeFresnel") as MeshInstance3D
-	if edge != null and edge.material_override is ShaderMaterial:
+	if edge != null:
 		edge.visible = true
 		edge.scale = Vector3.ONE*1.0015
-		var edge_material := edge.material_override as ShaderMaterial
-		# Direct Yuzu target is optically clear through the center. Keep the glass
-		# legible only at grazing angles and let the two dedicated highlight strips
-		# carry the frontal specular cues instead of filling the neck with cyan.
-		edge_material.set_shader_parameter("edge_color",Color(0.985,1.0,1.0,1.0))
-		edge_material.set_shader_parameter("edge_alpha",EDGE_ALPHA)
-		edge_material.set_shader_parameter("fresnel_power",FRESNEL_POWER)
+		_ensure_clear_edge_material(edge)
 	var base_ring := _product.get_node_or_null("BottleBaseRing") as MeshInstance3D
 	if base_ring != null:
 		base_ring.visible = true
@@ -110,6 +128,20 @@ func _tune_base_bottle() -> void:
 			var ring_material := base_ring.material_override as StandardMaterial3D
 			ring_material.albedo_color = Color(0.96,0.99,1.0,0.18)
 			ring_material.roughness = 0.04
+
+func _ensure_clear_edge_material(edge: MeshInstance3D) -> void:
+	if _clear_edge_material == null:
+		var shader := Shader.new()
+		shader.code = CLEAR_EDGE_SHADER
+		_clear_edge_material = ShaderMaterial.new()
+		_clear_edge_material.resource_name = "YuzuOrientationSafeGlassEdge"
+		_clear_edge_material.shader = shader
+		_clear_edge_material.render_priority = 1
+		_clear_edge_material.set_shader_parameter("edge_color",Color(0.985,1.0,1.0,1.0))
+		_clear_edge_material.set_shader_parameter("edge_alpha",EDGE_ALPHA)
+		_clear_edge_material.set_shader_parameter("fresnel_power",FRESNEL_POWER)
+	if edge.material_override != _clear_edge_material:
+		edge.material_override = _clear_edge_material
 
 func _build_liquid_hero() -> void:
 	var liquid := MeshInstance3D.new()
