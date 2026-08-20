@@ -145,13 +145,22 @@ jobs:
             test -s "artifacts/reference_frames/${name}.png"
           done
           grep -Fq 'PASS: captured five paper-release triplets' godot-capture.log
-          # Godot/llvmpipe can emit a late renderer-owned `resources still in use
-          # at exit` diagnostic after the scene was synchronously freed and all
-          # required frames were saved. Keep that diagnostic visible in logs but
-          # do not confuse it with a gameplay/script/capture failure. Any other
-          # ERROR remains fatal.
           if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-capture.log | grep -v -F 'resources still in use at exit'; then
             echo "Godot emitted a real error while capturing object-only reference frames."
+            exit 1
+          fi
+
+      - name: Capture resolved object-play states
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a ./godot --audio-driver Dummy --path . --rendering-method gl_compatibility --script res://tests/capture_post_peel_play.gd 2>&1 | tee godot-post-play-capture.log
+          for name in coffee_play market_play can_play; do
+            test -s "artifacts/reference_frames/${name}.png"
+          done
+          grep -Fq 'PASS: captured resolved object-play states' godot-post-play-capture.log
+          if grep -E "(^|[[:space:]])(SCRIPT )?ERROR:" godot-post-play-capture.log | grep -v -F 'resources still in use at exit'; then
+            echo "Godot emitted a real error while capturing post-peel object play."
             exit 1
           fi
 
