@@ -136,9 +136,13 @@ func _apply_liquid_lag(tilt: float) -> void:
 		if liquid != null:
 			liquid.rotation.z = tilt
 	if _hero_detail != null:
-		for child in _hero_detail.get_children():
-			if child is Node3D and (String(child.name).contains("Sauce") or String(child.name).contains("Liquid")):
-				(child as Node3D).rotation.z = tilt
+		_apply_liquid_lag_recursive(_hero_detail,tilt)
+
+func _apply_liquid_lag_recursive(node: Node, tilt: float) -> void:
+	for child in node.get_children():
+		if child is Node3D and (String(child.name).contains("Sauce") or String(child.name).contains("Liquid")):
+			(child as Node3D).rotation.z = tilt
+		_apply_liquid_lag_recursive(child,tilt)
 
 func _ensure_prompt() -> void:
 	if _prompt != null or _lab == null:
@@ -148,13 +152,13 @@ func _ensure_prompt() -> void:
 		return
 	_prompt = Label.new()
 	_prompt.name = "PostPeelObjectPlayHint"
-	_prompt.position = Vector2(350,520)
-	_prompt.size = Vector2(580,54)
+	_prompt.position = Vector2(405,552)
+	_prompt.size = Vector2(470,34)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_prompt.add_theme_font_size_override("font_size",16)
-	_prompt.add_theme_color_override("font_color",Color(0.97,0.94,0.86,0.96))
-	_prompt.add_theme_color_override("font_shadow_color",Color(0,0,0,0.72))
+	_prompt.add_theme_font_size_override("font_size",13)
+	_prompt.add_theme_color_override("font_color",Color(1.0,0.82,0.40,0.96))
+	_prompt.add_theme_color_override("font_shadow_color",Color(0,0,0,0.82))
 	_prompt.add_theme_constant_override("shadow_offset_x",2)
 	_prompt.add_theme_constant_override("shadow_offset_y",2)
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -169,7 +173,13 @@ func _update_prompt(resolved: bool) -> void:
 	_prompt.visible = resolved and not _is_paused()
 	if not _prompt.visible:
 		return
-	_prompt.text = "%s  •  LMB drag: squeeze / shake  •  RMB: inspect  •  Continue" % _model.get_feedback_text()
+	var state := _model.get_feedback_text()
+	var verb := "PLAY"
+	if state.begins_with("SHAKING"):
+		verb = "SHAKE"
+	elif state.begins_with("SQUEEZE"):
+		verb = "SQUEEZE"
+	_prompt.text = "%s  •  LMB drag   RMB inspect   Continue" % verb
 
 func _exit_tree() -> void:
 	if _model != null:
