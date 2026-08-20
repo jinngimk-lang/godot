@@ -34,23 +34,34 @@ func run() -> Array[String]:
 	var tin: Dictionary = hero.call("material_contract_for_kind","tin_can")
 	if String(tin.get("finish","")) != "brushed_tin":
 		failures.append("HERO_TIN_RED: tin target needs a readable brushed-tin finish")
-	if float(tin.get("body_value",0.0)) < 0.86:
-		failures.append("HERO_MATERIAL_RED: tin body should stay bright silver in GL rendering")
-	if float(tin.get("metallic",1.0)) > 0.12:
+	if float(tin.get("body_value",0.0)) < 0.94:
+		failures.append("HERO_TIN_RED: tin body must be bright enough to read silver under the warm pantry lights")
+	if float(tin.get("metallic",1.0)) > 0.08:
 		failures.append("HERO_MATERIAL_RED: tin must not collapse into black metal without an HDR reflection probe")
+	if float(tin.get("roughness",1.0)) > 0.24:
+		failures.append("HERO_TIN_RED: brushed tin needs a sharper asymmetric highlight than grey cement")
 	if float(tin.get("rim_value",1.0)) > 0.90 or float(tin.get("rim_value",0.0)) < 0.70:
 		failures.append("HERO_TIN_RED: rolled seams should read as mid-silver metal, not white plastic hoops")
-	if int(tin.get("highlight_count",0)) < 2:
-		failures.append("HERO_TIN_RED: cylindrical tin needs at least two asymmetric reflection bands")
+	if int(tin.get("highlight_count",0)) < 3:
+		failures.append("HERO_TIN_RED: cylindrical tin needs at least three reflection bands")
+	if int(tin.get("brush_band_count",0)) < 5:
+		failures.append("HERO_TIN_RED: bare tin needs subtle circumferential manufacturing bands")
+
 	var can: Dictionary = hero.call("material_contract_for_kind","soda_can")
 	if String(can.get("finish","")) != "bare_aluminum":
 		failures.append("HERO_CAN_RED: target can is bare aluminum beneath the yellow paper label, not teal paint")
 	var body_color: Color = can.get("body_color",Color.BLACK)
 	var channel_span := maxf(body_color.r,maxf(body_color.g,body_color.b))-minf(body_color.r,minf(body_color.g,body_color.b))
-	if maxf(body_color.r,maxf(body_color.g,body_color.b)) < 0.78 or channel_span > 0.08:
-		failures.append("HERO_CAN_RED: bare aluminum body must stay bright and near-neutral in GL rendering")
-	if float(can.get("metallic",1.0)) > 0.24:
+	if minf(body_color.r,minf(body_color.g,body_color.b)) < 0.92 or channel_span > 0.04:
+		failures.append("HERO_CAN_RED: aluminum body must be bright near-neutral so warm/cool lights cannot turn it blue")
+	if float(can.get("metallic",1.0)) > 0.12:
 		failures.append("HERO_CAN_RED: aluminum body must remain readable without an HDR reflection probe")
+	if float(can.get("roughness",1.0)) > 0.19:
+		failures.append("HERO_CAN_RED: beverage can needs a crisp coated-aluminum highlight")
+	if int(can.get("highlight_count",0)) < 3:
+		failures.append("HERO_CAN_RED: can needs multiple neutral reflection strips to read metallic")
+	if not bool(can.get("top_structure",false)):
+		failures.append("HERO_CAN_RED: bare can needs visible top disk, rolled rim and pull-tab structure")
 	if not bool(can.get("condensation",false)):
 		failures.append("HERO_CAN_RED: cold beverage can target requires visible condensation")
 	hero.free()
