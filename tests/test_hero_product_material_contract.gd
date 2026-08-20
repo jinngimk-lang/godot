@@ -12,8 +12,25 @@ func run() -> Array[String]:
 	var jar: Dictionary = hero.call("material_contract_for_kind","sauce_jar")
 	if float(jar.get("glass_alpha",1.0)) > 0.08:
 		failures.append("HERO_MATERIAL_RED: jar glass should read clear, not milky")
-	if float(jar.get("fill_height_ratio",0.0)) < 0.80:
-		failures.append("HERO_MATERIAL_RED: jar target needs sauce visibly filling most of the vessel")
+	var fill_ratio := float(jar.get("fill_height_ratio",0.0))
+	if fill_ratio < 0.78 or fill_ratio > 0.88:
+		failures.append("HERO_JAR_RED: sauce should fill most of the jar while preserving visible headspace")
+	if float(jar.get("headspace_ratio",0.0)) < 0.08:
+		failures.append("HERO_JAR_RED: glass jar needs visible clear headspace above sauce")
+	if float(jar.get("sauce_radius_ratio",1.0)) > 0.90:
+		failures.append("HERO_JAR_RED: sauce volume must sit visibly inside the glass wall")
+	if float(jar.get("base_thickness",0.0)) < 0.020:
+		failures.append("HERO_JAR_RED: glass jar needs a readable thick base")
+	if int(jar.get("highlight_count",0)) < 2:
+		failures.append("HERO_JAR_RED: jar needs asymmetric glass reflection bands")
+	if String(jar.get("lid_finish","")) != "aged_metal":
+		failures.append("HERO_JAR_RED: jar lid must read as metal, not brown plastic")
+	if int(jar.get("lid_flute_count",0)) < 16:
+		failures.append("HERO_JAR_RED: metal twist lid needs fine vertical grip flutes")
+	var sauce_color: Color = jar.get("sauce_color",Color.BLACK)
+	if sauce_color.r < 0.48 or sauce_color.g > 0.10:
+		failures.append("HERO_JAR_RED: sauce should read warm tomato red rather than a black-red solid")
+
 	var tin: Dictionary = hero.call("material_contract_for_kind","tin_can")
 	if String(tin.get("finish","")) != "brushed_tin":
 		failures.append("HERO_TIN_RED: tin target needs a readable brushed-tin finish")
