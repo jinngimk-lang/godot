@@ -39,7 +39,7 @@ func material_contract_for_kind(kind: String) -> Dictionary:
 		"tin_can":
 			return {"body_value":0.90,"metallic":0.16,"roughness":0.24}
 		"soda_can":
-			return {"paint_color":Color(0.28,0.58,0.54),"metallic":0.14,"roughness":0.27}
+			return {"finish":"bare_aluminum","body_color":Color(0.89,0.90,0.91),"metallic":0.18,"roughness":0.20,"condensation":true}
 		_:
 			return {}
 
@@ -123,13 +123,14 @@ func _build_soda_can() -> void:
 		Vector2(0.54,0.402),Vector2(0.585,0.396),Vector2(0.625,0.378),
 		Vector2(0.660,0.344),Vector2(0.682,0.332)
 	]
-	_add_lathe("SodaHeroBody",body_profile,_metal_material(contract["paint_color"],float(contract["roughness"]),float(contract["metallic"])),true,true)
-	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.94,0.95,0.95),0.18,false,0.18)
+	_add_lathe("SodaHeroBody",body_profile,_metal_material(contract["body_color"],float(contract["roughness"]),float(contract["metallic"])),true,true)
+	_add_ring("SodaHeroTopRoll",0.690,0.365,0.026,Color(0.97,0.975,0.98),0.16,false,0.20)
 	_add_ring("SodaHeroBottomRoll",-0.705,0.378,0.030,Color(0.86,0.88,0.89),0.22,false,0.16)
-	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.91,0.92,0.93),0.22,0.18),112)
+	_add_cylinder("SodaHeroTopDisk",Vector3(0,0.699,0),0.332,0.332,0.008,_metal_material(Color(0.93,0.94,0.95),0.20,0.20),112)
 	_add_pull_tab()
 	_add_condensation(0.405,-0.50,0.54,34)
-	_add_vertical_specular("SodaPaintHighlight",-0.280,0.01,0.92,0.042,0.085)
+	_add_vertical_specular("SodaMetalHighlightLeft",-0.280,0.01,0.92,0.042,0.12)
+	_add_vertical_specular("SodaMetalHighlightRight",0.265,-0.02,0.74,0.025,0.055)
 
 func _add_pull_tab() -> void:
 	var tab := MeshInstance3D.new()
