@@ -32,6 +32,7 @@ func run() -> Array[String]:
 		else:
 			var cold: Dictionary = lighting.call("lighting_contract_for_venue","market_coldcase")
 			var can: Dictionary = lighting.call("lighting_contract_for_venue","market_can")
+			var tin: Dictionary = lighting.call("lighting_contract_for_venue","pantry_tin")
 			var cold_key: Color = cold.get("key_color",Color.WHITE)
 			var can_key: Color = can.get("key_color",Color.WHITE)
 			var can_fill: Color = can.get("fill_color",Color.WHITE)
@@ -45,6 +46,13 @@ func run() -> Array[String]:
 				failures.append("VENUE_LIGHT_RED: Can fill may be slightly cool but must not repaint aluminum cyan")
 			if can_ambient.b > can_ambient.r:
 				failures.append("VENUE_LIGHT_RED: Can ambient must stay warm-neutral and distinct from supermarket coldcase")
+			for pair in [{"name":"Tin","contract":tin},{"name":"Can","contract":can}]:
+				var contract: Dictionary = pair["contract"]
+				var rotation: Vector3 = contract.get("key_rotation",Vector3(-90,-90,0))
+				if rotation.x < -36.0 or rotation.x > -12.0 or absf(rotation.y) > 18.0:
+					failures.append("VENUE_LIGHT_RED: %s key must be front-biased product light, got %s" % [String(pair["name"]),rotation])
+				if float(contract.get("fill_energy",0.0)) < 0.85:
+					failures.append("VENUE_LIGHT_RED: %s needs enough camera-side fill to avoid a black metal front" % String(pair["name"]))
 		lighting.free()
 
 	var backdrop_path := "res://scripts/presentation/reference_backdrop.gd"
