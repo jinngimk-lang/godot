@@ -17,21 +17,23 @@ func run() -> Array[String]:
 		failures.append("COMPLETION_FLOW_RED: tray/status must stay out of the way before release")
 	if String(settling.get("stage","")) != "RELEASED" or not bool(settling.get("visible",false)):
 		failures.append("COMPLETION_FLOW_RED: fully released paper needs a brief visible acknowledgement")
-	if String(resolved.get("stage","")) != "COLLECTED" or not bool(resolved.get("visible",false)):
-		failures.append("COMPLETION_FLOW_RED: resolved paper needs an authored collected/disposed state")
+	if String(resolved.get("stage","")) != "COLLECTED":
+		failures.append("COMPLETION_FLOW_RED: resolved paper still needs an authored collected/disposed state")
+	if bool(resolved.get("visible",true)):
+		failures.append("COMPLETION_FOCUS_RED: once collected, the tray must clear so object play can showcase the bare product")
 	if not bool(resolved.get("allow_inspect",false)) or not bool(resolved.get("allow_continue",false)):
 		failures.append("COMPLETION_FLOW_RED: after disposal the player must be able to inspect residue or continue")
-	if float(resolved.get("hero_occlusion",1.0)) > 0.05:
-		failures.append("COMPLETION_FLOW_RED: collected label UI must not block the hero product")
+	if float(resolved.get("hero_occlusion",1.0)) > 0.01:
+		failures.append("COMPLETION_FLOW_RED: resolved UI must not block the hero product")
 	if not flow.has_method("layout_contract"):
 		failures.append("COMPLETION_FLOW_RED: completion tray needs deterministic non-overlap layout")
 	else:
 		var layout: Dictionary = flow.call("layout_contract")
 		if String(layout.get("region","")) != "lower_left":
-			failures.append("COMPLETION_FLOW_RED: completion tray should resolve in lower-left free rail, not overlap HOW TO PLAY")
+			failures.append("COMPLETION_FLOW_RED: transient completion tray should resolve in lower-left free rail")
 		if float(layout.get("right",1280.0)) > 390.0:
-			failures.append("COMPLETION_FLOW_RED: completion tray may not intrude into centered hero product")
+			failures.append("COMPLETION_FLOW_RED: transient completion tray may not intrude into centered hero product")
 		if float(layout.get("bottom",720.0)) > 640.0:
-			failures.append("COMPLETION_FLOW_RED: completion tray must stay above scene selector rail")
+			failures.append("COMPLETION_FLOW_RED: transient completion tray must stay above scene selector rail")
 	flow.free()
 	return failures
