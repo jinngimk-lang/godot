@@ -60,8 +60,17 @@ func _run() -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	scene.queue_free()
-	await process_frame
+	for _frame in range(5):
+		await process_frame
+	# Linux llvmpipe/Xvfb retires the final dynamic mesh and viewport texture a
+	# little later than the Windows renderer. Release script-held references and
+	# give the render server one calm beat before SceneTree shutdown so a fully
+	# successful 35-frame capture is not misreported as a resource leak.
+	scene = null
+	packed = null
 	await RenderingServer.frame_post_draw
+	await create_timer(0.08).timeout
+	await process_frame
 	print("PASS: captured five attached/peel/release/settle/resolved/scrub/clean lifecycle sets")
 	quit(0)
 
