@@ -24,6 +24,10 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_HERO_RED: glass needs readable edge/highlight breakup")
 		if float(contract.get("outer_glass_alpha",1.0)) > 0.055:
 			failures.append("BOTTLE_HERO_RED: target glass center must stay optically clear, not milky")
+		if float(contract.get("edge_alpha",1.0)) > 0.24:
+			failures.append("BOTTLE_GLASS_RED: Yuzu center must not be filled by a broad blue Fresnel shell")
+		if float(contract.get("fresnel_power",0.0)) < 3.5:
+			failures.append("BOTTLE_GLASS_RED: glass contour should be confined to grazing edges")
 		if float(contract.get("liquid_alpha",0.0)) < 0.42:
 			failures.append("BOTTLE_HERO_RED: pale Yuzu liquid must read separately through clear glass")
 		if float(contract.get("liquid_top_y",0.0)) < 0.68:
@@ -32,10 +36,6 @@ func run() -> Array[String]:
 			failures.append("BOTTLE_HERO_RED: Yuzu liquid needs a shouldered bottle-following volume, not a floating cylinder")
 		if float(contract.get("target_focus_y",0.0)) < 0.24:
 			failures.append("BOTTLE_HERO_RED: bottle framing should keep the crown cap inside the viewport")
-	# Dynamic ArrayMesh/material resources used by the target-shaped liquid must
-	# have an explicit teardown path before a scene switch or process exit. The
-	# full five-scene capture is the integration gate; this unit contract keeps
-	# the lifecycle requirement local and falsifiable.
 	if not polish.has_method("release_preview_resources"):
 		failures.append("BOTTLE_RESOURCE_RED: bottle hero needs explicit preview resource teardown")
 	else:
