@@ -53,6 +53,18 @@ func run() -> Array[String]:
 	if not String(guide.get_action_text()).to_lower().contains("peel"):
 		failures.append("GUIDE_RED: active scene state must retain peel guidance")
 
+	guide.set_state(4,"RESOLVED","inspect",1.0,true)
+	if rail.visible:
+		failures.append("GUIDE_FOCUS_RED: resolved object play must hide the five-scene rail so the bare product dominates")
+	if not continue_button.visible:
+		failures.append("GUIDE_FOCUS_RED: Continue must remain available while the rail is hidden")
+	if not String(guide.get_action_text()).to_upper().contains("OBJECT"):
+		failures.append("GUIDE_FOCUS_RED: resolved action copy must identify object play rather than another peel step")
+
+	guide.set_state(4,"PEEL","inspect",0.33,false)
+	if not rail.visible:
+		failures.append("GUIDE_FOCUS_RED: returning to peel state must restore scene rail")
+
 	var requested: Array[int] = [-1]
 	if not guide.has_signal("scene_requested"):
 		failures.append("GUIDE_RED: journey rail must expose scene_requested")
