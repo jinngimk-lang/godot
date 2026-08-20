@@ -9,6 +9,7 @@ const GOLD := Color(1.0,0.66,0.08,1.0)
 var _built := false
 var _active_scene_index := 0
 var _action_text := "PEEL THE LABEL"
+var _object_play_focus := false
 var _buttons: Array[Button] = []
 var _rail: Panel
 var _parent_connected := false
@@ -30,7 +31,10 @@ func set_state(scene_index: int, phase_name: String, _post_action: String, peel_
 	_active_scene_index = clampi(scene_index,0,SCENE_NAMES.size()-1)
 	var progress := clampf(peel_progress if is_finite(peel_progress) else 0.0,0.0,1.0)
 	var phase := phase_name.to_upper()
-	if detached or phase in ["DETACHING","HELD","PEEL_SETTLE","RITUAL_COMPLETE"]:
+	_object_play_focus = detached and phase in ["RESOLVED","COMPLETE","RITUAL_COMPLETE"]
+	if _object_play_focus:
+		_action_text = "OBJECT PLAY  •  SQUEEZE / SHAKE  •  INSPECT  •  CONTINUE"
+	elif detached or phase in ["DETACHING","HELD","PEEL_SETTLE","SETTLING"]:
 		_action_text = "LABEL OFF  •  INSPECT RESIDUE  •  CONTINUE"
 	elif progress>0.001:
 		_action_text = "PEEL THE LABEL  •  %d%%" % int(round(progress*100.0))
@@ -39,8 +43,6 @@ func set_state(scene_index: int, phase_name: String, _post_action: String, peel_
 	_apply_state_to_ui()
 
 func set_inspection_active(_active: bool) -> void:
-	# The owner-approved mockup keeps the scene rail visible while rotating and
-	# zooming; inspection is object motion, not a separate full-screen mode.
 	_apply_state_to_ui()
 
 func get_active_scene_index() -> int:
@@ -48,6 +50,9 @@ func get_active_scene_index() -> int:
 
 func get_action_text() -> String:
 	return _action_text
+
+func is_object_play_focus() -> bool:
+	return _object_play_focus
 
 func _pull_runtime_state() -> void:
 	var lab := get_parent()
@@ -64,6 +69,8 @@ func _pull_runtime_state() -> void:
 	var phase := String(lifecycle.get_phase_name()) if lifecycle != null and lifecycle.has_method("get_phase_name") else "PEEL"
 	var detached_value = lab.get("_detach_reward_recorded")
 	var detached := bool(detached_value) if detached_value != null else false
+	if lifecycle != null and lifecycle.has_method("is_resolved") and bool(lifecycle.call("is_resolved")):
+		detached = true
 	set_state(index,phase,String(variant.get("post_peel_action","inspect")),progress,detached)
 
 func _connect_parent_navigation() -> void:
@@ -152,9 +159,23 @@ func _apply_state_to_ui() -> void:
 	if not _built:
 		return
 	if _rail != null:
-		_rail.visible = true
+		_rail.visible = not _object_play_focus
 	for i in range(_buttons.size()):
 		_buttons[i].button_pressed = i == _active_scene_index
+	if _continue_button != null:
+		if _object_play_focus:
+			_continue_button.visible = true
+			_continue_button.offset_left = -72.0
+			_continue_button.offset_top = -72.0
+			_continue_button.offset_right = 72.0
+			_continue_button.offset_bottom = -30.0
+			_continue_button.add_theme_font_size_override("font_size",13)
+		else:
+			_continue_button.offset_left = 355.0
+			_continue_button.offset_top = -126.0
+			_continue_button.offset_right = 495.0
+			_continue_button.offset_bottom = -82.0
+			_continue_button.add_theme_font_size_override("font_size",11)
 
 func _panel_style(bg: Color, border: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
