@@ -58,6 +58,13 @@ func _ready() -> void:
 	_apply("cafe_window")
 	call_deferred("_mask_blockout_geometry")
 
+func _exit_tree() -> void:
+	# Backdrop profiles swap imported textures at runtime. Explicitly release the
+	# final Sprite3D texture before the renderer drains at shutdown; this avoids
+	# leaving the last Can/Tin plate referenced through the GL draw list.
+	texture = null
+	_active_id = ""
+
 func _process(_delta: float) -> void:
 	var venue := get_parent().get_node_or_null("VenuePresentation")
 	if venue == null or not venue.has_method("get_active_profile_id"):
