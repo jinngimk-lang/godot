@@ -20,10 +20,11 @@ Purpose: durable, low-noise record of public technical developments that may mat
 - Rendering/performance regressions affecting 1280×720 object-first presentation.
 - Accessibility/input changes that can improve PC mouse interaction without weakening deterministic gesture ownership.
 - Maintained GitHub reference projects whose implementation or tests directly address a current North Star gap.
+- Verification-toolchain drift: every persistent Builder/Challenger path must use the same production Godot patch as canonical CI.
 
 ## 2026-08-25 scan
 
-### ADOPT — Godot 4.7.2 stable
+### ADOPTED — Godot 4.7.2 stable
 
 Source: `godotengine/godot` official `4.7.2-stable` release, published 2026-08-18.
 
@@ -32,7 +33,17 @@ Why it matters: official maintenance release in the currently adopted 4.7 line; 
 Linux x86_64 editor asset: `Godot_v4.7.2-stable_linux.x86_64.zip`
 SHA-256: `cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4`
 
-Decision: migrate canonical CI/toolchain from 4.7.1 to 4.7.2 on `chore/autonomous-intelligence-loop-v1`; keep the patch only if full import/launch/unit/smoke/capture verification remains green.
+Decision: production toolchain is Godot 4.7.2. PR #164 exact head `ac727d2d5c7f09778e8a5c14e37073aedf88a1b2` passed canonical Godot Check run `32817255780`, including import, configured launch, unit/smoke gates and the 35-frame lifecycle capture artifact. PR #164 merged as `154d8cdbb3e395da540bd1c5641ec16507778ae4`; merged-main push run `32817415796` also passed. Candidate captures were manually inspected with no obvious engine-patch rendering regression.
+
+Status: INTEGRATED + MERGED-MAIN VERIFIED.
+
+### PROJECT INFRA FIX — autonomous verifier version drift
+
+Finding: immediately after the 4.7.2 adoption, the persistent `agent-builder.yml` and `agent-challenger.yml` workflows were still hard-coded to Godot 4.7.1 in downloads, prompts and evidence text. The exact-head Challenger deterministic checks therefore used an obsolete engine baseline even though canonical CI and project knowledge had moved to 4.7.2.
+
+Decision: align persistent Builder/Challenger workflows to the official 4.7.2 asset/checksum and add canonical static guards that fail if those workflows regress to 4.7.1. This is tracked on `fix/agent-toolchain-4.7.2-v1`.
+
+Additional evidence: Codex Challenger run `32817497263` completed its exact-head checkout and deterministic Godot checks, then failed only when the Codex API reported no remaining credits. Treat that as verifier-infrastructure availability, not a game-code RED. The repository-local Ollama/Qwen Challenger remains the no-credit independent fallback.
 
 Status: INTEGRATING.
 
@@ -63,4 +74,5 @@ Status: RESEARCH ONLY.
 ## Integration log
 
 - 2026-08-25 — owner delegated routine reversible product/engineering decisions and requested continuous related GitHub/public-information scanning plus automatic integration of worthwhile improvements. Governance design and this ledger created on `chore/autonomous-intelligence-loop-v1`.
-- 2026-08-25 — Godot 4.7.2 selected as first evidence-backed maintenance integration; exact CI/capture result pending.
+- 2026-08-25 — Godot 4.7.2 selected as the first evidence-backed maintenance integration, passed exact-head and merged-main canonical verification, and became the production engine patch via PR #164.
+- 2026-08-25 — post-merge audit found persistent autonomous Builder/Challenger workflows still pinned to 4.7.1; version-alignment repair started on `fix/agent-toolchain-4.7.2-v1`. Paid Codex Challenger is temporarily unavailable because the API account reported no credits; repository-local Challenger remains the independent no-credit path.
