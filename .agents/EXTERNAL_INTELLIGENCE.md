@@ -71,8 +71,23 @@ Decision: do not move production to a development build while 4.7.x is stable. T
 
 Status: RESEARCH ONLY.
 
+## 2026-08-26 scan
+
+### REFERENCE — Godot 4.7 DrawableTexture2D for local painting
+
+Sources: official Godot 4.7 `Using DrawableTextures` documentation and the official `godot-demo-projects` 4.7 release, which includes the new 2D Drawable Textures demo.
+
+Finding: `DrawableTexture2D` is a first-party GPU-modifiable `Texture2D` API intended for procedural texturing and real-time effects. The official tutorial explicitly demonstrates mouse-drag painting through `blit_rect()`, supports custom `texture_blit` shaders and multiple outputs, and the original accepted proposal specifically targeted a simpler painting path that could work where compute-based approaches were unsuitable for GLES3/Compatibility.
+
+Relevance to Peel Calm: this is a stronger provenance and dependency story than third-party GPU texture-paint addons if a future residue implementation needs a denser continuous cleanup mask. It could encode exact rubbed regions directly in a texture while remaining engine-native.
+
+Decision: do **not** replace PR #166's small deterministic cleanup grid now. Peel Calm's current former-label footprint is small, deterministic, easy to unit-test and already represented without a new GPU-state verification surface. DrawableTexture2D also has current 4.7 edge cases (for example editor `get_image()` behavior) and premultiplied-alpha support is not present in 4.7 texture-blit blending. Keep it as the preferred first-party experiment path only if grid resolution becomes visibly insufficient, irregular residue/crumb masks need denser spatial detail, or a future visual target clearly benefits from texture-space painting. Any adoption must prove Compatibility runtime behavior and deterministic reset/capture behavior on an isolated branch.
+
+Status: WATCH/REFERENCE — preferred over third-party GPU-paint dependencies for any future texture-mask experiment.
+
 ## Integration log
 
 - 2026-08-25 — owner delegated routine reversible product/engineering decisions and requested continuous related GitHub/public-information scanning plus automatic integration of worthwhile improvements. Governance design and this ledger created on `chore/autonomous-intelligence-loop-v1`.
 - 2026-08-25 — Godot 4.7.2 selected as the first evidence-backed maintenance integration, passed exact-head and merged-main canonical verification, and became the production engine patch via PR #164.
 - 2026-08-25 — post-merge audit found persistent autonomous Builder/Challenger workflows still pinned to 4.7.1; version-alignment repair started on `fix/agent-toolchain-4.7.2-v1`. Paid Codex Challenger is temporarily unavailable because the API account reported no credits; repository-local Challenger remains the independent no-credit path.
+- 2026-08-26 — recorded Godot 4.7 DrawableTexture2D as the preferred first-party fallback for any future dense spatial residue-mask experiment; retained PR #166's repository-native deterministic grid for the current scope.
