@@ -189,9 +189,18 @@ func _rebuild() -> void:
 	_fiber_material.albedo_color = Color(readable_fiber.r,readable_fiber.g,readable_fiber.b,fiber_alpha)
 	_fiber_material.emission = readable_fiber.lightened(0.10)
 
-	_draw_adhesive_layer()
+	var sparse_completed_trace := _progress >= 0.995 and _fiber_strength <= 0.02
+	if sparse_completed_trace:
+		_draw_sparse_completed_trace()
+	else:
+		_draw_adhesive_layer()
 	if _fiber_strength > 0.02:
 		_draw_fiber_layer()
+
+func _draw_sparse_completed_trace() -> void:
+	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
+	_draw_tack_streaks(1.0)
+	_immediate.surface_end()
 
 func _draw_adhesive_layer() -> void:
 	var segments := 40
