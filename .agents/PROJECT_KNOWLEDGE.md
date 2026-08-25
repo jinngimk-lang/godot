@@ -1,6 +1,6 @@
 # Peel Calm Shared Project Knowledge
 
-This is compact operational memory for local and cloud agents. Current `main`, exact workflow evidence, `.agents/PROJECT_NORTH_STAR.md`, and the current handoff override conversation summaries and historical branches.
+This is compact operational memory for local and cloud agents. Current `main`, exact workflow evidence, `.agents/PROJECT_NORTH_STAR.md`, `.agents/EXTERNAL_INTELLIGENCE.md`, and the current handoff override conversation summaries and historical branches.
 
 ## Product thesis
 
@@ -10,10 +10,11 @@ It is object-first and object-only. The hero container, paper, adhesive, residue
 
 ## Platform and entrypoint
 
-- Godot 4.7.1 stable, GDScript.
+- Godot 4.7.2 stable, GDScript.
 - PC mouse first; pointer abstraction remains touch-ready.
 - Configured main scene: `res://scenes/peel_lab/peel_lab.tscn`.
 - A fresh clone/ZIP must import and run without Blender, external downloads, private runtime secrets, third-party Godot plugins, or AI services.
+- Stable patch releases in the adopted Godot minor line are evaluated promptly; preview/dev releases remain research-only until a dedicated migration is proven.
 
 Pointer state exposed to gameplay:
 
@@ -24,6 +25,16 @@ relative: Vector2
 velocity: Vector2
 released_this_frame: bool
 ```
+
+## Autonomous stewardship
+
+The owner delegates normal reversible repository decisions to the PRIMARY agent. Do not block on routine clarification when current repo evidence, trusted upstream information, tests or captures can decide the next action.
+
+Before meaningful work, inspect current `main`, Issue #5 claims, open PRs/branches, current handoff, exact CI and relevant runtime captures. For external developments, also read `.agents/EXTERNAL_INTELLIGENCE.md`.
+
+Continuously evaluate official Godot releases/issues/docs/demos and maintained relevant GitHub projects. Integrate only material, license/provenance-safe, compatibility-safe improvements. Prefer principles/tests/small isolated code over new dependencies. External adoption requires a narrow claim, isolated branch, falsifiable acceptance, canonical Godot verification, and merged-main recheck. No meaningful finding means no repo churn.
+
+Destructive/irreversible changes, credentials/secrets, paid services, legal commitments, sensitive disclosures and actions outside the repository are not covered by standing autonomy.
 
 ## Current interaction authority
 
@@ -54,7 +65,7 @@ Lifecycle:
 - After a boundary, release is consumed and a later fresh press re-arms gameplay.
 - RMB rotation and LMB peel/rub responsibilities must not leak into one another.
 
-Preserve adversarial tests whenever changing input.
+Preserve adversarial tests whenever changing input. Godot 4.7.2 includes an upstream high-polling-rate mouse performance fix; keep project-level packetization/gesture invariants because engine performance fixes do not replace deterministic gameplay semantics.
 
 ## Paper and adhesive invariants
 
@@ -111,7 +122,7 @@ Next audio extension should be restrained residue-rub friction and tack release 
 
 Meaningful work requires:
 
-- official Godot 4.7.1 fresh import/parser guard;
+- official Godot 4.7.2 fresh import/parser guard;
 - configured default-main-scene launch;
 - deterministic unit/input/material/lifecycle tests;
 - complete real-scene grab → peel → settle → rub → clean → next flow;

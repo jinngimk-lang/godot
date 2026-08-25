@@ -28,8 +28,10 @@ jobs:
           test -f .github/workflows/agent-challenger.yml
           test -f .github/workflows/agent-challenger-local.yml
           test -f .agents/PROJECT_KNOWLEDGE.md
+          test -f .agents/EXTERNAL_INTELLIGENCE.md
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-builder.yml
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-challenger.yml
+          grep -Fq 'Godot 4.7.2 stable' .agents/PROJECT_KNOWLEDGE.md
           if grep -ERn 'OPENAI_API_KEY[[:space:]]*[:=][[:space:]]*(sk-|[A-Za-z0-9_-]{30,})' .github .agents; then
             echo "Possible committed API key material detected."
             exit 1
@@ -41,17 +43,17 @@ jobs:
           set -euo pipefail
           bash tools/test_validate_local_challenger_verdict.sh
 
-      - name: Install Godot 4.7.1
+      - name: Install Godot 4.7.2
         shell: bash
         run: |
           set -euo pipefail
           curl -L --fail --retry 3 -o godot.zip \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          echo "c7ff14fd28472c8d4f193043de30278dcf7e5241a1dcf7566b02e27addaa33ba  godot.zip" | sha256sum -c -
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  godot.zip" | sha256sum -c -
           unzip -q godot.zip
-          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          mv Godot_v4.7.2-stable_linux.x86_64 godot
           chmod +x godot
-          ./godot --version
+          ./godot --version | grep -F '4.7.2.stable'
 
       - name: Headless import and parse guard
         shell: bash
