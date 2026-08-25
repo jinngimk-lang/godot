@@ -23,6 +23,8 @@ var _fiber_gain: float = 1.0
 var _substrate := "thermal_paper"
 var _profile_signature := ""
 var _cleanup_progress := 0.0
+var _cleanup_field := PackedFloat32Array()
+var _cleanup_grid_size := Vector2i.ZERO
 
 func _ready() -> void:
 	mesh = _immediate
@@ -94,8 +96,38 @@ func set_cleanup_progress(progress: float) -> void:
 	_recompute_semantics()
 	_rebuild()
 
+func set_cleanup_field(field: PackedFloat32Array, grid_size: Vector2i) -> void:
+	if grid_size.x <= 0 or grid_size.y <= 0 or field.size() != grid_size.x*grid_size.y:
+		_cleanup_field = PackedFloat32Array()
+		_cleanup_grid_size = Vector2i.ZERO
+		_rebuild()
+		return
+	_cleanup_grid_size = grid_size
+	_cleanup_field = field.duplicate()
+	for i in range(_cleanup_field.size()):
+		_cleanup_field[i] = clampf(float(_cleanup_field[i]),0.0,1.0)
+	_rebuild()
+
 func get_cleanup_progress() -> float:
 	return _cleanup_progress
+
+func get_cleanup_grid_size() -> Vector2i:
+	return _cleanup_grid_size
+
+func get_cleanup_at_uv(uv: Vector2) -> float:
+	if _cleanup_grid_size.x <= 0 or _cleanup_grid_size.y <= 0 or _cleanup_field.size() != _cleanup_grid_size.x*_cleanup_grid_size.y:
+		return _cleanup_progress
+	var x := clampf(uv.x,0.0,1.0)*float(_cleanup_grid_size.x)-0.5
+	var y := clampf(uv.y,0.0,1.0)*float(_cleanup_grid_size.y)-0.5
+	var x0 := clampi(int(floor(x)),0,_cleanup_grid_size.x-1)
+	var y0 := clampi(int(floor(y)),0,_cleanup_grid_size.y-1)
+	var x1 := clampi(x0+1,0,_cleanup_grid_size.x-1)
+	var y1 := clampi(y0+1,0,_cleanup_grid_size.y-1)
+	var tx := clampf(x-float(x0),0.0,1.0)
+	var ty := clampf(y-float(y0),0.0,1.0)
+	var a := lerpf(_cleanup_field[y0*_cleanup_grid_size.x+x0],_cleanup_field[y0*_cleanup_grid_size.x+x1],tx)
+	var b := lerpf(_cleanup_field[y1*_cleanup_grid_size.x+x0],_cleanup_field[y1*_cleanup_grid_size.x+x1],tx)
+	return clampf(lerpf(a,b,ty),0.0,1.0)
 
 func _recompute_semantics() -> void:
 	if _progress <= 0.002:
@@ -103,7 +135,9 @@ func _recompute_semantics() -> void:
 		_fiber_strength = 0.0
 		return
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
-	var remaining := pow(1.0-_cleanup_progress,1.18)
+	# Spatial clearing owns partial visibility. Keep semantic strength nearly
+	# stable until completion instead of globally fading every untouched patch.
+	var remaining := 0.0 if _cleanup_progress >= 0.999 else 1.0-_cleanup_progress*0.12
 	_adhesive_trace_amount = clampf((_adhesive_trace_profile*reveal + _residue_amount*0.30)*remaining,0.0,0.68)
 	if _residue_amount <= 0.002 and _integrity >= 0.998:
 		_fiber_strength = 0.0
@@ -203,9 +237,6 @@ func _draw_adhesive_layer() -> void:
 		var signal_value := _signal(i,5)
 		if signal_value > density:
 			continue
-		if not started:
-			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
-			started = true
 		var center_offset := sin(float(i)*1.43+0.25)*_label_height*(0.24+0.12*_residue_amount)
 		var half_height := _label_height*(0.050+0.070*(1.0-signal_value)+0.040*_adhesive_trace_amount+0.025*_residue_amount)
 		var y0_top := _label_y+center_offset+half_height
@@ -214,6 +245,12 @@ func _draw_adhesive_layer() -> void:
 		var next_half := half_height*(0.82+0.22*_signal(i+1,9))
 		var y1_top := _label_y+next_offset+next_half
 		var y1_bottom := _label_y+next_offset-next_half
+		var center_y := (y0_top+y0_bottom+y1_top+y1_bottom)*0.25
+		if not _cleanup_keeps_patch(_residue_uv((u0+u1)*0.5,center_y),i+11):
+			continue
+		if not started:
+			_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_adhesive_material)
+			started = true
 		_emit_patch(u0,u1,y0_top,y0_bottom,y1_top,y1_bottom,0.0144)
 	if started:
 		_draw_tack_streaks(peeled_u)
@@ -233,6 +270,8 @@ func _draw_tack_streaks(peeled_u: float) -> void:
 		var u1 := minf(peeled_u,center_u+half_span)
 		var center0 := _label_y+(0.5-_signal(streak_index,101))*_label_height*0.70
 		var center1 := center0+(0.5-_signal(streak_index,107))*_label_height*0.08
+		if not _cleanup_keeps_patch(_residue_uv(center_u,(center0+center1)*0.5),streak_index+211):
+			continue
 		var half0 := _label_height*(0.010+0.010*_adhesive_trace_amount+0.005*_signal(streak_index,109))
 		var half1 := half0*(0.65+0.35*_signal(streak_index,113))
 		_emit_patch(u0,u1,center0+half0,center0-half0,center1+half1,center1-half1,0.0162)
@@ -241,7 +280,7 @@ func _draw_fiber_layer() -> void:
 	var islands := get_fiber_island_spans(_progress)
 	if islands.is_empty():
 		return
-	_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_fiber_material)
+	var started := false
 	for island_index in range(islands.size()):
 		var island := islands[island_index]
 		var subdivisions := 5
@@ -255,6 +294,11 @@ func _draw_fiber_layer() -> void:
 			var u1 := lerpf(island.x,island.y,t1)
 			var center0 := _label_y+(0.5-_signal(seed,31))*_label_height*0.70
 			var center1 := center0+(0.5-_signal(seed,37))*_label_height*0.18
+			if not _cleanup_keeps_patch(_residue_uv((u0+u1)*0.5,(center0+center1)*0.5),seed+307):
+				continue
+			if not started:
+				_immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_fiber_material)
+				started = true
 			var half0 := _label_height*(0.035+0.050*_fiber_strength+0.020*_signal(seed,23))
 			var half1 := _label_height*(0.035+0.050*_fiber_strength+0.020*_signal(seed,29))
 			var rag_top0 := (0.5-_signal(seed,41))*_label_height*0.050
@@ -269,7 +313,22 @@ func _draw_fiber_layer() -> void:
 				center1-half1-rag_bottom1,
 				0.0172
 			)
-	_immediate.surface_end()
+	if started:
+		_immediate.surface_end()
+
+func _residue_uv(u: float, y: float) -> Vector2:
+	var v := 0.5-(y-_label_y)/maxf(_label_height,0.001)
+	return Vector2(clampf(u,0.0,1.0),clampf(v,0.0,1.0))
+
+func _cleanup_keeps_patch(uv: Vector2, seed: int) -> bool:
+	var cleaned := get_cleanup_at_uv(uv)
+	if cleaned <= 0.01:
+		return true
+	if cleaned >= 0.985:
+		return false
+	# Deterministic dither removes individual glue/fiber fragments as a cell is
+	# rubbed, making the cleared trail local without requiring a GPU addon.
+	return _signal(seed,149) > cleaned
 
 func _emit_patch(u0: float, u1: float, y0_top: float, y0_bottom: float, y1_top: float, y1_bottom: float, offset: float) -> void:
 	var a := _point(u0,y0_top,offset)
