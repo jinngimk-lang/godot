@@ -32,6 +32,12 @@ jobs:
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-builder.yml
           grep -Fq 'openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56' .github/workflows/agent-challenger.yml
           grep -Fq 'Godot 4.7.2 stable' .agents/PROJECT_KNOWLEDGE.md
+          grep -Fq 'Godot_v4.7.2-stable_linux.x86_64.zip' .github/workflows/agent-builder.yml
+          grep -Fq 'Godot_v4.7.2-stable_linux.x86_64.zip' .github/workflows/agent-challenger.yml
+          if grep -En 'Godot 4\.7\.1|4\.7\.1-stable|Godot_v4\.7\.1' .github/workflows/agent-builder.yml .github/workflows/agent-challenger.yml; then
+            echo "Persistent Builder/Challenger drifted back to Godot 4.7.1."
+            exit 1
+          fi
           if grep -ERn 'OPENAI_API_KEY[[:space:]]*[:=][[:space:]]*(sk-|[A-Za-z0-9_-]{30,})' .github .agents; then
             echo "Possible committed API key material detected."
             exit 1
