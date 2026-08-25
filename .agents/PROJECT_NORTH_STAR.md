@@ -13,9 +13,33 @@ Read this file:
 - before declaring the project complete;
 - before continuing from an old branch or historical PR.
 
-Then inspect current `main`, current production code/tests, the active handoff/checkpoints, and exact CI/runtime evidence. Conversation memory never overrides current repository evidence.
+Then inspect current `main`, current production code/tests, the active handoff/checkpoints, Issue #5 claims, `.agents/EXTERNAL_INTELLIGENCE.md`, and exact CI/runtime evidence. Conversation memory never overrides current repository evidence.
 
-If a verified owner-level direction, major architecture decision, acceptance rule, merged milestone, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
+If a verified owner-level direction, major architecture decision, acceptance rule, engine/toolchain decision, merged milestone, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
+
+## Autonomous stewardship and external intelligence loop
+
+The owner delegates normal, reversible product and engineering decisions inside this repository to the PRIMARY agent. Do not stop for routine clarification or implementation approval when repository evidence, tests, runtime captures, trusted upstream information, or the North Star can resolve the decision. The agent is expected to choose, implement, challenge and verify the strongest evidence-backed direction.
+
+This standing autonomy does **not** extend to destructive/irreversible actions, secrets or credentials, paid services, legal commitments, sensitive disclosures, or actions outside the repository; those retain their normal safety boundary.
+
+Project maintenance is continuous, not release-only. On a recurring basis and before major input/rendering/architecture work:
+
+1. inspect current `main`, open PRs/branches, Issue #5 claims, current handoff, CI and newest runtime captures;
+2. scan trusted public sources for material developments — official Godot releases/docs/issues/proposals and official demos first, then maintained relevant GitHub projects and mature community references;
+3. triage by direct relevance, freshness, maintenance state, license/provenance, compatibility, dependency/security cost and falsifiability;
+4. prefer adopting a principle, test or small isolated implementation over adding a dependency;
+5. never vendor external code/assets without understood origin/license and a concrete project benefit;
+6. claim a narrow isolated workstream, establish RED/acceptance evidence when practical, integrate the minimum useful change, run canonical tests/captures, and merge only exact-head verified work;
+7. reverify merged `main` separately, then record the source, decision and evidence in `.agents/EXTERNAL_INTELLIGENCE.md`;
+8. if a finding changes durable direction, engine/toolchain policy, architecture, acceptance or priorities, update this North Star and `.agents/PROJECT_KNOWLEDGE.md` in the same workstream.
+
+A scan with no meaningful finding should create no repository churn. Preview/dev engine versions and fashionable dependencies are research-only until a separate evidence-backed migration proves a North Star benefit.
+
+Stable patch releases in the currently adopted Godot minor line should be evaluated promptly, especially fixes affecting pointer input, rendering, crashes or performance. The current production target is Godot **4.7.2 stable**, adopted because it is the compatible maintenance release for the 4.7 line and includes a high-polling-rate mouse performance fix directly relevant to Peel Calm's tactile drag loop. A fresh clone must still run without runtime internet, private secrets, AI services, Blender, or mandatory third-party Godot plugins.
+
+Detailed operating design: `docs/superpowers/specs/2026-08-25-autonomous-project-intelligence-design.md`.
+Living external watch/integration ledger: `.agents/EXTERNAL_INTELLIGENCE.md`.
 
 ## Owner-locked completion stack
 
@@ -158,7 +182,7 @@ For meaningful gameplay/visual work:
 1. State the user-visible defect.
 2. Add a falsifiable behavioral/visual acceptance check; use RED-GREEN when practical.
 3. Implement the smallest coherent change.
-4. Run Godot 4.7.1 import/parser guard and configured default launch.
+4. Run Godot 4.7.2 import/parser guard and configured default launch.
 5. Run deterministic unit/input/scene smokes.
 6. Capture every affected product at attached, representative mid-peel, fully released, dirty-residue, partial-scrub, and clean states.
 7. Inspect captures manually against the target/template image.
@@ -172,13 +196,14 @@ Functional green is necessary but never sufficient for visual completion.
 
 This file should remain compact enough to reread quickly but complete enough to restore project direction. Do not turn it into a chronological diary.
 
-Put detailed implementation history and exact parameters in checkpoints/handoffs. Keep here only:
+Put detailed implementation history and exact parameters in checkpoints/handoffs. Put external-source findings and integration provenance in `.agents/EXTERNAL_INTELLIGENCE.md`. Keep here only:
 
 - current product thesis;
 - current non-negotiable UX/presentation rules;
 - architecture/interaction invariants;
 - acceptance definition;
 - current scene family;
+- current autonomous-maintenance rules;
 - current major priorities.
 
 When something here becomes obsolete, replace it rather than appending contradictory guidance.
@@ -187,11 +212,13 @@ When something here becomes obsolete, replace it rather than appending contradic
 
 After this file, read:
 
-1. `.agents/skills/peel-calm-reference-realism/SKILL.md`
-2. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
-3. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
-4. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
-5. current `main` production code/tests/workflows and newest runtime captures.
+1. `.agents/PROJECT_KNOWLEDGE.md`
+2. `.agents/EXTERNAL_INTELLIGENCE.md`
+3. `.agents/skills/peel-calm-reference-realism/SKILL.md`
+4. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
+5. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
+6. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
+7. current `main` production code/tests/workflows and newest runtime captures.
 
 Highest-value future work, in order:
 
