@@ -40,6 +40,21 @@ func run() -> Array[String]:
 		elif clean_adhesive.albedo_color.a < 0.10:
 			failures.append("ADHESIVE_RED: clean glue film needs readable but restrained opacity")
 
+	# The highest normal dirty-residue capture uses residue=0.18 and integrity=0.82.
+	# That stage must still read as exposed vessel + glue evidence, not a second
+	# opaque paper curtain. Lower-damage Coffee/Jar/Yuzu/Can captures must inherit
+	# the same guarantee.
+	residue.set_residue(1.0, 0.18, 0.82)
+	if float(residue.get_fiber_strength()) > 0.02 or residue.has_layered_residue():
+		failures.append("NORMAL_RESIDUE_RED: representative successful peel must not render torn-paper fiber drips")
+	if not residue.has_adhesive_trace():
+		failures.append("NORMAL_RESIDUE_RED: successful peel should preserve visible glue evidence for the scrub stage")
+	if residue.mesh != null and residue.mesh.get_surface_count() == 1:
+		var normal_arrays: Array = residue.mesh.surface_get_arrays(0)
+		var normal_vertices: PackedVector3Array = normal_arrays[Mesh.ARRAY_VERTEX]
+		if normal_vertices.size() > 72:
+			failures.append("NORMAL_RESIDUE_RED: completed glue evidence must be sparse short tack marks, not a continuous label-width film (%d vertices)" % normal_vertices.size())
+
 	# Damage/residue should then add a separate dry fibrous backing layer.
 	residue.set_residue(0.62, 0.34, 0.72)
 	if residue.get_residue_amount() < 0.33:
