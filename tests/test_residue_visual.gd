@@ -50,7 +50,7 @@ func run() -> Array[String]:
 	if not residue.has_adhesive_trace():
 		failures.append("NORMAL_RESIDUE_RED: successful peel should preserve visible glue evidence for the scrub stage")
 	if residue.mesh != null and residue.mesh.get_surface_count() == 1:
-		var normal_arrays := residue.mesh.surface_get_arrays(0)
+		var normal_arrays: Array = residue.mesh.surface_get_arrays(0)
 		var normal_vertices: PackedVector3Array = normal_arrays[Mesh.ARRAY_VERTEX]
 		if normal_vertices.size() > 72:
 			failures.append("NORMAL_RESIDUE_RED: completed glue evidence must be sparse short tack marks, not a continuous label-width film (%d vertices)" % normal_vertices.size())
