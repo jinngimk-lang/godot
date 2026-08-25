@@ -1,6 +1,8 @@
 extends MeshInstance3D
 class_name ResidueVisual
 
+const FIBER_DAMAGE_GATE := 0.24
+
 var _immediate: ImmediateMesh = ImmediateMesh.new()
 var _adhesive_material: StandardMaterial3D = StandardMaterial3D.new()
 var _fiber_material: StandardMaterial3D = StandardMaterial3D.new()
@@ -105,10 +107,11 @@ func _recompute_semantics() -> void:
 	var reveal := 0.35 + 0.65 * sqrt(_progress)
 	var remaining := pow(1.0-_cleanup_progress,1.18)
 	_adhesive_trace_amount = clampf((_adhesive_trace_profile*reveal + _residue_amount*0.30)*remaining,0.0,0.68)
-	if _residue_amount <= 0.002 and _integrity >= 0.998:
+	var damage_score := _residue_amount*0.45+(1.0-_integrity)*0.75
+	if damage_score <= FIBER_DAMAGE_GATE:
 		_fiber_strength = 0.0
 	else:
-		_fiber_strength = clampf((_residue_amount*0.45+(1.0-_integrity)*0.75)*_fiber_gain*remaining,0.0,1.0)
+		_fiber_strength = clampf((damage_score-FIBER_DAMAGE_GATE)*2.10*_fiber_gain*remaining,0.0,1.0)
 
 func get_residue_amount() -> float:
 	return _residue_amount
