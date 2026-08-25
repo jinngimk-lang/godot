@@ -79,29 +79,63 @@ func _run() -> void:
 		_fail("resolved residue stage must turn the small hand cursor into visible RUB feedback",scene)
 		return
 	var scrub = scene.get("_scrub_model")
-	if scrub == null:
-		_fail("resolved flow is missing the mouse-driven residue scrub stage",scene)
+	if scrub == null or not scrub.has_method("get_cleanup_grid_size"):
+		_fail("resolved flow is missing the spatial mouse-driven residue scrub stage",scene)
 		return
 	var scrub_region: Rect2 = scene.call("_project_label_region")
-	var scrub_position := scrub_region.get_center()
-	for stroke_index in range(90):
-		var relative := Vector2(18 if stroke_index % 2 == 0 else -18,2 if stroke_index % 4 < 2 else -2)
-		scrub_position += relative
-		pointer.state.set_frame(true,scrub_position,relative,relative*38.0,false)
+
+	# First prove real runtime locality: polish a small center patch. It should
+	# visibly clean there while a distant corner stays dirty and Continue remains gated.
+	var local_position := scrub_region.get_center()
+	for stroke_index in range(14):
+		var relative := Vector2(14 if stroke_index % 2 == 0 else -14,2 if stroke_index % 4 < 2 else -2)
+		local_position += relative*0.18
+		pointer.state.set_frame(true,local_position,relative,relative*38.0,false)
 		scene.call("_process",1.0/60.0)
 		pointer.clear_transients()
+	var center_clean := residue.get_cleanup_at_uv(Vector2(0.5,0.5))
+	var corner_clean := residue.get_cleanup_at_uv(Vector2(0.08,0.08))
+	if center_clean <= corner_clean+0.20:
+		_fail("runtime rubbing did not clear the contacted patch before untouched residue",scene)
+		return
+	if scrub.is_complete() or continue_button.visible:
+		_fail("one polished patch must not complete the whole residue footprint",scene)
+		return
+
+	# Sweep the footprint cell by cell with short reversals. This proves actual
+	# spatial coverage, not synthetic set_cleanup_progress shortcuts.
+	var grid_size: Vector2i = scrub.get_cleanup_grid_size()
+	for row in range(grid_size.y):
+		for column in range(grid_size.x):
+			var cell_center := Vector2(
+				scrub_region.position.x+scrub_region.size.x*(float(column)+0.5)/float(grid_size.x),
+				scrub_region.position.y+scrub_region.size.y*(float(row)+0.5)/float(grid_size.y)
+			)
+			for stroke in range(4):
+				var relative := Vector2(12 if stroke % 2 == 0 else -12,2 if stroke < 2 else -2)
+				var position := cell_center+relative*0.22
+				pointer.state.set_frame(true,position,relative,relative*38.0,false)
+				scene.call("_process",1.0/60.0)
+				pointer.clear_transients()
+				if scrub.is_complete():
+					break
+			if scrub.is_complete():
+				break
 		if scrub.is_complete():
 			break
-	pointer.state.set_frame(false,scrub_position,Vector2.ZERO,Vector2.ZERO,true)
+	pointer.state.set_frame(false,scrub_region.get_center(),Vector2.ZERO,Vector2.ZERO,true)
 	scene.call("_process",1.0/60.0)
-	if not scrub.is_complete() or residue.get_cleanup_progress() < 0.999:
-		_fail("pressed back-and-forth hand motion did not rub the residue clean",scene)
+	if not scrub.is_complete() or residue.get_cleanup_progress() < 0.999 or scrub.get_coverage_progress() < 0.92:
+		_fail("broad pressed back-and-forth coverage did not rub the residue clean",scene)
 		return
 	if int(session.get_clean_peels()) != clean_before_resolution+1:
 		_fail("scrub completion must record exactly one clean result",scene)
 		return
 	if not continue_button.visible:
 		_fail("Continue must appear after residue cleanup completes",scene)
+		return
+	if residue.has_adhesive_trace() or residue.mesh.get_surface_count() != 0:
+		_fail("fully covered scrub must leave the hero surface visibly clean",scene)
 		return
 	cursor.call("_process",1.0/60.0)
 	if cursor.is_scrub_feedback_visible():
@@ -116,8 +150,11 @@ func _run() -> void:
 	if String(scene.get("_lifecycle").get_phase_name()) != "ATTACHED" or not released_visual.visible:
 		_fail("scene boundary did not restore the attached paper presentation",scene)
 		return
+	if residue.get_cleanup_progress() != 0.0 or residue.get_cleanup_at_uv(Vector2(0.5,0.5)) > 0.001:
+		_fail("scene boundary did not reset the spatial cleanup field",scene)
+		return
 
-	print("PASS: object-only grab -> load -> peel -> settle -> next-scene flow")
+	print("PASS: object-only grab -> peel -> settle -> spatial rub -> clean -> next-scene flow")
 	Input.set_custom_mouse_cursor(null,Input.CURSOR_POINTING_HAND)
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
