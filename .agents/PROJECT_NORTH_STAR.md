@@ -13,9 +13,52 @@ Read this file:
 - before declaring the project complete;
 - before continuing from an old branch or historical PR.
 
-Then inspect current `main`, current production code/tests, the active handoff/checkpoints, and exact CI/runtime evidence. Conversation memory never overrides current repository evidence.
+Then inspect current `main`, current production code/tests, the active handoff/checkpoints, exact CI/runtime evidence, and the current ecosystem watch ledger. Conversation memory never overrides current repository evidence.
 
-If a verified owner-level direction, major architecture decision, acceptance rule, merged milestone, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
+If a verified owner-level direction, major architecture decision, acceptance rule, merged milestone, engine baseline, external-integration decision, or next-work priority changes, update this file in the same workstream so the next agent can recover without the chat transcript.
+
+## Autonomous project stewardship
+
+The owner has delegated normal reversible project decisions to the acting agent. Do not repeatedly ask the owner to choose between ordinary implementation options, minor visual directions, refactors, tests, compatible tools, or repository organization when evidence can decide them.
+
+The agent should autonomously:
+
+- choose the highest-value next defect from runtime evidence;
+- create branches/PRs/issues/checkpoints and update repository memory;
+- add or use appropriate skills/MCP/connectors when they materially improve execution;
+- research current Godot releases, relevant GitHub projects, techniques, assets, and project-adjacent developments;
+- reject weak or risky ideas without requiring owner review;
+- integrate compatible improvements only after evidence, license/provenance, dependency, and runtime checks;
+- keep iterating after technical green when visible/interaction quality is still below the project target.
+
+Separate authorization is still required for destructive/irreversible operations, secrets/credentials, paid services, legal commitments, sensitive disclosures, or external publishing outside the repository.
+
+## Continuous ecosystem intelligence rule
+
+Project completeness includes staying aware of useful external developments. At meaningful work checkpoints, and through scheduled monitoring when available, scan for:
+
+- stable Godot maintenance releases and relevant renderer/input/material fixes;
+- mature Godot implementations related to runtime surface masks/painting, paper/cloth-like deformation, mesh/material realism, input feel, Foley, post-processing, or test/capture tooling;
+- permissively licensed models/textures/audio only when they strengthen the current object-first tactile fantasy;
+- relevant UX/game-feel research and production techniques.
+
+Use this gate before any external source enters production:
+
+`discover -> relevance -> explicit license/provenance -> dependency/architecture fit -> isolated experiment -> exact Godot verification -> runtime visual/feel evidence -> integrate or reject -> update project memory`
+
+Hard rules:
+
+- Unknown or absent license means **no source or asset copying**. It may be studied only as a high-level idea, followed by an original implementation.
+- Prefer repository-native code over mandatory third-party plugins when the same user-visible result can be achieved without dependency risk.
+- Do not import a library/addon merely because it is impressive; it must solve a current measurable Peel Calm defect.
+- Preserve attribution/license/provenance beside any external asset/code that is actually integrated.
+- Record candidates and decisions in `docs/research/ECOSYSTEM_WATCH.md` so future agents do not repeatedly rediscover or accidentally reintroduce rejected sources.
+
+## Engine maintenance policy
+
+The verified baseline may advance within a compatible stable Godot maintenance line when official releases recommend adoption. A patch upgrade is not accepted from release notes alone: update CI, run the full configured default launch/tests/smokes/runtime capture suite, inspect visible output, then update this North Star and handoff only after exact-head and merged-main evidence are green.
+
+As of 2026-08-25, Godot 4.7.2 stable is the active maintenance-upgrade candidate from the current 4.7.1 baseline. Do not describe 4.7.2 as the verified project baseline until the full project workflow passes on it.
 
 ## Owner-locked completion stack
 
@@ -25,7 +68,7 @@ Do not lose or reorder these five product priorities without new owner feedback 
 2. **Optimize models** — cup, glass jar/bottle, tin can and aluminum can must read as believable hero products rather than primitive geometry.
 3. **Optimize label material** — paper front/back/edge, fibers, adhesive boundary, residue and local bending must read as paper rather than tape.
 4. **Optimize post-peel label handling** — after 100% release the label must enter an intentional completion lifecycle; it must not remain indefinitely floating over the product as if still being peeled.
-5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, receive calm completion feedback, and continue to the next product/scene without dead ends.
+5. **Build a logical complete interaction flow** — discover edge, load/grab, peel, inspect, fully release, resolve/dispose/collect the removed label, receive calm completion feedback, clean remaining residue, and continue to the next product/scene without dead ends.
 
 The 2026-08-20 reference-fidelity integration established a machine-verified baseline for all five items. Treat them as permanent regression contracts, not finished areas that may be removed or simplified.
 
@@ -37,11 +80,11 @@ The 2026-08-20 reference-fidelity integration established a machine-verified bas
 - Persistent vessel-bound glue/fiber residue after paper release.
 - Required second interaction pass: once the paper settles, the small hand cursor displays `RUB ↔`; held LMB back-and-forth movement inside the old label footprint fades residue; Continue stays gated until 100% clean.
 - Deterministic full-flow verification covers grab → load → peel → detach → settle → rub → clean → next scene, plus pause/reset quarantine and all five scene bundles.
-- Canonical visual evidence now contains seven states per scene: attached, representative peel, release hold, settling, dirty residue, partial scrub, and clean (35 frames total).
+- Canonical visual evidence contains seven states per scene: attached, representative peel, release hold, settling, dirty residue, partial scrub, and clean (35 frames total).
 
 ## Product identity
 
-Peel Calm is a relaxing tactile/ASMR desktop game about peeling real-time labels from everyday containers. The pleasure comes from catching an edge, loading the paper and adhesive, overcoming breakaway resistance, hearing/seeing local release, and finishing with a completely detached label.
+Peel Calm is a relaxing tactile/ASMR desktop game about peeling real-time labels from everyday containers. The pleasure comes from catching an edge, loading the paper and adhesive, overcoming breakaway resistance, hearing/seeing local release, and finishing with a completely detached label and a clean exposed vessel.
 
 It is **object-first**, not character-first.
 
@@ -106,11 +149,13 @@ Do not collapse all products to one generic feel profile without new evidence.
 
 ## Post-peel lifecycle north star
 
-A fully removed label must not remain forever as an unexplained floating object. Completion should have an authored calm resolution, for example:
+A fully removed label must not remain forever as an unexplained floating object. Completion has an authored calm resolution:
 
 `ATTACHED -> EDGE_LIFT -> PINCHED -> PEELING -> FULLY_RELEASED -> SHORT_HOLD/SETTLE -> RESIDUE_RUB -> CLEAN -> NEXT_READY`
 
 The exact presentation may differ by product, but it must be logically understandable and reversible/resettable. The released label briefly holds and settles clear of the hero. The user then performs a fresh LMB rub gesture over the remaining adhesive footprint. Hover, stationary hold, and movement outside the footprint do not clean. The next action appears only when cleaning reaches 100%.
+
+Optional post-clean object play such as subtle squeeze, wobble, shake, liquid inertia, or inspection may be added when it strengthens a specific vessel's material identity, but it must remain secondary to the peel/clean fantasy, must be real-time, and must not resurrect obsolete hand-model or fake-video paths.
 
 ## Five-scene identity rule
 
@@ -158,7 +203,7 @@ For meaningful gameplay/visual work:
 1. State the user-visible defect.
 2. Add a falsifiable behavioral/visual acceptance check; use RED-GREEN when practical.
 3. Implement the smallest coherent change.
-4. Run Godot 4.7.1 import/parser guard and configured default launch.
+4. Run the current verified stable Godot patch import/parser guard and configured default launch.
 5. Run deterministic unit/input/scene smokes.
 6. Capture every affected product at attached, representative mid-peel, fully released, dirty-residue, partial-scrub, and clean states.
 7. Inspect captures manually against the target/template image.
@@ -179,7 +224,9 @@ Put detailed implementation history and exact parameters in checkpoints/handoffs
 - architecture/interaction invariants;
 - acceptance definition;
 - current scene family;
-- current major priorities.
+- current major priorities;
+- current autonomy/external-adoption rules;
+- current verified engine family and upgrade policy.
 
 When something here becomes obsolete, replace it rather than appending contradictory guidance.
 
@@ -187,16 +234,19 @@ When something here becomes obsolete, replace it rather than appending contradic
 
 After this file, read:
 
-1. `.agents/skills/peel-calm-reference-realism/SKILL.md`
-2. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
-3. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
-4. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
-5. current `main` production code/tests/workflows and newest runtime captures.
+1. `.agents/PROJECT_KNOWLEDGE.md`
+2. `.agents/skills/peel-calm-reference-realism/SKILL.md`
+3. `.agents/skills/peel-calm-reference-realism/CURRENT_HANDOFF.md`
+4. `docs/research/ECOSYSTEM_WATCH.md` when present
+5. `docs/superpowers/checkpoints/2026-08-20-reference-fidelity-final.md`
+6. `docs/superpowers/plans/2026-08-20-reference-fidelity-completion.md`
+7. current `main` production code/tests/workflows and newest runtime captures.
 
 Highest-value future work, in order:
 
-1. Owner playtest tuning for breakaway force, per-substrate pointer travel, scrub duration, cursor feedback, and Foley balance.
-2. Spatial/local residue cleaning so the exact rubbed region clears first, with restrained glue-roll/paper-crumb visuals and corresponding sound.
+1. Spatial/local residue cleaning so the exact rubbed region clears first, with restrained glue-roll/paper-crumb visuals and corresponding sound.
+2. Owner feel tuning for breakaway force, per-substrate pointer travel, scrub duration, cursor feedback, and Foley balance.
 3. Further realtime product/environment realism: stronger silhouettes, glass and metal edge response, contact shadows, paper microdetail, and backdrop/live-surface integration.
 4. More irregular tear/release silhouettes without reintroducing print distortion, elastic stretch, or full-height ribbon behavior.
-5. Settings/accessibility, touch-device validation, and performance profiling after the PC mouse loop is stable.
+5. Optional vessel-specific post-clean object play where it reinforces material identity.
+6. Settings/accessibility, touch-device validation, and performance profiling after the PC mouse loop is stable.
