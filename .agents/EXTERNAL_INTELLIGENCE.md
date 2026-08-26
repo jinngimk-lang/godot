@@ -85,9 +85,22 @@ Decision: do **not** replace PR #166's small deterministic cleanup grid now. Pee
 
 Status: WATCH/REFERENCE — preferred over third-party GPU-paint dependencies for any future texture-mask experiment.
 
+### WATCH — Windows touchscreen drag freeze reported in Godot 4.7.2
+
+Source: upstream `godotengine/godot` issue #122791, opened 2026-08-25 and currently labeled `bug`, `regression`, `performance`, `platform:windows`, `needs testing`.
+
+Finding: the reporter reproduces severe freezing while dragging on an actual Windows touchscreen in Godot 4.7.2 stable and 4.8 dev, while 4.7.1 does not reproduce. Upstream triage explicitly suspects PR #109639, the high-polling-rate Windows input change that is one reason Peel Calm adopted 4.7.2, but that causal link is not confirmed yet. A Wacom tablet did not reproduce; upstream plans testing on a real touchscreen.
+
+Relevance to Peel Calm: the production interaction target is PC mouse first, so this is not evidence to roll back the 4.7.2 mouse fix. It is directly relevant to the project's touch-ready pointer abstraction and the later touch-device validation milestone.
+
+Decision: keep Godot 4.7.2 as production. Do not broaden touch support or claim Windows touchscreen readiness on 4.7.2 until this upstream regression is resolved or Peel Calm has an isolated real-touch reproducer showing it is unaffected. Preserve mouse/touch gesture ownership tests because they remain valid semantic contracts, but treat actual Windows touch performance as unverified. Re-evaluate when upstream confirms the cause/fix or a 4.7.x maintenance release addresses it.
+
+Status: WATCH — touch validation gate, no production rollback.
+
 ## Integration log
 
 - 2026-08-25 — owner delegated routine reversible product/engineering decisions and requested continuous related GitHub/public-information scanning plus automatic integration of worthwhile improvements. Governance design and this ledger created on `chore/autonomous-intelligence-loop-v1`.
 - 2026-08-25 — Godot 4.7.2 selected as the first evidence-backed maintenance integration, passed exact-head and merged-main canonical verification, and became the production engine patch via PR #164.
 - 2026-08-25 — post-merge audit found persistent autonomous Builder/Challenger workflows still pinned to 4.7.1; version-alignment repair started on `fix/agent-toolchain-4.7.2-v1`. Paid Codex Challenger is temporarily unavailable because the API account reported no credits; repository-local Challenger remains the independent no-credit path.
 - 2026-08-26 — recorded Godot 4.7 DrawableTexture2D as the preferred first-party fallback for any future dense spatial residue-mask experiment; retained PR #166's repository-native deterministic grid for the current scope.
+- 2026-08-26 — recorded upstream Windows touchscreen drag regression #122791 as a touch-readiness gate for Godot 4.7.2; kept the production mouse toolchain on 4.7.2 pending confirmed upstream causality/fix.
