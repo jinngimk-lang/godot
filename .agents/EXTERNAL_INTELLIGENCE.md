@@ -97,6 +97,20 @@ Decision: keep Godot 4.7.2 as production. Do not broaden touch support or claim 
 
 Status: WATCH — confirmed upstream regression with a reporter-validated, open 4.8-milestoned fix candidate; touch validation remains gated, no production rollback.
 
+## 2026-08-27 scan
+
+### WATCH/REFERENCE — native Compatibility-renderer decals in Godot 4.8 dev4
+
+Sources: official Godot 4.8 dev4 release notes (2026-08-26) and merged upstream `godotengine/godot` PR #118070 (`66b4826fca6400f3a7181d49077235f2f4b558f9`).
+
+Finding: Godot 4.8 dev4 now ships first-party `Decal` support in the Compatibility renderer. The implementation is derived from the Mobile renderer and adjusted for OpenGL. Upstream documents a default soft cap of 64 visible decals per frame (hardware/buffer dependent and project-configurable) and a hard maximum of 8 decals affecting one surface. This is an engine-native path for projecting albedo/normal/ORM/emission detail onto curved or uneven realtime geometry without generating replacement meshes.
+
+Relevance to Peel Calm: vessel-bound adhesive smears, sparse fibers, glue-roll marks and small paper crumbs are exactly the kind of localized surface detail that could benefit from projected decals, especially on jars/cans/bottles where extra transparent geometry or bespoke per-vessel residue meshes create sorting and authoring cost. The feature is also a materially better provenance/dependency story than third-party Compatibility decal plugins. However, Peel Calm is still on Godot 4.7.2, and 4.8 dev4 is a preview build; moving production solely for decals would violate the stable-engine policy. The 8-decals-per-surface limit also means this should be treated as a restrained accent layer, not a per-scrub-sample event stream.
+
+Decision: do **not** change the current production renderer/toolchain and do **not** block or replace PR #166's deterministic spatial cleanup field. When Godot 4.8 reaches stable and a migration is independently justified (including the Windows-touch fix path), include a small Compatibility `Decal` residue/crumb experiment in the migration evaluation. Test one or a few decals driven by the existing deterministic cleanup authority, compare captures on all five hero vessels, and reject it if projection artifacts, per-surface limits, reset nondeterminism or capture instability outweigh the visual gain. Prefer this first-party path over community Compatibility decal plugins if that future experiment is needed.
+
+Status: WATCH/REFERENCE — materially relevant 4.8 migration benefit, no current production adoption.
+
 ## Integration log
 
 - 2026-08-25 — owner delegated routine reversible product/engineering decisions and requested continuous related GitHub/public-information scanning plus automatic integration of worthwhile improvements. Governance design and this ledger created on `chore/autonomous-intelligence-loop-v1`.
@@ -107,3 +121,4 @@ Status: WATCH — confirmed upstream regression with a reporter-validated, open 
 - 2026-08-26 — upgraded the #122791 watch after independent upstream 60 Hz touchscreen reproduction and open fix PR #122825; retained the 4.7.2 PC-mouse production toolchain and made stable-fix plus real-touch validation the mitigation gate.
 - 2026-08-26 — observed that both #122791 and #122825 are assigned to Godot 4.8; removed any implicit expectation of a 4.7.x fix and made 4.8 stable (or an explicit 4.7 backport) the earliest evidenced upstream mitigation line before real-touch validation.
 - 2026-08-27 — recorded that the original #122791 reporter tested PR #122825 and reported the freeze/lag resolved; upgraded confidence in the candidate while retaining the stable-release plus real-touch mitigation gate.
+- 2026-08-27 — recorded Godot 4.8 dev4's merged first-party Compatibility-renderer decal support as a future residue/crumb rendering experiment candidate; retained Godot 4.7.2 and the repository-native deterministic cleanup field for current production.
