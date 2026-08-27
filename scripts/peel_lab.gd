@@ -60,7 +60,7 @@ func _ready() -> void:
 	_session = SessionModel.new()
 	_ritual = RitualFlow.new()
 	_lifecycle = LabelLifecycle.new(0.16)
-	_scrub_model = ResidueScrubModelScript.new({"required_travel":340.0,"reversal_bonus":0.45})
+	_scrub_model = ResidueScrubModelScript.new({"required_travel":340.0,"reversal_bonus":0.45,"grid_columns":12,"grid_rows":6,"brush_radius":0.18})
 	_inspection = InspectionController.new({"sensitivity":0.006,"follow_rate":18.0})
 	_apply_current_variant()
 	_reset_session()
@@ -118,6 +118,9 @@ func _process(delta: float) -> void:
 	_residue.set_residue(progress,residue,integrity)
 	if _lifecycle.is_resolved() and _scrub_model != null:
 		_scrub_model.update(state.pressed,state.position,state.relative,_project_label_region(),delta)
+		# The local field is the visible authority for *where* residue has cleared;
+		# scalar progress remains the completion/HUD authority.
+		_residue.set_cleanup_field(_scrub_model.get_cleanup_field(),_scrub_model.get_cleanup_grid_size())
 		_residue.set_cleanup_progress(_scrub_model.get_progress())
 		if _scrub_model.consume_completed_event():
 			_handle_residue_cleaned()
@@ -281,7 +284,7 @@ func _update_hud(state_name: String, phase_name: String, progress: float) -> voi
 	elif phase_name == "HELD": hint = "label released • inspect the fibers and residue"
 	elif phase_name == "SETTLING": hint = "paper settling clear of the object…"
 	elif phase_name == "RESOLVED" and _scrub_model != null and not _scrub_model.is_complete():
-		hint = "hold LMB over the residue and rub back and forth • clean %d%%" % int(round(_scrub_model.get_progress()*100.0))
+		hint = "hold LMB over the residue and rub across every dirty patch • clean %d%%" % int(round(_scrub_model.get_progress()*100.0))
 	elif phase_name == "RESOLVED": hint = "residue cleared • rotate/zoom or continue"
 	elif state_name == "PEELING": hint = "steady pull • ease off if the paper starts to tear"
 	elif state_name == "RELEASED": hint = "re-grab anywhere on the visible label"
@@ -461,6 +464,10 @@ func _reset_session() -> void:
 	if _corner_peel != null and _session != null:
 		_corner_peel.set_release_settle(0.0,_session.get_variant_index())
 	if _residue != null:
+		if _scrub_model != null:
+			_residue.set_cleanup_field(_scrub_model.get_cleanup_field(),_scrub_model.get_cleanup_grid_size())
+		else:
+			_residue.set_cleanup_field(PackedFloat32Array(),Vector2i.ZERO)
 		_residue.set_cleanup_progress(0.0)
 		_residue.set_residue(0.0,0.0,1.0)
 	if _label != null:

@@ -11,6 +11,10 @@ func run() -> Array[String]:
 		failures.append("ADHESIVE_RED: residue presentation needs profile-driven clean adhesive trace semantics")
 		residue.free()
 		return failures
+	if not residue.has_method("set_cleanup_field") or not residue.has_method("get_cleanup_at_uv") or not residue.has_method("get_cleanup_grid_size"):
+		failures.append("SPATIAL_RESIDUE_RED: ResidueVisual must accept and expose a local cleanup field")
+		residue.free()
+		return failures
 
 	var bar_profile := {
 		"substrate":"uncoated_fiber",
@@ -81,14 +85,34 @@ func run() -> Array[String]:
 				failures.append("RESIDUE_READABILITY_RED: pale paper fibers need restrained bounce across all five venue light rigs")
 	if not residue.has_layered_residue():
 		failures.append("RED: damaged residue state should report layered adhesive + fiber presentation")
-	var dirty_trace: float = float(residue.get_adhesive_trace_amount())
-	residue.set_cleanup_progress(0.65)
-	if float(residue.get_adhesive_trace_amount()) >= dirty_trace*0.55:
-		failures.append("SCRUB_VISUAL_RED: rubbing must visibly fade adhesive and paper fibers")
+
+	# Local cleanup must remove the rubbed half first instead of uniformly fading
+	# the entire footprint from one scalar. The visual samples the same normalized
+	# field exported by ResidueScrubModel.
+	var cleanup_grid := Vector2i(8,4)
+	var cleanup_field := PackedFloat32Array()
+	cleanup_field.resize(cleanup_grid.x*cleanup_grid.y)
+	for row in range(cleanup_grid.y):
+		for column in range(cleanup_grid.x):
+			cleanup_field[row*cleanup_grid.x+column] = 1.0 if column < cleanup_grid.x/2 else 0.0
+	residue.set_cleanup_field(cleanup_field,cleanup_grid)
+	residue.set_cleanup_progress(0.50)
+	if residue.get_cleanup_grid_size() != cleanup_grid:
+		failures.append("SPATIAL_RESIDUE_RED: cleanup field dimensions must remain stable")
+	var clean_left := float(residue.get_cleanup_at_uv(Vector2(0.20,0.50)))
+	var dirty_right := float(residue.get_cleanup_at_uv(Vector2(0.82,0.50)))
+	if clean_left < 0.90:
+		failures.append("SPATIAL_RESIDUE_RED: rubbed local UV must become clean; got %.3f" % clean_left)
+	if dirty_right > 0.10:
+		failures.append("SPATIAL_RESIDUE_RED: untouched local UV must remain dirty; got %.3f" % dirty_right)
+	if float(residue.get_adhesive_trace_amount()) <= 0.02:
+		failures.append("SPATIAL_RESIDUE_RED: partial local cleanup must not globally erase all adhesive semantics")
+
 	residue.set_cleanup_progress(1.0)
 	if residue.has_adhesive_trace() or residue.mesh.get_surface_count() != 0:
 		failures.append("SCRUB_VISUAL_RED: fully rubbed residue must clear from the hero surface")
 	residue.set_cleanup_progress(0.0)
+	residue.set_cleanup_field(PackedFloat32Array(),Vector2i.ZERO)
 
 	# Torn backing must read as a few broad irregular islands, not a row of tiny
 	# square cells. The drawing path consumes these exact deterministic spans.

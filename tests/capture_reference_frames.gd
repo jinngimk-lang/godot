@@ -71,7 +71,7 @@ func _run() -> void:
 	await RenderingServer.frame_post_draw
 	await create_timer(0.08).timeout
 	await process_frame
-	print("PASS: captured five attached/peel/release/settle/resolved/scrub/clean lifecycle sets")
+	print("PASS: captured five attached/peel/release/settle/resolved/spatial-scrub/clean lifecycle sets")
 	quit(0)
 
 func _assert_object_only_scene(scene: Node) -> bool:
@@ -108,6 +108,8 @@ func _stage_direct_peel(scene: Node, capture_case: Dictionary) -> bool:
 	label.set_phase("PEELING")
 	label.set_detach_alpha(0.0)
 	label.set_peel(progress,grip_local)
+	residue.set_cleanup_field(PackedFloat32Array(),Vector2i.ZERO)
+	residue.set_cleanup_progress(0.0)
 	residue.set_residue(progress,float(capture_case["residue"]),float(capture_case["integrity"]))
 	scene.set_process(false)
 	if guide != null:
@@ -129,6 +131,8 @@ func _stage_full_release(scene: Node, capture_case: Dictionary) -> bool:
 	var desired_grip_local := front+Vector3(0.50,0.10,0.34)
 	var grip_local := label.get_effective_grip(1.0,desired_grip_local)
 	label.set_peel(1.0,grip_local)
+	residue.set_cleanup_field(PackedFloat32Array(),Vector2i.ZERO)
+	residue.set_cleanup_progress(0.0)
 	residue.set_residue(1.0,float(capture_case["residue"]),float(capture_case["integrity"]))
 	var lifecycle = scene.get("_lifecycle")
 	if lifecycle != null:
@@ -164,24 +168,56 @@ func _stage_scrub(scene: Node, target: float) -> bool:
 	var scrub = scene.get("_scrub_model")
 	var residue := scene.get_node_or_null("ResidueVisual") as ResidueVisual
 	var cursor := scene.get_node_or_null("CursorPresentation") as CursorPresentation
-	if scrub == null or residue == null or cursor == null:
-		push_error("CAPTURE_RED: residue scrub staging is incomplete")
+	if scrub == null or residue == null or cursor == null or not scrub.has_method("get_cleanup_grid_size"):
+		push_error("CAPTURE_RED: spatial residue scrub staging is incomplete")
 		quit(1); return false
 	var region: Rect2 = scene.call("_project_label_region")
+	var grid_size: Vector2i = scrub.get_cleanup_grid_size()
 	var pointer := region.get_center()
-	for stroke_index in range(120):
+	var max_columns := grid_size.x if target >= 0.99 else maxi(1,int(ceil(float(grid_size.x)*0.64)))
+	# Sweep a contiguous side of the footprint first. The resulting scrub55 frame
+	# must visibly contain both clean and dirty zones instead of one global fade.
+	for pass_index in range(3):
+		for row in range(grid_size.y):
+			for column in range(max_columns):
+				if scrub.get_progress() >= target:
+					break
+				var cell_center := Vector2(
+					region.position.x+region.size.x*(float(column)+0.5)/float(grid_size.x),
+					region.position.y+region.size.y*(float(row)+0.5)/float(grid_size.y)
+				)
+				for stroke in range(5):
+					var relative := Vector2(12 if stroke % 2 == 0 else -12,2 if stroke < 2 else -2)
+					pointer = cell_center+relative*0.22
+					scrub.update(true,pointer,relative,region,1.0/60.0)
+					if scrub.get_progress() >= target:
+						break
+			if scrub.get_progress() >= target:
+				break
 		if scrub.get_progress() >= target:
 			break
-		var relative := Vector2(16 if stroke_index % 2 == 0 else -16,2 if stroke_index % 4 < 2 else -2)
-		pointer += relative
-		scrub.update(true,pointer,relative,region,1.0/60.0)
+		# The clean frame follows the partial frame in the same scrub model. Once
+		# target=1.0, subsequent passes sweep every column until broad coverage wins.
+		if target >= 0.99:
+			max_columns = grid_size.x
+	residue.set_cleanup_field(scrub.get_cleanup_field(),grid_size)
 	residue.set_cleanup_progress(scrub.get_progress())
 	cursor.set_debug_position(pointer)
 	cursor.call("_process",1.0/60.0)
 	scene.call("_update_hud","CLEANING","RESOLVED",1.0)
 	if scrub.get_progress()+0.001 < target:
-		push_error("CAPTURE_RED: scrub staging did not reach %.2f" % target)
+		push_error("CAPTURE_RED: spatial scrub staging did not reach %.2f (progress=%.3f coverage=%.3f)" % [target,scrub.get_progress(),scrub.get_coverage_progress()])
 		quit(1); return false
+	if target < 0.99:
+		var left_clean := residue.get_cleanup_at_uv(Vector2(0.20,0.50))
+		var right_clean := residue.get_cleanup_at_uv(Vector2(0.86,0.50))
+		if left_clean <= right_clean+0.25:
+			push_error("CAPTURE_RED: partial scrub frame does not prove local clearing")
+			quit(1); return false
+	else:
+		if residue.has_adhesive_trace() or residue.mesh.get_surface_count() != 0:
+			push_error("CAPTURE_RED: clean frame still contains residue after full spatial coverage")
+			quit(1); return false
 	return true
 
 func _align_cursor_to_corner(scene: Node, peeled: bool) -> void:
