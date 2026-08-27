@@ -111,6 +111,18 @@ Decision: do **not** change the current production renderer/toolchain and do **n
 
 Status: WATCH/REFERENCE — materially relevant 4.8 migration benefit, no current production adoption.
 
+### WATCH — DrawableTexture updates into DecalAtlas are being developed, but GLES3 mipmaps are unresolved
+
+Source: open upstream `godotengine/godot` PR #115653, `Add function to update Atlases (such as DecalAtlas) with changes to individual textures`, with fresh rendering review on 2026-08-27.
+
+Finding: upstream is explicitly developing incremental atlas refresh so a `DrawableTexture2D` used by a `Decal` can change without forcing a full DecalAtlas rebuild. The PR includes both RenderingDevice and GLES3/Compatibility paths and its author supplied a minimal animated DrawableTexture→Decal example. This directly connects two Peel Calm watch paths: a dense engine-native residue mask and projected residue/crumb detail. However, the PR remains open and assigned only to the undetermined `4.x` milestone. A fresh 2026-08-27 renderer review also flags that the GLES3 implementation does not currently show how mip levels are regenerated when mipmaps are used, while the RenderingDevice side handles that case.
+
+Relevance to Peel Calm: if this upstream work eventually lands with the Compatibility mipmap path resolved, a future stable Godot release could support a clean first-party architecture where deterministic scrub authority updates a DrawableTexture mask and a small number of vessel-projected decals consume it. Today that is not a production-ready assumption, especially because Peel Calm is specifically on the Compatibility renderer and requires deterministic capture/reset behavior.
+
+Decision: keep the current repository-native cleanup field and the existing future-4.8 Decal experiment plan unchanged. Do **not** add a DrawableTexture→Decal dependency or design the residue system around PR #115653 while it is open. Re-evaluate only after upstream resolves the GLES3 mipmap concern, the PR merges into a stable-targeted release, and an isolated Peel Calm experiment passes all five vessels plus exact reset/capture checks. This upstream path remains preferable to a third-party dynamic-decal dependency if it matures.
+
+Status: WATCH — promising first-party convergence of two relevant features, but current Compatibility readiness is explicitly incomplete.
+
 ## Integration log
 
 - 2026-08-25 — owner delegated routine reversible product/engineering decisions and requested continuous related GitHub/public-information scanning plus automatic integration of worthwhile improvements. Governance design and this ledger created on `chore/autonomous-intelligence-loop-v1`.
@@ -122,3 +134,4 @@ Status: WATCH/REFERENCE — materially relevant 4.8 migration benefit, no curren
 - 2026-08-26 — observed that both #122791 and #122825 are assigned to Godot 4.8; removed any implicit expectation of a 4.7.x fix and made 4.8 stable (or an explicit 4.7 backport) the earliest evidenced upstream mitigation line before real-touch validation.
 - 2026-08-27 — recorded that the original #122791 reporter tested PR #122825 and reported the freeze/lag resolved; upgraded confidence in the candidate while retaining the stable-release plus real-touch mitigation gate.
 - 2026-08-27 — recorded Godot 4.8 dev4's merged first-party Compatibility-renderer decal support as a future residue/crumb rendering experiment candidate; retained Godot 4.7.2 and the repository-native deterministic cleanup field for current production.
+- 2026-08-27 — recorded upstream PR #115653 as the first-party convergence path for DrawableTexture-driven dynamic DecalAtlas updates, while explicitly gating any Compatibility use on resolution of the fresh GLES3 mipmap concern plus stable release and isolated runtime/capture verification.
